@@ -4,14 +4,14 @@ import { PROJECTS, FILTER_LABELS, type ProjectCategory } from "@/data/projects";
 
 export default function Projects() {
   const [active, setActive] = useState<ProjectCategory>("all");
-  const [flipped, setFlipped] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const visible = active === "all"
     ? PROJECTS
     : PROJECTS.filter((p) => p.categories.includes(active as Exclude<ProjectCategory, "all">));
 
   const toggle = (num: string) => {
-    setFlipped((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       next.has(num) ? next.delete(num) : next.add(num);
       return next;
@@ -53,79 +53,116 @@ export default function Projects() {
         }}
       >
         {visible.map((p) => {
-          const isFlipped = flipped.has(p.num);
+          const isOpen = expanded.has(p.num);
           return (
-            <div
+            <article
               key={p.num}
-              className="proj-flip-wrap"
+              className="proj-card"
+              style={{
+                background: "var(--surface)",
+                padding: "28px 28px 22px",
+                position: "relative",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                cursor: "pointer",
+              }}
               onClick={() => toggle(p.num)}
-              title="Натисни для деталей"
             >
-              <div className={"proj-flip-inner" + (isFlipped ? " is-flipped" : "")}>
-                {/* FRONT */}
-                <article
-                  className="proj-flip-face proj-card"
-                  style={{ background: "var(--surface)", padding: "34px 32px 30px", position: "relative", overflow: "hidden" }}
-                >
-                  <div className="proj-border" style={{ position: "absolute", inset: 0, border: "1px solid transparent", transition: "border-color 0.25s", pointerEvents: "none", zIndex: 2 }} />
-                  <div className="proj-num" style={{ position: "absolute", bottom: -14, right: 16, fontFamily: "var(--font-display)", fontSize: 96, lineHeight: 1, color: "var(--dim)", pointerEvents: "none", transition: "color 0.25s", zIndex: 0 }}>
-                    {p.num}
-                  </div>
-                  <h3 className="proj-name" style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: "0.04em", color: "var(--text)", marginBottom: 10, position: "relative", zIndex: 1, transition: "color 0.2s" }}>
-                    {p.name}
-                  </h3>
-                  <p style={{ fontSize: 13, lineHeight: 1.62, color: "var(--muted)", marginBottom: 22, minHeight: 44, position: "relative", zIndex: 1 }}>
-                    {p.desc}
-                  </p>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, position: "relative", zIndex: 1 }}>
-                    {p.tags.map((tag) => (
-                      <span key={tag} className="proj-tag" style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: "0.04em", padding: "3px 9px", border: "1px solid var(--border-2)", color: "var(--muted)", transition: "all 0.2s" }}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ position: "absolute", bottom: 14, right: 16, fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)", zIndex: 3 }}>
-                    деталі ↗
-                  </div>
-                </article>
+              {/* hover border */}
+              <div className="proj-border" style={{ position: "absolute", inset: 0, border: "1px solid transparent", transition: "border-color 0.25s", pointerEvents: "none", zIndex: 2 }} />
 
-                {/* BACK */}
-                <div
-                  className="proj-flip-face proj-flip-back"
-                  style={{ background: "var(--surface-2)", padding: "28px 28px 24px", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}
-                >
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "var(--accent)", opacity: 0.6 }} />
-                  <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 8 }}>
-                    {p.num} / {p.name}
-                  </p>
-                  <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text)", flex: 1, marginBottom: 16 }}>
+              {/* bg number */}
+              <div className="proj-num" style={{ position: "absolute", bottom: -14, right: 12, fontFamily: "var(--font-display)", fontSize: 88, lineHeight: 1, color: "var(--dim)", pointerEvents: "none", transition: "color 0.25s", zIndex: 0 }}>
+                {p.num}
+              </div>
+
+              {/* title row */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 8, position: "relative", zIndex: 1 }}>
+                <h3 className="proj-name" style={{ fontFamily: "var(--font-display)", fontSize: 22, letterSpacing: "0.04em", color: "var(--text)", transition: "color 0.2s", lineHeight: 1.1 }}>
+                  {p.name}
+                </h3>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--dim)", paddingTop: 4, flexShrink: 0, transition: "color 0.2s" }} className="proj-toggle">
+                  {isOpen ? "▲" : "▼"}
+                </span>
+              </div>
+
+              {/* desc */}
+              <p style={{ fontSize: 12.5, lineHeight: 1.6, color: "var(--muted)", marginBottom: 14, position: "relative", zIndex: 1 }}>
+                {p.desc}
+              </p>
+
+              {/* tags */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12, position: "relative", zIndex: 1 }}>
+                {p.tags.map((tag) => (
+                  <span key={tag} className="proj-tag" style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.04em", padding: "2px 8px", border: "1px solid var(--border-2)", color: "var(--muted)", transition: "all 0.2s" }}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+
+              {/* links — always visible */}
+              {p.links.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5, position: "relative", zIndex: 3 }} onClick={e => e.stopPropagation()}>
+                  {p.links.map((link) => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontFamily: "var(--font-mono)",
+                        fontSize: 9.5,
+                        letterSpacing: "0.04em",
+                        color: "var(--accent)",
+                        textDecoration: "none",
+                        border: "1px solid rgba(185,255,75,0.35)",
+                        padding: "4px 10px",
+                        transition: "background 0.18s, color 0.18s, border-color 0.18s",
+                      }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLAnchorElement;
+                        el.style.background = "var(--accent)";
+                        el.style.color = "#000";
+                        el.style.borderColor = "var(--accent)";
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLAnchorElement;
+                        el.style.background = "transparent";
+                        el.style.color = "var(--accent)";
+                        el.style.borderColor = "rgba(185,255,75,0.35)";
+                      }}
+                    >
+                      ↗ {link.label}
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* expanded details */}
+              {isOpen && (
+                <div style={{
+                  marginTop: 16,
+                  paddingTop: 14,
+                  borderTop: "1px solid var(--border-2)",
+                  position: "relative",
+                  zIndex: 1,
+                }}>
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "var(--accent)", opacity: 0.25 }} />
+                  <p style={{ fontSize: 12, lineHeight: 1.7, color: "var(--muted)" }}>
                     {p.longDesc}
                   </p>
-                  <div style={{ marginTop: "auto", display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {p.links.length > 0 ? (
-                      p.links.map((link) => (
-                        <a
-                          key={link.url}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--accent)", textDecoration: "none", border: "1px solid var(--accent)", padding: "6px 14px", transition: "background 0.2s, color 0.2s" }}
-                          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = "var(--accent)"; (e.currentTarget as HTMLAnchorElement).style.color = "#000"; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--accent)"; }}
-                        >
-                          ↗ {link.label}
-                        </a>
-                      ))
-                    ) : (
-                      <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--dim)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ color: "var(--border-2)" }}>⊘</span> {p.noUrlReason}
-                      </p>
-                    )}
-                  </div>
+                  {p.links.length === 0 && p.noUrlReason && (
+                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--dim)", marginTop: 10 }}>
+                      ⊘ {p.noUrlReason}
+                    </p>
+                  )}
                 </div>
-              </div>
-            </div>
+              )}
+            </article>
           );
         })}
       </div>
