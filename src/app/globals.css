@@ -8,7 +8,7 @@
   --border:      #1c1c1c;
   --border-2:    #282828;
   --text:        #edeae2;
-  --muted:       #484848;
+  --muted:       #8a8a8a;
   --dim:         #1e1e1e;
   --accent:      #b9ff4b;
   --accent-line: rgba(185, 255, 75, 0.28);
@@ -118,4 +118,50 @@ body::after {
 /* ── Skill col hover ───────────────────────────── */
 .skill-col:hover .skill-item       { color: var(--text); }
 .skill-col:hover .skill-item::before { color: var(--accent); }
+
+/* ── Filter pills ──────────────────────────────── */
+.filter-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 7px 16px;
+  border: 1px solid var(--border-2);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-pill:hover { border-color: var(--accent); color: var(--accent); }
+.filter-pill--active { border-color: var(--accent); background: var(--accent); color: #000; font-weight: 500; }
+
+/* ── Flip cards ────────────────────────────────── */
+.proj-flip-wrap {
+  perspective: 1000px;
+  cursor: pointer;
+  background: var(--surface);
+  min-height: 280px;
+}
+.proj-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.proj-flip-inner.is-flipped { transform: rotateY(180deg); }
+.proj-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  width: 100%;
+  height: 100%;
+}
+.proj-flip-back { transform: rotateY(180deg); }
+
+/* ── Service tile hover ────────────────────────── */
+.service-tile:hover { background: var(--surface-2) !important; }
+.service-tile:hover .service-title { color: var(--accent) !important; }
 

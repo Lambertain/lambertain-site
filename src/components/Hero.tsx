@@ -1,4 +1,4 @@
-import { GithubIcon, MailIcon, SendIcon } from "./Icons";
+import { GithubIcon, SendIcon, InstagramIcon, YoutubeIcon, TikTokIcon } from "./Icons";
 
 export default function Hero() {
   return (
@@ -13,7 +13,6 @@ export default function Hero() {
         overflow: "hidden",
       }}
     >
-      {/* grid lines */}
       <div
         aria-hidden
         style={{
@@ -29,7 +28,6 @@ export default function Hero() {
           pointerEvents: "none",
         }}
       />
-      {/* accent glow */}
       <div
         aria-hidden
         style={{
@@ -38,8 +36,7 @@ export default function Hero() {
           left: -80,
           width: 600,
           height: 600,
-          background:
-            "radial-gradient(circle, rgba(185,255,75,0.055) 0%, transparent 65%)",
+          background: "radial-gradient(circle, rgba(185,255,75,0.055) 0%, transparent 65%)",
           pointerEvents: "none",
         }}
       />
@@ -87,8 +84,10 @@ export default function Hero() {
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Btn href="https://github.com/Lambertain" primary icon={<GithubIcon />}>GitHub</Btn>
-          <Btn href="mailto:info@lambertain.agency" icon={<MailIcon />}>Email</Btn>
-          <Btn href="https://t.me/lambertain" icon={<SendIcon />}>Telegram</Btn>
+          <Btn href="https://t.me/solovenik" icon={<SendIcon />}>Telegram</Btn>
+          <Btn href="https://www.instagram.com/solovey_nikita/" icon={<InstagramIcon />}>Instagram</Btn>
+          <Btn href="https://www.youtube.com/@LazyIncome_AI" icon={<YoutubeIcon />}>YouTube</Btn>
+          <Btn href="https://www.tiktok.com/@lazyincome_ai" icon={<TikTokIcon />}>TikTok</Btn>
         </div>
       </div>
 
@@ -143,7 +142,7 @@ function Btn({
     : { background: "transparent", color: "var(--text)", borderColor: "var(--border-2)" };
 
   return (
-    <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel="noopener" className="btn-fill" style={{ ...base, ...variant }}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="btn-fill" style={{ ...base, ...variant }}>
       {icon}
       <span>{children}</span>
     </a>

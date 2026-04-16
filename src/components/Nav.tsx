@@ -43,6 +43,7 @@ export default function Nav() {
 
       <ul style={{ display: "flex", gap: 28, listStyle: "none" }}>
         {[
+          { href: "#services", label: "Послуги" },
           { href: "#projects", label: "Проекти" },
           { href: "#stack",    label: "Стек" },
           { href: "#contact",  label: "Контакти" },

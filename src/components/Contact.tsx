@@ -1,4 +1,4 @@
-import { GithubIcon, MailIcon, SendIcon } from "./Icons";
+import { GithubIcon, SendIcon, InstagramIcon, YoutubeIcon, TikTokIcon } from "./Icons";
 
 export default function Contact() {
   return (
@@ -12,7 +12,6 @@ export default function Contact() {
         overflow: "hidden",
       }}
     >
-      {/* accent glow top-right */}
       <div
         aria-hidden
         style={{
@@ -48,14 +47,20 @@ export default function Contact() {
       </h2>
 
       <div className="reveal" style={{ display: "flex", gap: 12, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-        <ContactBtn href="mailto:info@lambertain.agency" icon={<MailIcon />} primary>
-          info@lambertain.agency
-        </ContactBtn>
-        <ContactBtn href="https://t.me/lambertain" icon={<SendIcon />}>
-          @lambertain
+        <ContactBtn href="https://t.me/solovenik" icon={<SendIcon />} primary>
+          @solovenik
         </ContactBtn>
         <ContactBtn href="https://github.com/Lambertain" icon={<GithubIcon />}>
           github.com/Lambertain
+        </ContactBtn>
+        <ContactBtn href="https://www.instagram.com/solovey_nikita/" icon={<InstagramIcon />}>
+          @solovey_nikita
+        </ContactBtn>
+        <ContactBtn href="https://www.youtube.com/@LazyIncome_AI" icon={<YoutubeIcon />}>
+          @LazyIncome_AI
+        </ContactBtn>
+        <ContactBtn href="https://www.tiktok.com/@lazyincome_ai" icon={<TikTokIcon />}>
+          @lazyincome_ai
         </ContactBtn>
       </div>
 
@@ -82,8 +87,8 @@ function ContactBtn({
   return (
     <a
       href={href}
-      target={href.startsWith("http") ? "_blank" : undefined}
-      rel="noopener"
+      target="_blank"
+      rel="noopener noreferrer"
       className="btn-fill"
       style={{
         display: "inline-flex",
