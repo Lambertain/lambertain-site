@@ -45,7 +45,7 @@ export const PROJECTS: Project[] = [
     categories: ["telegram", "ai"],
     links: [
       { url: "https://www.allumma.app/", label: "allumma.app" },
-      { url: "https://t.me/allumma_bot", label: "Mini App" },
+      { url: "https://t.me/Allumma_bot", label: "Mini App" },
     ],
     noUrlReason: null,
   },
@@ -58,6 +58,7 @@ export const PROJECTS: Project[] = [
     categories: ["web"],
     links: [
       { url: "https://www.orginizer.com/", label: "orginizer.com" },
+      { url: "https://t.me/socialorganizer_bot", label: "Mini App" },
       { url: "https://play.google.com/store/apps/details?id=com.socialorganizer.app", label: "Google Play" },
     ],
     noUrlReason: null,
@@ -71,6 +72,7 @@ export const PROJECTS: Project[] = [
     categories: ["ai", "saas"],
     links: [
       { url: "https://powerinside.app/", label: "powerinside.app" },
+      { url: "https://t.me/powerinsideapp_bot", label: "Mini App" },
     ],
     noUrlReason: null,
   },
@@ -95,6 +97,7 @@ export const PROJECTS: Project[] = [
     categories: ["ai"],
     links: [
       { url: "https://lambertain.agency", label: "lambertain.agency" },
+      { url: "https://t.me/lambertain_bot", label: "Mini App" },
     ],
     noUrlReason: null,
   },
@@ -107,6 +110,7 @@ export const PROJECTS: Project[] = [
     categories: ["web", "saas"],
     links: [
       { url: "https://www.zennotemplates.com/", label: "zennotemplates.com" },
+      { url: "https://t.me/zennotemplates_bot", label: "Mini App" },
     ],
     noUrlReason: null,
   },
@@ -155,6 +159,7 @@ export const PROJECTS: Project[] = [
     categories: ["web", "saas"],
     links: [
       { url: "https://www.l-school.app/", label: "l-school.app" },
+      { url: "https://t.me/L_School_bot", label: "Mini App" },
     ],
     noUrlReason: null,
   },
@@ -187,6 +192,7 @@ export const PROJECTS: Project[] = [
     categories: ["web", "saas"],
     links: [
       { url: "https://www.patternshift.app/", label: "patternshift.app" },
+      { url: "https://t.me/Pattern_shift_bot", label: "Mini App" },
     ],
     noUrlReason: null,
   },
