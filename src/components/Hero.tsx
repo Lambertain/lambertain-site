@@ -49,7 +49,7 @@ export default function Hero() {
         className="anim-1"
         style={{
           fontFamily: "var(--font-display)",
-          fontSize: "clamp(72px, 13vw, 210px)",
+          fontSize: "clamp(40px, 13vw, 210px)",
           lineHeight: 0.88,
           letterSpacing: "0.01em",
           color: "var(--text)",
