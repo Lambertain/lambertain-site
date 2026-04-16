@@ -41,7 +41,7 @@ export default function Nav() {
         LAMB<span style={{ color: "var(--accent)" }}>.</span>
       </Link>
 
-      <ul style={{ display: "flex", gap: 28, listStyle: "none" }}>
+      <ul className="nav-links" style={{ display: "flex", gap: 28, listStyle: "none" }}>
         {[
           { href: "#services", label: "Послуги" },
           { href: "#projects", label: "Проекти" },

@@ -20,7 +20,7 @@ export default function Stack() {
       </h2>
 
       <div
-        className="reveal"
+        className="reveal grid-4"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",

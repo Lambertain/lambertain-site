@@ -165,3 +165,41 @@ body::after {
 .service-tile:hover { background: var(--surface-2) !important; }
 .service-tile:hover .service-title { color: var(--accent) !important; }
 
+/* ── Responsive ────────────────────────────────── */
+@media (max-width: 1024px) {
+  .grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (max-width: 768px) {
+  /* Nav */
+  .nav-links { display: none !important; }
+  nav { padding-left: 20px !important; padding-right: 20px !important; }
+
+  /* All sections */
+  section { padding-left: 20px !important; padding-right: 20px !important; }
+
+  /* Grids */
+  .grid-3 { grid-template-columns: 1fr !important; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Flip cards */
+  .proj-flip-wrap,
+  .proj-flip-inner { min-height: 220px !important; }
+
+  /* Hero bottom padding */
+  #__next > section:first-child { padding-bottom: 60px !important; }
+
+  /* Contact buttons wrap */
+  #contact .reveal { flex-direction: column !important; }
+  #contact .reveal a { justify-content: center !important; }
+
+  /* Hero buttons */
+  .hero-btns { flex-wrap: wrap !important; }
+}
+
+@media (max-width: 480px) {
+  .grid-4 { grid-template-columns: 1fr !important; }
+  .grid-3 { grid-template-columns: 1fr !important; }
+}
+

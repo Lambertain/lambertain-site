@@ -159,7 +159,7 @@ export const PROJECTS: Project[] = [
 export const STACK = [
   {
     label: "Frontend",
-    items: ["React / React 19", "Next.js 16", "Vite + TypeScript", "Tailwind CSS", "Telegram Mini Apps", "Capacitor (Android)"],
+    items: ["React / React 19", "Next.js 16", "Vite + TypeScript", "Tailwind CSS", "Telegram Mini Apps", "React Native / Capacitor"],
   },
   {
     label: "Backend",

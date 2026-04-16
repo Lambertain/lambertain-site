@@ -51,7 +51,7 @@ export default function Services() {
       </h2>
 
       <div
-        className="reveal"
+        className="reveal grid-3"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",

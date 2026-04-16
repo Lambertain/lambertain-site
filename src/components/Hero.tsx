@@ -42,7 +42,7 @@ export default function Hero() {
       />
 
       <p className="anim-0" style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--accent)", marginBottom: 14, position: "relative", zIndex: 1 }}>
-        Full-Stack Developer · AI · Telegram · SaaS
+        Full-Stack Developer · AI · Apps · SaaS
       </p>
 
       <h1

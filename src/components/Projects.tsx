@@ -42,6 +42,7 @@ export default function Projects() {
       </div>
 
       <div
+        className="grid-3"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
