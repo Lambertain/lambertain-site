@@ -184,6 +184,18 @@ export const PROJECTS: Project[] = [
     noUrlReason: "Ссилка буде пізніше",
   },
   {
+    num: "15",
+    name: "CHATIV",
+    desc: "White-label SaaS-платформа для AI-агентів у Instagram, Telegram і WhatsApp.",
+    longDesc: "Multi-tenant платформа для автоматизації чатів з клієнтами через AI. Агенти навчаються на базі знань бізнесу, відповідають 24/7. Омніканальність: Instagram DM, Telegram, WhatsApp. Ескалація на живого оператора з Telegram-сповіщеннями. White-label: кожен тенант отримує власний брендований простір.",
+    tags: ["Next.js", "NestJS", "LangChain", "PostgreSQL", "AWS", "BullMQ"],
+    categories: ["ai", "saas"],
+    links: [
+      { url: "https://chativ.app", label: "chativ.app" },
+    ],
+    noUrlReason: null,
+  },
+  {
     num: "14",
     name: "PATTERNSHIFT",
     desc: "Веб-платформа та Telegram Mini App для роботи з патернами і шаблонами.",
