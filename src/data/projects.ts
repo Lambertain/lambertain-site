@@ -84,7 +84,7 @@ export const PROJECTS: Project[] = [
     tags: ["FastAPI", "Telethon", "React", "PostgreSQL", "Railway"],
     categories: ["telegram", "saas"],
     links: [
-      { url: "https://t.me/tgleadsparser_bot", label: "Telegram бот" },
+      { url: "https://t.me/tgleadsparser_bot", label: "Telegram бот / Mini App" },
     ],
     noUrlReason: null,
   },
