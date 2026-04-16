@@ -101,19 +101,22 @@ export default function Projects() {
                   <p style={{ fontSize: 12.5, lineHeight: 1.7, color: "var(--text)", flex: 1, marginBottom: 16 }}>
                     {p.longDesc}
                   </p>
-                  <div style={{ marginTop: "auto" }}>
-                    {p.url ? (
-                      <a
-                        href={p.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--accent)", textDecoration: "none", border: "1px solid var(--accent)", padding: "6px 14px", transition: "background 0.2s, color 0.2s" }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = "var(--accent)"; (e.currentTarget as HTMLAnchorElement).style.color = "#000"; }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--accent)"; }}
-                      >
-                        ↗ {p.urlLabel}
-                      </a>
+                  <div style={{ marginTop: "auto", display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {p.links.length > 0 ? (
+                      p.links.map((link) => (
+                        <a
+                          key={link.url}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, fontFamily: "var(--font-mono)", fontSize: 10.5, color: "var(--accent)", textDecoration: "none", border: "1px solid var(--accent)", padding: "6px 14px", transition: "background 0.2s, color 0.2s" }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = "var(--accent)"; (e.currentTarget as HTMLAnchorElement).style.color = "#000"; }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = "transparent"; (e.currentTarget as HTMLAnchorElement).style.color = "var(--accent)"; }}
+                        >
+                          ↗ {link.label}
+                        </a>
+                      ))
                     ) : (
                       <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--dim)", display: "flex", alignItems: "center", gap: 6 }}>
                         <span style={{ color: "var(--border-2)" }}>⊘</span> {p.noUrlReason}
