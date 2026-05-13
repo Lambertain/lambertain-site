@@ -184,18 +184,6 @@ export const PROJECTS: Project[] = [
     noUrlReason: "Ссилка буде пізніше",
   },
   {
-    num: "15",
-    name: "CHATIV",
-    desc: "White-label SaaS-платформа для AI-агентів у Instagram, Telegram і WhatsApp.",
-    longDesc: "Multi-tenant платформа для автоматизації чатів з клієнтами через AI. Агенти навчаються на базі знань бізнесу, відповідають 24/7. Омніканальність: Instagram DM, Telegram, WhatsApp. Ескалація на живого оператора з Telegram-сповіщеннями. White-label: кожен тенант отримує власний брендований простір.",
-    tags: ["Next.js", "NestJS", "LangChain", "PostgreSQL", "AWS", "BullMQ"],
-    categories: ["ai", "saas"],
-    links: [
-      { url: "https://chativ.app", label: "chativ.app" },
-    ],
-    noUrlReason: null,
-  },
-  {
     num: "14",
     name: "PATTERNSHIFT",
     desc: "Веб-платформа та Telegram Mini App для роботи з патернами і шаблонами.",
@@ -205,6 +193,30 @@ export const PROJECTS: Project[] = [
     links: [
       { url: "https://www.patternshift.app/", label: "patternshift.app" },
       { url: "https://t.me/Pattern_shift_bot", label: "Mini App" },
+    ],
+    noUrlReason: null,
+  },
+  {
+    num: "15",
+    name: "CORELEX CRM",
+    desc: "Коробкова CRM для юридичних компаній з фінансовим контуром і реєстром судових справ.",
+    longDesc: "White-label CRM-система з 4 ролями (Admin/Partner/Lawyer/Assistant). Клієнти, проєкти, реєстр судових справ з провадженнями та хронологією, задачі з підзадачами, командою виконавців і журналом змін. Фінансовий модуль: позиції, часткові платежі, аналітика по місяцях, автокурс НБУ для USD/EUR. Глобальний пошук, сповіщення, файли, темна/світла теми, i18n UA/RU. Розгортання на власному сервері або Railway.",
+    tags: ["Next.js 16", "Prisma 7", "NextAuth.js", "PostgreSQL", "Railway"],
+    categories: ["web", "saas"],
+    links: [
+      { url: "https://corelex.pro", label: "corelex.pro" },
+    ],
+    noUrlReason: null,
+  },
+  {
+    num: "16",
+    name: "CHATIV",
+    desc: "White-label SaaS-платформа для AI-агентів у Instagram, Telegram і WhatsApp.",
+    longDesc: "Multi-tenant платформа для автоматизації чатів з клієнтами через AI. Агенти навчаються на базі знань бізнесу, відповідають 24/7. Омніканальність: Instagram DM, Telegram, WhatsApp. Ескалація на живого оператора з Telegram-сповіщеннями. White-label: кожен тенант отримує власний брендований простір.",
+    tags: ["Next.js", "NestJS", "LangChain", "PostgreSQL", "AWS", "BullMQ"],
+    categories: ["ai", "saas"],
+    links: [
+      { url: "https://chativ.app", label: "chativ.app" },
     ],
     noUrlReason: null,
   },
