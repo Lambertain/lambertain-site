@@ -232,6 +232,18 @@ export const PROJECTS: Project[] = [
     ],
     noUrlReason: null,
   },
+  {
+    num: "18",
+    name: "HEAVEN & HELL GIFTS",
+    desc: "Інтернет-магазин жартівливих подарункових сертифікатів «Рай / Ад» з PDF-генерацією та email-доставкою.",
+    longDesc: "Веб-сервіс продажу цифрових подарункових сертифікатів у шуточній тематиці. Split-screen лендинг Heaven/Hell, чекаут зі Stripe Checkout, серверна PDF-генерація (@react-pdf/renderer, A4 landscape) і email-доставка через SendGrid. 6 мов (en/es/fr/de/ru/uk) через next-intl 4. NextAuth v5: Credentials + Magic Link. Особистий кабінет з історією замовлень і повторним завантаженням PDF. Адмінка: dashboard, замовлення з CSV-експортом, CRUD тарифів і шаблонів.",
+    tags: ["Next.js 16", "Prisma 7", "NextAuth v5", "Stripe", "SendGrid", "@react-pdf/renderer"],
+    categories: ["web", "saas"],
+    links: [
+      { url: "https://heavenhell.gifts", label: "heavenhell.gifts" },
+    ],
+    noUrlReason: null,
+  },
 ];
 
 export const STACK = [
