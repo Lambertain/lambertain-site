@@ -220,6 +220,18 @@ export const PROJECTS: Project[] = [
     ],
     noUrlReason: null,
   },
+  {
+    num: "17",
+    name: "SPEED DATE PITCH",
+    desc: "Система персоналізованих pitch-лендингів для організаторів speed dating з адмінкою і аналітикою.",
+    longDesc: "Генератор унікальних pitch-лендингів під кожного потенційного клієнта агентства. HTML-шаблон з {{template_variables}}, які підставляються з даних бренду. Унікальний URL з токеном (/p/[slug]-[token]) — без правильного токена 404. Адмінка з Basic Auth: CRUD брендів, графіки переглядів, заявки з калькулятора цін, Telegram-нотифікації. Трекінг подій: перегляди лендингів, кліки CTA, заявки.",
+    tags: ["Next.js 15", "Drizzle ORM", "PostgreSQL", "shadcn/ui", "Railway"],
+    categories: ["web", "saas", "tools"],
+    links: [
+      { url: "https://speed-date-production.up.railway.app", label: "speed-date" },
+    ],
+    noUrlReason: null,
+  },
 ];
 
 export const STACK = [
