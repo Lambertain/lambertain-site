@@ -216,7 +216,7 @@ export const PROJECTS: Project[] = [
     tags: ["Next.js", "NestJS", "LangChain", "PostgreSQL", "AWS", "BullMQ"],
     categories: ["ai", "saas"],
     links: [
-      { url: "https://chativ.app", label: "chativ.app" },
+      { url: "https://ai-chat-platformlanding-production.up.railway.app", label: "chativ" },
     ],
     noUrlReason: null,
   },
