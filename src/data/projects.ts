@@ -244,6 +244,18 @@ export const PROJECTS: Project[] = [
     ],
     noUrlReason: null,
   },
+  {
+    num: "19",
+    name: "USUAL ONE",
+    desc: "Інтернет-магазин термопляшок з кошиком, адмінкою та інтеграцією SalesDrive CRM.",
+    longDesc: "E-commerce магазин термопляшок: каталог з вибором кольору та об'єму (500мл/750мл/1л), галерея зображень, кошик і чекаут. Замовлення йдуть у CRM SalesDrive, фіскальні чеки при післяплаті — через зв'язку SalesDrive → Вчасно Каса → Нова Пошта. Адмінка: замовлення, покупці, CRUD товарів, підписники та «очікують товар» з CSV-експортом, SEO-теги. Завантаження фото товарів через Cloudinary. Збір email через футер, поп-ап -10% і кнопку «повідомити про наявність».",
+    tags: ["Next.js 16", "Prisma 7", "PostgreSQL", "Tailwind v4", "Cloudinary", "Railway"],
+    categories: ["web", "saas"],
+    links: [
+      { url: "https://usualone-production-40d2.up.railway.app", label: "usualone" },
+    ],
+    noUrlReason: null,
+  },
 ];
 
 export const STACK = [
