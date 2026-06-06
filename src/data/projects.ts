@@ -240,7 +240,7 @@ export const PROJECTS: Project[] = [
     tags: ["Next.js 16", "Prisma 7", "NextAuth v5", "Stripe", "SendGrid", "@react-pdf/renderer"],
     categories: ["web", "saas"],
     links: [
-      { url: "https://heavenhell.gifts", label: "heavenhell.gifts" },
+      { url: "https://www.heavenhell.gifts", label: "heavenhell.gifts" },
     ],
     noUrlReason: null,
   },
