@@ -11,6 +11,7 @@ import type {
   Role,
 } from "./types";
 import { parseProjectMeta } from "./meta";
+import { getRoleOverrides } from "../db";
 
 const URL_BASE = (process.env.YOUTRACK_URL || "").replace(/\/$/, "");
 const TOKEN = process.env.YOUTRACK_TOKEN || "";
@@ -76,6 +77,13 @@ async function rolesByLogin(): Promise<Map<string, Role>> {
     }
   } catch {
     // Hub недоступен — роли остаются unknown
+  }
+  // Оверрайды из БД приоритетнее (роли в YouTrack могут быть не назначены).
+  try {
+    const overrides = await getRoleOverrides();
+    for (const [login, role] of overrides) map.set(login, role);
+  } catch {
+    // БД недоступна — используем только Hub
   }
   rolesCache = map;
   return map;

@@ -31,6 +31,7 @@ const pool = new pg.Pool({
 
 async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS poller_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS role_overrides (login TEXT PRIMARY KEY, role TEXT NOT NULL)`);
 }
 async function getState(key) {
   const r = await pool.query("SELECT value FROM poller_state WHERE key=$1", [key]);
@@ -85,6 +86,13 @@ async function roles() {
   } catch (e) {
     console.error("roles error:", e.message);
   }
+  // Оверрайды из БД приоритетнее ролей YouTrack.
+  try {
+    const r = await pool.query("SELECT login, role FROM role_overrides");
+    for (const row of r.rows) map.set(row.login, row.role);
+  } catch (e) {
+    console.error("overrides error:", e.message);
+  }
   rolesCache = map;
   rolesAt = Date.now();
   return map;
@@ -119,7 +127,7 @@ async function checkClientComments(rmap) {
   const acts = await yt("/api/activities", {
     categories: "CommentsCategory",
     reverse: "true",
-    fields: "timestamp,author(login,fullName),target(idReadable),added(text)",
+    fields: "timestamp,author(login,fullName),target(issue(idReadable)),added(text)",
     $top: 50,
   });
   let max = last;
@@ -131,7 +139,7 @@ async function checkClientComments(rmap) {
     }
   }
   for (const a of fresh.reverse()) {
-    const id = a.target?.idReadable || "?";
+    const id = a.target?.issue?.idReadable || "?";
     const text = (Array.isArray(a.added) ? a.added[0]?.text : "") || "";
     await tg(`💬 <b>Вопрос клиента</b> в ${id}\n${a.author?.fullName || a.author?.login}: ${text.slice(0, 300)}\n<a href="${link(id)}">${id}</a>`);
   }

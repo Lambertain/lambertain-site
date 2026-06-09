@@ -48,6 +48,10 @@ CREATE TABLE IF NOT EXISTS poller_state (
   key    TEXT PRIMARY KEY,
   value  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS role_overrides (
+  login  TEXT PRIMARY KEY,
+  role   TEXT NOT NULL
+);
 `;
 
 /** Гарантирует, что схема создана (один раз на процесс). */
@@ -126,6 +130,12 @@ export async function getInvite(token: string): Promise<Invite | null> {
 
 export async function markInviteUsed(token: string, tgId: number): Promise<void> {
   await q("UPDATE invites SET used_at = now(), used_by_tg_id = $2 WHERE token = $1", [token, tgId]);
+}
+
+// ---- Оверрайды ролей (login -> role), приоритетнее ролей YouTrack ----
+export async function getRoleOverrides(): Promise<Map<string, Role>> {
+  const rows = await q<{ login: string; role: Role }>("SELECT login, role FROM role_overrides");
+  return new Map(rows.map((r) => [r.login, r.role]));
 }
 
 // ---- Состояние поллера ----
