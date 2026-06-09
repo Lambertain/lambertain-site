@@ -1,0 +1,202 @@
+/**
+ * Поллер событий YouTrack → Telegram. Запускается отдельным воркером на Railway.
+ * Самодостаточный: pg + fetch, без Next-зависимостей.
+ *
+ * Триггеры (каждый отключается флагом env = "0"):
+ *   NOTIFY_NEW_TASK        — новая задача от КЛИЕНТА
+ *   NOTIFY_CLIENT_COMMENT  — новый комментарий/вопрос от КЛИЕНТА
+ *   NOTIFY_DONE            — задача переведена в «готово» КОНТРИБЬЮТОРОМ
+ *
+ * Переменные: YOUTRACK_URL, YOUTRACK_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
+ *             DATABASE_URL, POLL_INTERVAL_SEC (по умолч. 60), POLL_ONCE, DRY_RUN.
+ */
+import pg from "pg";
+
+const URL_BASE = (process.env.YOUTRACK_URL || "").replace(/\/$/, "");
+const TOKEN = process.env.YOUTRACK_TOKEN || "";
+const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
+const TG_CHAT = process.env.TELEGRAM_CHAT_ID || "";
+const INTERVAL = Number(process.env.POLL_INTERVAL_SEC || 60) * 1000;
+const ONCE = process.env.POLL_ONCE === "1";
+const DRY = process.env.DRY_RUN === "1";
+
+const flag = (name) => process.env[name] !== "0";
+const DONE_STATES = ["done", "fixed", "verified", "resolved", "готово", "закрыто", "выполнено", "complete"];
+
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes("localhost") ? undefined : { rejectUnauthorized: false },
+  max: 3,
+});
+
+async function ensureSchema() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS poller_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+}
+async function getState(key) {
+  const r = await pool.query("SELECT value FROM poller_state WHERE key=$1", [key]);
+  return r.rows[0]?.value ?? null;
+}
+async function setState(key, value) {
+  await pool.query(
+    `INSERT INTO poller_state (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value`,
+    [key, String(value)],
+  );
+}
+
+async function yt(path, params = {}) {
+  const u = new URL(URL_BASE + path);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v));
+  const r = await fetch(u, { headers: { Authorization: `Bearer ${TOKEN}`, Accept: "application/json" } });
+  if (!r.ok) throw new Error(`YouTrack ${r.status} ${path}: ${await r.text()}`);
+  return r.json();
+}
+
+async function tg(text) {
+  if (DRY) {
+    console.log("[DRY] →", text.replace(/\n/g, " ⏎ "));
+    return;
+  }
+  const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true }),
+  });
+  if (!r.ok) console.error("TG error:", await r.text());
+}
+
+// login -> role ("client" | "contributor" | "admin" | "unknown")
+let rolesCache = null;
+let rolesAt = 0;
+async function roles() {
+  if (rolesCache && Date.now() - rolesAt < 5 * 60 * 1000) return rolesCache;
+  const map = new Map();
+  try {
+    const data = await yt("/hub/api/rest/users", { fields: "login,projectRoles(role(name))", $top: 500 });
+    for (const u of data.users || []) {
+      let best = "unknown";
+      for (const pr of u.projectRoles || []) {
+        const n = (pr.role?.name || "").toLowerCase();
+        if (n.includes("клиент") || n.includes("client")) best = "client";
+        else if ((n.includes("контрибьютор") || n.includes("contributor")) && best !== "client") best = "contributor";
+        else if ((n.includes("админ") || n.includes("admin")) && best === "unknown") best = "admin";
+      }
+      map.set(u.login, best);
+    }
+  } catch (e) {
+    console.error("roles error:", e.message);
+  }
+  rolesCache = map;
+  rolesAt = Date.now();
+  return map;
+}
+
+const link = (id) => `${URL_BASE}/issue/${id}`;
+
+async function checkNewTasks(rmap) {
+  const last = Number((await getState("last_created")) || 0);
+  const issues = await yt("/api/issues", {
+    query: "sort by: created desc",
+    fields: "idReadable,summary,created,reporter(login,fullName)",
+    $top: 50,
+  });
+  let max = last;
+  const fresh = [];
+  for (const i of issues) {
+    if (i.created > last) {
+      if (rmap.get(i.reporter?.login) === "client") fresh.push(i);
+      if (i.created > max) max = i.created;
+    }
+  }
+  for (const i of fresh.reverse()) {
+    await tg(`🆕 <b>Новая задача от клиента</b>\n${i.reporter?.fullName || i.reporter?.login}: ${i.summary}\n<a href="${link(i.idReadable)}">${i.idReadable}</a>`);
+  }
+  if (max > last) await setState("last_created", max);
+  return fresh.length;
+}
+
+async function checkClientComments(rmap) {
+  const last = Number((await getState("last_comment")) || 0);
+  const acts = await yt("/api/activities", {
+    categories: "CommentsCategory",
+    reverse: "true",
+    fields: "timestamp,author(login,fullName),target(idReadable),added(text)",
+    $top: 50,
+  });
+  let max = last;
+  const fresh = [];
+  for (const a of acts) {
+    if (a.timestamp > last) {
+      if (rmap.get(a.author?.login) === "client") fresh.push(a);
+      if (a.timestamp > max) max = a.timestamp;
+    }
+  }
+  for (const a of fresh.reverse()) {
+    const id = a.target?.idReadable || "?";
+    const text = (Array.isArray(a.added) ? a.added[0]?.text : "") || "";
+    await tg(`💬 <b>Вопрос клиента</b> в ${id}\n${a.author?.fullName || a.author?.login}: ${text.slice(0, 300)}\n<a href="${link(id)}">${id}</a>`);
+  }
+  if (max > last) await setState("last_comment", max);
+  return fresh.length;
+}
+
+async function checkDone(rmap) {
+  const last = Number((await getState("last_done")) || 0);
+  const acts = await yt("/api/activities", {
+    categories: "CustomFieldCategory",
+    reverse: "true",
+    fields: "timestamp,author(login,fullName),target(idReadable,summary),field(name),added(name)",
+    $top: 50,
+  });
+  let max = last;
+  const fresh = [];
+  for (const a of acts) {
+    if (a.timestamp <= last) continue;
+    if (a.timestamp > max) max = a.timestamp;
+    if ((a.field?.name || "").toLowerCase() !== "state") continue;
+    const added = (Array.isArray(a.added) ? a.added[0]?.name : "") || "";
+    if (!DONE_STATES.some((s) => added.toLowerCase().includes(s))) continue;
+    if (rmap.get(a.author?.login) === "contributor") fresh.push({ a, added });
+  }
+  for (const { a, added } of fresh.reverse()) {
+    const id = a.target?.idReadable || "?";
+    await tg(`✅ <b>Задача сдана</b> (${added})\n${a.author?.fullName || a.author?.login}: ${a.target?.summary || ""}\n<a href="${link(id)}">${id}</a>`);
+  }
+  if (max > last) await setState("last_done", max);
+  return fresh.length;
+}
+
+async function cycle() {
+  const rmap = await roles();
+  let total = 0;
+  if (flag("NOTIFY_NEW_TASK")) total += await checkNewTasks(rmap).catch((e) => (console.error("newTasks:", e.message), 0));
+  if (flag("NOTIFY_CLIENT_COMMENT")) total += await checkClientComments(rmap).catch((e) => (console.error("comments:", e.message), 0));
+  if (flag("NOTIFY_DONE")) total += await checkDone(rmap).catch((e) => (console.error("done:", e.message), 0));
+  console.log(new Date().toISOString(), `цикл завершён, событий: ${total}`);
+}
+
+async function main() {
+  if (!URL_BASE || !TOKEN || !TG_TOKEN || !TG_CHAT || !process.env.DATABASE_URL) {
+    console.error("Не хватает env (YOUTRACK_*, TELEGRAM_*, DATABASE_URL)");
+    process.exit(1);
+  }
+  await ensureSchema();
+  // Первый запуск: инициализируем отметки текущим временем, чтобы не слать историю.
+  if ((await getState("last_created")) == null) {
+    const now = Date.now();
+    await setState("last_created", now);
+    await setState("last_comment", now);
+    await setState("last_done", now);
+    console.log("Поллер инициализирован, отметки = сейчас.");
+  }
+  await cycle();
+  if (ONCE) {
+    await pool.end();
+    return;
+  }
+  setInterval(cycle, INTERVAL);
+}
+
+main().catch((e) => {
+  console.error("Фатальная ошибка:", e);
+  process.exit(1);
+});
