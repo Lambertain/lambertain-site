@@ -1,44 +1,17 @@
 /**
- * Авторизация Telegram Mini App. ВРЕМЕННО с диагностикой подписи.
+ * Авторизация Telegram Mini App: фронт присылает initData, сервер валидирует подпись.
+ * - admin / привязанный пользователь -> сессия + роль.
+ * - есть инвайт в start_param -> привязка и вход.
+ * - иначе -> needRole: апка покажет выбор роли.
  */
 import { NextResponse } from "next/server";
-import { createHmac } from "node:crypto";
 import { validateInitData } from "@/lib/telegram-auth";
 import { redeemInvite } from "@/lib/invites";
 import { setSession } from "@/lib/auth";
 import { getLinkByTgId } from "@/lib/db";
 
-function diag(initData: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN || "";
-  const params = new URLSearchParams(initData);
-  const recv = params.get("hash") || "";
-  params.delete("hash");
-  const secret = createHmac("sha256", "WebAppData").update(token).digest();
-  const withSig = createHmac("sha256", secret)
-    .update([...params.entries()].map(([k, v]) => `${k}=${v}`).sort().join("\n"))
-    .digest("hex");
-  params.delete("signature");
-  const noSig = createHmac("sha256", secret)
-    .update([...params.entries()].map(([k, v]) => `${k}=${v}`).sort().join("\n"))
-    .digest("hex");
-  console.log("TMA-DIAG", JSON.stringify({
-    tokenId: token.split(":")[0],
-    len: initData.length,
-    keys: [...new URLSearchParams(initData).keys()],
-    recv: recv.slice(0, 12),
-    withSig: withSig.slice(0, 12),
-    noSig: noSig.slice(0, 12),
-    matchWithSig: withSig === recv,
-    matchNoSig: noSig === recv,
-  }));
-}
-
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { initData?: string };
-  if (body.initData) {
-    try { diag(body.initData); } catch (e) { console.log("TMA-DIAG-ERR", String(e)); }
-  }
-
   const result = validateInitData(body.initData || "");
   if (!result) {
     return NextResponse.json({ ok: false, error: "invalid initData" }, { status: 401 });
