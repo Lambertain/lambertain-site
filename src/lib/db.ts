@@ -66,6 +66,11 @@ CREATE TABLE IF NOT EXISTS web_login_tokens (
   expires_at  TIMESTAMPTZ NOT NULL,
   used_at     TIMESTAMPTZ
 );
+CREATE TABLE IF NOT EXISTS project_api_tokens (
+  project_key TEXT PRIMARY KEY,
+  token       TEXT UNIQUE NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
 
 /** Гарантирует, что схема создана (один раз на процесс). */
@@ -204,6 +209,30 @@ export async function consumeWebLoginToken(token: string): Promise<number | null
     [token],
   );
   return rows[0]?.tg_id ?? null;
+}
+
+// ---- API-токены проектов (для чтения задач Claude'ом разработчика) ----
+export async function getProjectKeyByToken(token: string): Promise<string | null> {
+  const rows = await q<{ project_key: string }>(
+    "SELECT project_key FROM project_api_tokens WHERE token = $1",
+    [token],
+  );
+  return rows[0]?.project_key ?? null;
+}
+
+export async function getProjectTokens(): Promise<Map<string, string>> {
+  const rows = await q<{ project_key: string; token: string }>(
+    "SELECT project_key, token FROM project_api_tokens",
+  );
+  return new Map(rows.map((r) => [r.project_key, r.token]));
+}
+
+export async function setProjectToken(projectKey: string, token: string): Promise<void> {
+  await q(
+    `INSERT INTO project_api_tokens (project_key, token) VALUES ($1,$2)
+     ON CONFLICT (project_key) DO UPDATE SET token = EXCLUDED.token, created_at = now()`,
+    [projectKey, token],
+  );
 }
 
 // ---- Состояние поллера ----

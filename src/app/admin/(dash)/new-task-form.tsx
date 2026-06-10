@@ -11,6 +11,8 @@ type Usr = { login: string; fullName: string; role: string };
 
 export function NewTaskForm({ projects, users, locale }: { projects: Proj[]; users: Usr[]; locale: Locale }) {
   const [text, setText] = useState("");
+  const [preProject, setPreProject] = useState("");
+  const [preAssignee, setPreAssignee] = useState("");
   const [draft, setDraft] = useState<DraftTask | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ id: string; url: string } | null>(null);
@@ -20,7 +22,10 @@ export function NewTaskForm({ projects, users, locale }: { projects: Proj[]; use
     setError(null);
     setDone(null);
     start(async () => {
-      const res = await structureDraft(text);
+      const res = await structureDraft(text, {
+        projectKey: preProject || undefined,
+        assigneeLogin: preAssignee || undefined,
+      });
       if (res.error) setError(res.error);
       else setDraft(res.draft ?? null);
     });
@@ -46,12 +51,36 @@ export function NewTaskForm({ projects, users, locale }: { projects: Proj[]; use
 
   return (
     <div>
+      <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 20 }}>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.project")}</label>
+          <select value={preProject} onChange={(e) => setPreProject(e.target.value)} style={ui.input}>
+            <option value="">{t(locale, "common.choose")}</option>
+            {projects.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.key} — {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.assignee")}</label>
+          <select value={preAssignee} onChange={(e) => setPreAssignee(e.target.value)} style={ui.input}>
+            <option value="">{t(locale, "field.unassigned")}</option>
+            {users.map((u) => (
+              <option key={u.login} value={u.login}>
+                {u.fullName} ({u.login})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={5}
         placeholder={t(locale, "newtask.placeholder")}
-        style={{ ...ui.input, resize: "vertical", marginTop: 20 }}
+        style={{ ...ui.input, resize: "vertical", marginTop: 16 }}
       />
       <button
         onClick={doStructure}
@@ -81,7 +110,7 @@ export function NewTaskForm({ projects, users, locale }: { projects: Proj[]; use
               {t(locale, "newtask.lowConfidence")}
             </p>
           )}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
               <label style={ui.fieldLabel}>{t(locale, "field.project")}</label>
               <select value={draft.projectKey} onChange={(e) => upd("projectKey", e.target.value)} style={ui.input}>
@@ -124,7 +153,7 @@ export function NewTaskForm({ projects, users, locale }: { projects: Proj[]; use
             />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
+          <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
             <div>
               <label style={ui.fieldLabel}>{t(locale, "field.priority")}</label>
               <input

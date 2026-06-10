@@ -14,6 +14,7 @@ const NAV: Record<Role, { href: string; key: string }[]> = {
     { href: "/admin/tasks", key: "nav.tasks" },
     { href: "/admin/clients", key: "nav.clients" },
     { href: "/admin/overdue", key: "nav.overdue" },
+    { href: "/admin/projects", key: "nav.projects" },
     { href: "/admin/team", key: "nav.team" },
   ],
   contributor: [{ href: "/admin/tasks", key: "nav.myTasks" }],
@@ -33,6 +34,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   return (
     <div style={ui.page}>
       <nav
+        className="pm-nav"
         style={{
           display: "flex",
           alignItems: "center",
@@ -54,7 +56,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           <span style={{ ...ui.monoLabel, marginLeft: 10 }}>Dev</span>
         </Link>
 
-        <div style={{ display: "flex", gap: 22 }}>
+        <div className="pm-nav-links" style={{ display: "flex", gap: 22 }}>
           {nav.map((n) => (
             <Link key={n.href} href={n.href} style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
               {t(locale, n.key)}
@@ -62,7 +64,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           ))}
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
+        <div className="pm-nav-right" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
           <span style={ui.monoLabel}>
             {principal.fullName} · {t(locale, `role.${principal.role}`)}
           </span>
@@ -75,7 +77,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
         </div>
       </nav>
 
-      <main style={{ padding: "32px", maxWidth: 1000, margin: "0 auto" }}>{children}</main>
+      <main className="pm-main">{children}</main>
     </div>
   );
 }

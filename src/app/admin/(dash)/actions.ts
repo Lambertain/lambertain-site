@@ -9,9 +9,11 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Структурировать произвольный текст в черновик задачи (превью перед созданием). */
+/** Структурировать произвольный текст в черновик задачи (превью перед созданием).
+ *  preset — заданные вручную проект/исполнитель (приоритетнее догадки модели). */
 export async function structureDraft(
   text: string,
+  preset?: { projectKey?: string; assigneeLogin?: string },
 ): Promise<{ draft?: DraftTask; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
@@ -20,6 +22,12 @@ export async function structureDraft(
     const be = getBackend();
     const [projects, users] = await Promise.all([be.listProjects(), be.listUsers()]);
     const draft = await structureTask(text, projects, users, today());
+    // Ручной выбор побеждает догадку модели.
+    if (preset?.projectKey) {
+      draft.projectKey = preset.projectKey;
+      draft.confidence = "high";
+    }
+    if (preset?.assigneeLogin) draft.assigneeLogin = preset.assigneeLogin;
     return { draft };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка структурирования" };

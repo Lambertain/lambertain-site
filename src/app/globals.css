@@ -143,6 +143,16 @@ body::after {
 .service-tile:hover { background: var(--surface-2) !important; }
 .service-tile:hover .service-title { color: var(--accent) !important; }
 
+/* ── PM-портал: адаптив (веб + Telegram Mini App) ─ */
+.pm-main { padding: 32px; max-width: 1000px; margin: 0 auto; }
+@media (max-width: 700px) {
+  .pm-nav { padding: 12px 16px !important; gap: 14px !important; flex-wrap: wrap; }
+  .pm-nav-links { gap: 14px !important; flex-wrap: wrap; }
+  .pm-nav-right { width: 100%; justify-content: flex-start !important; margin-left: 0 !important; }
+  .pm-main { padding: 18px 16px; }
+  .pm-grid-2 { grid-template-columns: 1fr !important; }
+}
+
 /* ── Responsive ────────────────────────────────── */
 @media (max-width: 1024px) {
   .grid-3 { grid-template-columns: repeat(2, 1fr) !important; }

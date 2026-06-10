@@ -34,6 +34,7 @@ export const DICT: Record<string, Entry> = {
   "nav.clients": { uk: "Клієнти", ru: "Клиенты", en: "Clients" },
   "nav.overdue": { uk: "Прострочення", ru: "Просрочки", en: "Overdue" },
   "nav.team": { uk: "Команда", ru: "Команда", en: "Team" },
+  "nav.projects": { uk: "Проєкти", ru: "Проекты", en: "Projects" },
   "nav.myTasks": { uk: "Мої задачі", ru: "Мои задачи", en: "My tasks" },
   "nav.myProjects": { uk: "Мої проєкти", ru: "Мои проекты", en: "My projects" },
 
@@ -152,6 +153,20 @@ export const DICT: Record<string, Entry> = {
   "team.reject": { uk: "Відхилити", ru: "Отклонить", en: "Reject" },
   "team.approved": { uk: "доступ відкрито", ru: "доступ открыт", en: "access granted" },
   "team.rejected": { uk: "відхилено", ru: "отклонено", en: "rejected" },
+
+  // — проекты / токены для разработчиков —
+  "projects.kicker": { uk: "Доступ для розробників", ru: "Доступ для разработчиков", en: "Developer access" },
+  "projects.title": { uk: "Проєкти", ru: "Проекты", en: "Projects" },
+  "projects.hint": {
+    uk: "Токен проєкту дозволяє Claude розробника читати задачі через API — без ручного копіювання.",
+    ru: "Токен проекта позволяет Claude разработчика читать задачи через API — без ручного копирования.",
+    en: "A project token lets the developer’s Claude read tasks via API — no manual copy-paste.",
+  },
+  "projects.genToken": { uk: "Згенерувати токен", ru: "Сгенерировать токен", en: "Generate token" },
+  "projects.regenToken": { uk: "Перегенерувати", ru: "Перегенерировать", en: "Regenerate" },
+  "projects.tokenLabel": { uk: "Токен проєкту", ru: "Токен проекта", en: "Project token" },
+  "projects.snippetLabel": { uk: "Рядок для CLAUDE.md розробника", ru: "Строка для CLAUDE.md разработчика", en: "Snippet for the developer’s CLAUDE.md" },
+  "projects.noToken": { uk: "токен не створено", ru: "токен не создан", en: "no token yet" },
 
   // — карточка задачи —
   "card.stale": { uk: "висить {n} дн.", ru: "висит {n} дн.", en: "{n}d idle" },

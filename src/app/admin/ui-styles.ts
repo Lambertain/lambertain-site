@@ -24,7 +24,7 @@ export const ui = {
 
   h1: {
     fontFamily: "var(--font-display)",
-    fontSize: 40,
+    fontSize: "clamp(26px, 7vw, 40px)",
     letterSpacing: "0.04em",
     textTransform: "uppercase",
     margin: 0,
@@ -35,6 +35,7 @@ export const ui = {
     background: "var(--surface)",
     border: "1px solid var(--border)",
     padding: 24,
+    boxSizing: "border-box",
   } as CSSProperties,
 
   input: {
@@ -44,8 +45,9 @@ export const ui = {
     border: "1px solid var(--border-2)",
     color: "var(--text)",
     fontFamily: "var(--font-body)",
-    fontSize: 14,
+    fontSize: 16, // >=16 чтобы iOS/Telegram не зумил при фокусе
     outline: "none",
+    boxSizing: "border-box",
   } as CSSProperties,
 
   fieldLabel: {
