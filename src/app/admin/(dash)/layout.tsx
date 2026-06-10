@@ -11,21 +11,14 @@ import { ui } from "../ui-styles";
 
 const NAV: Record<Role, { href: string; key: string }[]> = {
   admin: [
-    { href: "/admin", key: "nav.newTask" },
-    { href: "/admin/tasks", key: "nav.tasks" },
+    { href: "/admin", key: "nav.tasks" },
     { href: "/admin/projects", key: "nav.projects" },
     { href: "/admin/skills", key: "nav.skills" },
     { href: "/admin/team", key: "nav.team" },
   ],
-  contributor: [{ href: "/admin/tasks", key: "nav.myTasks" }],
-  client: [
-    { href: "/admin", key: "nav.newTask" },
-    { href: "/admin/tasks", key: "nav.myProjects" },
-  ],
-  employee: [
-    { href: "/admin", key: "nav.newTask" },
-    { href: "/admin/tasks", key: "nav.myProjects" },
-  ],
+  contributor: [{ href: "/admin", key: "nav.myTasks" }],
+  client: [{ href: "/admin", key: "nav.tasks" }],
+  employee: [{ href: "/admin", key: "nav.tasks" }],
   unknown: [],
 };
 
@@ -36,7 +29,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   const nav = NAV[principal.role] ?? [];
 
   return (
-    <div style={ui.page}>
+    <div style={{ ...ui.page, height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <nav
         className="pm-nav"
         style={{
@@ -48,8 +41,8 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           borderBottom: "1px solid var(--border)",
           background: "rgba(8,8,8,0.9)",
           backdropFilter: "blur(16px)",
-          position: "sticky",
-          top: 0,
+          position: "relative",
+          flexShrink: 0,
           zIndex: 50,
         }}
       >
@@ -93,7 +86,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
         </div>
       </nav>
 
-      <main className="pm-main">
+      <main className="pm-main" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
         {principal.realRole === "admin" && (
           <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <ViewAs current={principal.role as "admin" | "client" | "contributor" | "employee"} locale={locale} />

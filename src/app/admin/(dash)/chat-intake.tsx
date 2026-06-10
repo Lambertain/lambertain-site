@@ -25,7 +25,7 @@ function imagesOf(c: unknown): string[] {
 
 const SPEECH_LANG: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
 
-export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Locale }) {
+export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; locale: Locale; fill?: boolean }) {
   const [projectKey, setProjectKey] = useState(projects[0]?.key ?? "");
   const [history, setHistory] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -204,7 +204,7 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
   const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, flexShrink: 0, background: "transparent", border: "1px solid var(--border-2)", color: "var(--muted)", cursor: "pointer", borderRadius: 2 };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 210px)", minHeight: 380, marginTop: 14, border: "1px solid var(--border)", background: "var(--surface)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: fill ? "100%" : "calc(100dvh - 200px)", minHeight: 0, flex: fill ? 1 : undefined, marginTop: fill ? 0 : 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
       {/* проект (селект только если проектов больше одного) */}
       <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={ui.monoLabel}>{t(locale, "field.project")}:</span>
