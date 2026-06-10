@@ -64,8 +64,10 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
 // Полные тексты — в scripts/skills/<file>; здесь slug, заголовок, файл и триггеры (RU+EN).
 const SKILLS_DIR = new URL("./skills/", import.meta.url);
 const SEED_SKILLS = [
-  ["frontend-design", "Frontend-дизайн / UI", "frontend-design.md",
-    "UI, интерфейс, дизайн, вёрстка, верстка, страница, экран, лендинг, компонент, стиль, оформление, визуал, layout, design, типографика"],
+  ["ui-ux-pro-max", "UI/UX Pro Max — дизайн-интеллект", "ui-ux-pro-max.md",
+    "дизайн страницы, дизайн экрана, сделать красиво, профессионально, не как шаблон, выбрать стиль, дашборд, dashboard, лендинг, landing, SaaS, админка, дизайн-система, палитра, цвета, типографика, шрифты, glassmorphism, минимализм, бенто, дизайн UI, UX, redesign, улучшить интерфейс"],
+  ["frontend-design", "Frontend-дизайн / UI (вкус)", "frontend-design.md",
+    "UI, интерфейс, дизайн, вёрстка, верстка, страница, экран, лендинг, компонент, стиль, оформление, визуал, layout, design, типографика, эстетика"],
   ["web-design-guidelines", "Чек-лист веб-интерфейса (a11y/UX)", "web-design-guidelines.md",
     "ревью UI, проверка интерфейса, доступность, accessibility, a11y, UX аудит, юзабилити, форма, фокус, контраст, адаптив, review UI, audit"],
   ["react-best-practices", "React / Next.js best practices", "react-best-practices.md",
