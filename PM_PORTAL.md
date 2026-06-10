@@ -61,6 +61,7 @@ progressive disclosure (как Agent Skills у Anthropic): в системный
 
   | slug | источник |
   |---|---|
+  | ui-ux-pro-max | nextlevelbuilder/ui-ux-pro-max-skill (основной дизайн) |
   | frontend-design | anthropics/skills |
   | web-design-guidelines | vercel-labs/web-interface-guidelines |
   | react-best-practices | vercel-labs/agent-skills |
