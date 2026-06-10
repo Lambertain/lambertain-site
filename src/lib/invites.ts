@@ -21,11 +21,12 @@ export async function generateInvite(
 }
 
 export function inviteLink(token: string): string {
-  const bot = process.env.TELEGRAM_BOT_USERNAME || "";
+  const bot = process.env.TELEGRAM_BOT_USERNAME || "<bot>";
   const app = process.env.TELEGRAM_MINIAPP_SHORTNAME || "";
-  if (bot && app) return `https://t.me/${bot}/${app}?startapp=${token}`;
-  // Фоллбэк, если мини-апп ещё не настроена в BotFather.
-  return `https://t.me/${bot || "<bot>"}?start=${token}`;
+  // Именованная мини-апп, если задан shortname; иначе Main Mini App (?startapp=).
+  return app
+    ? `https://t.me/${bot}/${app}?startapp=${token}`
+    : `https://t.me/${bot}?startapp=${token}`;
 }
 
 /**
