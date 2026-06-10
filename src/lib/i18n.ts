@@ -49,6 +49,8 @@ export const DICT: Record<string, Entry> = {
   "skills.auto": { uk: "авто", ru: "авто", en: "auto" },
   "skills.usageToday": { uk: "Токени сьогодні", ru: "Токены сегодня", en: "Tokens today" },
   "skills.usageMonth": { uk: "Витрати за місяць", ru: "Расход за месяц", en: "Spend this month" },
+  "skills.expand": { uk: "Розгорнути", ru: "Развернуть", en: "Expand" },
+  "skills.collapse": { uk: "Згорнути", ru: "Свернуть", en: "Collapse" },
   "viewas.label": { uk: "Перегляд як", ru: "Просмотр как", en: "View as" },
   "viewas.admin": { uk: "Адмін", ru: "Админ", en: "Admin" },
   "viewas.banner": { uk: "Превʼю ролі: {role}. ", ru: "Превью роли: {role}. ", en: "Role preview: {role}. " },

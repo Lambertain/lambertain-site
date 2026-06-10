@@ -3,6 +3,7 @@ import { listSkills, usageSummary } from "@/lib/db";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
+import { SkillCard } from "./skill-card";
 
 export const dynamic = "force-dynamic";
 
@@ -33,15 +34,7 @@ export default async function SkillsPage() {
       {/* Список скилов */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 24 }}>
         {skills.map((s) => (
-          <div key={s.slug} style={{ ...ui.card, padding: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 15, fontWeight: 600 }}>{s.title}</span>
-              <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{s.slug}</span>
-              {s.auto_generated && <span style={{ ...ui.monoLabel, color: "#e8b339" }}>{t(locale, "skills.auto")}</span>}
-            </div>
-            <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginBottom: 8 }}>{s.triggers}</div>
-            <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5, color: "var(--text)" }}>{s.playbook}</div>
-          </div>
+          <SkillCard key={s.slug} skill={s} locale={locale} autoLabel={t(locale, "skills.auto")} />
         ))}
       </div>
     </div>

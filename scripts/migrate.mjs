@@ -4,6 +4,7 @@
  * либо вручную: node --env-file=.env.local scripts/migrate.mjs
  */
 import pg from "pg";
+import fs from "fs";
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -58,91 +59,43 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
 `;
 
-// Стартовые скилы (плейбуки под типы задач). ON CONFLICT DO NOTHING — авто/ручные не затираются.
+// Стартовые скилы — реальные полные плейбуки (SKILL.md) из открытых источников:
+//   anthropics/skills, obra/superpowers, vercel-labs/agent-skills, supabase/agent-skills.
+// Полные тексты — в scripts/skills/<file>; здесь slug, заголовок, файл и триггеры (RU+EN).
+const SKILLS_DIR = new URL("./skills/", import.meta.url);
 const SEED_SKILLS = [
-  ["frontend-ui", "Фронтенд / UI",
-    "вёрстка, ui, интерфейс, компонент, страница, экран, адаптив, responsive, дизайн, кнопка, форма, стиль, css, верстка",
-    `Постановка фронтенд/UI-задачи.
-
-1. Контекст в коде (обязательно сверься):
-   - Найди существующие компоненты/токены дизайна (list_dir, search_code) — переиспользуй, не плоди дубли.
-   - Прочитай дизайн-правила из CLAUDE.md/конвенций проекта и следуй им.
-2. Адаптив:
-   - Проверь поведение на мобиле и в Telegram Mini App (узкий экран ~360px): нет горизонтального переполнения, элементы переносятся, шрифты резиновые.
-   - box-sizing: border-box, ширины в %, без фиксированных пикселей шире вьюпорта.
-3. Локализация (если в проекте есть i18n):
-   - Все новые строки сразу во все локали, без хардкода.
-4. Иконки — SVG, не эмодзи (эмодзи допустимы только в комментариях кода).
-5. Доступность: контраст, фокус, кликабельные области ≥40px на тач.
-
-В описании задачи укажи:
-- какие компоненты/файлы затронуты и что в них уже есть;
-- чего конкретно не хватает в коде для реализации;
-- критерии готовности — что именно увидит пользователь (по шагам/состояниям).`],
-  ["bug-fix", "Баги / правки",
-    "баг, ошибка, не работает, падает, фикс, дефект, сломалось, починить, краш, exception, некорректно",
-    `Постановка баг-задачи (методичный дебаг).
-
-1. Воспроизведение:
-   - Точные шаги; что ожидается vs что происходит; на каких данных/устройстве/роли; стабильно или плавающе.
-   - Запроси скриншот/лог ошибки, если их нет.
-2. Локализация в коде:
-   - search_code по симптому/сообщению ошибки → укажи подозрительные файлы и строки.
-   - Проверь связанные места (один баг часто живёт в нескольких файлах — DRY).
-3. Корневая причина:
-   - Сформулируй гипотезу о ПРИЧИНЕ, а не симптоме. Не предлагай «костыль», если виден корень.
-4. Объём и риск:
-   - Что ещё затронет правка; риск регрессии; нужен ли тест/проверка.
-
-В описании: воспроизведение, затронутые файлы, корневая причина, что не хватает для фикса, критерий готовности (как проверить, что починено).`],
-  ["backend-integration", "Backend / интеграции",
-    "api, бэкенд, backend, сервер, база, бд, database, sql, оплата, платёж, вебхук, webhook, интеграция, сервис, миграция, эндпоинт",
-    `Постановка backend/интеграционной задачи.
-
-1. Контракт:
-   - Входы/выходы, формат данных, коды и тела ошибок, идемпотентность.
-2. Данные:
-   - Модель/схема, нужна ли миграция; индексы; обратная совместимость.
-3. Безопасность:
-   - Авторизация, какие секреты/env-переменные нужны (хранить в .env, не в коде/репо).
-   - Валидация входа (никогда не доверять клиенту).
-4. Надёжность:
-   - Обработка ошибок и ретраев, таймауты; для вебхуков/платежей — идемпотентность и подтверждение доставки.
-5. Внешние сервисы:
-   - Лимиты, ключи, песочница vs прод; что делать при недоступности.
-
-В описании: затронутые эндпоинты/таблицы, что уже есть, чего не хватает, env-переменные, критерии готовности.`],
-  ["telegram-bot", "Telegram-боты / Mini Apps",
-    "telegram, телеграм, бот, bot, mini app, миниапп, webhook, initdata, botfather, меню, команда, вебхук",
-    `Постановка задачи по Telegram-боту / Mini App.
-
-1. Тип поверхности:
-   - Бот (вебхук/поллинг, команды, inline-кнопки, меню-кнопка) или Mini App (веб в Telegram).
-2. Mini App:
-   - Авторизация через initData (валидация подписи токеном бота, с учётом поля signature).
-   - Узкий экран, нет прокрутки всей апки, тёмная тема Telegram.
-3. Бот:
-   - Регистрация вебхука, обработка апдейтов, антидубли, состояние диалога.
-   - Настройки в BotFather (меню-кнопка, Main Mini App URL, домен) — отдельным шагом.
-4. Уведомления: кому и когда шлём DM; не спамить.
-
-В описании: сценарий пользователя, поверхность (бот/Mini App), затронутые части, что есть, чего не хватает, критерии готовности.`],
-  ["ai-llm", "AI / LLM-фичи",
-    "ai, ии, llm, gpt, claude, нейросеть, ассистент, промпт, prompt, эмбеддинг, rag, tool use, токены, транскрипция, генерация",
-    `Постановка задачи по AI/LLM-фиче.
-
-1. Модель и провайдер:
-   - Какая модель (по умолчанию — актуальный Claude); ключ в .env; оценка стоимости токенов.
-2. Вход/выход:
-   - Текст/изображения/документы на входе; нужен ли structured output (tool use) для надёжного формата.
-   - Нужен ли доступ к данным/коду (инструменты/RAG) — что именно читать.
-3. Промпты:
-   - Где хранятся и версионируются; как тестировать качество (примеры, голден-кейсы).
-4. UX:
-   - Стриминг ответа, индикатор обработки, обработка ошибок/таймаутов, лимиты.
-
-В описании: сценарий, модель, что на входе/выходе, нужны ли инструменты/данные, критерии готовности и как мерить качество.`],
+  ["frontend-design", "Frontend-дизайн / UI", "frontend-design.md",
+    "UI, интерфейс, дизайн, вёрстка, верстка, страница, экран, лендинг, компонент, стиль, оформление, визуал, layout, design, типографика"],
+  ["web-design-guidelines", "Чек-лист веб-интерфейса (a11y/UX)", "web-design-guidelines.md",
+    "ревью UI, проверка интерфейса, доступность, accessibility, a11y, UX аудит, юзабилити, форма, фокус, контраст, адаптив, review UI, audit"],
+  ["react-best-practices", "React / Next.js best practices", "react-best-practices.md",
+    "React, Next.js, next, компонент, ререндер, перерисовка, useEffect, useMemo, server component, серверный компонент, производительность, оптимизация, хук, bundle, hydration"],
+  ["systematic-debugging", "Системный дебаггинг", "systematic-debugging.md",
+    "баг, ошибка, не работает, падает, краш, дебаг, debug, фикс, починить, сломалось, exception, traceback, стектрейс, регрессия, дефект, bug, fix"],
+  ["tdd", "TDD — разработка через тесты", "test-driven-development.md",
+    "тест, тесты, TDD, тестирование, покрытие, unit, integration, jest, vitest, playwright, написать тест, red green refactor, test"],
+  ["code-review", "Code review перед мержем", "requesting-code-review.md",
+    "ревью кода, code review, проверить код, перед мержем, перед коммитом, перед PR, pull request, качество кода, рефакторинг, review"],
+  ["verification", "Проверка перед сдачей (verification)", "verification-before-completion.md",
+    "проверить готовность, перед коммитом, готово, выполнено, завершить, сдать, definition of done, проверка перед сдачей, verify, done"],
+  ["writing-plans", "Планирование задачи / спека", "writing-plans.md",
+    "план, спека, спецификация, ТЗ, разбить задачу, декомпозиция, этапы, шаги, roadmap, многошаговая, архитектура решения, plan, spec"],
+  ["claude-api", "Claude API / LLM-интеграции", "claude-api.md",
+    "Claude, Anthropic, Opus, Sonnet, Haiku, LLM, ИИ, AI, нейросеть, ассистент, промпт, prompt, агент, tool use, эмбеддинг, RAG, токены, стриминг, anthropic SDK, claude-*"],
+  ["postgres", "Postgres best practices", "postgres-best-practices.md",
+    "Postgres, PostgreSQL, SQL, запрос, индекс, схема БД, миграция, база данных, БД, query, index, performance, vacuum, explain analyze"],
+  ["webapp-testing", "Тестирование веб-приложения (Playwright)", "webapp-testing.md",
+    "тестирование UI, проверить в браузере, Playwright, e2e, скриншот браузера, проверить фронт, browser test, QA, smoke, консоль браузера"],
 ];
+
+// Срезаем YAML-фронтматтер (--- ... ---) — в плейбук идёт только тело инструкций.
+function stripFrontmatter(text) {
+  if (!text.startsWith("---")) return text.trim();
+  const end = text.indexOf("\n---", 3);
+  if (end === -1) return text.trim();
+  const nl = text.indexOf("\n", end + 1);
+  return text.slice(nl + 1).trim();
+}
 
 // Авторитетная раскладка ролей (от Никиты). ON CONFLICT DO NOTHING — ручные правки не затираются.
 const ROLES = [
@@ -167,9 +120,15 @@ async function main() {
       [login, role],
     );
   }
-  // Старый объединённый скил «Telegram + AI» разделён на telegram-bot и ai-llm.
-  await pool.query("DELETE FROM skills WHERE slug = 'telegram-ai'");
-  for (const [slug, title, triggers, playbook] of SEED_SKILLS) {
+  // Переходим на реальные полные скилы. Удаляем устаревшие ручные сиды
+  // (старые короткие плейбуки и объединённый «telegram-ai»); авто-сгенерированные интейком не трогаем.
+  const seedSlugs = SEED_SKILLS.map(([slug]) => slug);
+  await pool.query(
+    "DELETE FROM skills WHERE auto_generated = false AND slug <> ALL($1::text[])",
+    [seedSlugs],
+  );
+  for (const [slug, title, file, triggers] of SEED_SKILLS) {
+    const playbook = stripFrontmatter(fs.readFileSync(new URL(file, SKILLS_DIR), "utf8"));
     await pool.query(
       `INSERT INTO skills (slug, title, triggers, playbook, auto_generated) VALUES ($1,$2,$3,$4,false)
        ON CONFLICT (slug) DO UPDATE SET title=EXCLUDED.title, triggers=EXCLUDED.triggers, playbook=EXCLUDED.playbook

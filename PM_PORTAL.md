@@ -47,6 +47,37 @@ lambertain.site (Next.js 16, Railway)
 Миграция с YouTrack: реализовать `src/lib/tasks/postgres.ts`, переключить `TASKS_BACKEND` —
 UI и бот не меняются.
 
+## Скилы интейка (плейбуки)
+
+Интейк подбирает под тип задачи **скил** — плейбук с инструкциями. Работает по модели
+progressive disclosure (как Agent Skills у Anthropic): в системный промпт идёт только
+`slug: заголовок [триггеры]` (Level 1), а полный текст подгружается по требованию через
+инструмент `use_skill` (Level 2). Если подходящего скила нет — интейк создаёт новый
+(`create_skill`, помечается «авто», админу уходит уведомление).
+
+- Хранилище: таблица `skills` (`slug, title, triggers, playbook, auto_generated`).
+- Стартовый набор — **реальные полные скилы** из открытых источников (`SKILL.md`),
+  лежат в `scripts/skills/*.md`, сидятся миграцией `scripts/migrate.mjs`:
+
+  | slug | источник |
+  |---|---|
+  | frontend-design | anthropics/skills |
+  | web-design-guidelines | vercel-labs/web-interface-guidelines |
+  | react-best-practices | vercel-labs/agent-skills |
+  | systematic-debugging | obra/superpowers |
+  | tdd | obra/superpowers (test-driven-development) |
+  | code-review | obra/superpowers (requesting-code-review) |
+  | verification | obra/superpowers (verification-before-completion) |
+  | writing-plans | obra/superpowers |
+  | claude-api | anthropics/skills |
+  | postgres | supabase/agent-skills |
+  | webapp-testing | anthropics/skills |
+
+- Добавить/обновить скил: положить `scripts/skills/<slug>.md` (формат SKILL.md, фронтматтер
+  срезается при сиде) и дописать строку в `SEED_SKILLS` (`migrate.mjs`). Сид идемпотентен;
+  авто-скилы (`auto_generated=true`) миграция не затирает.
+- UI: `/admin/skills` — список (превью со «свернуть/развернуть») + расход токенов.
+
 ## Переменные окружения
 
 ```
