@@ -85,9 +85,9 @@ export const DICT: Record<string, Entry> = {
   "newtask.kicker": { uk: "Постановка", ru: "Постановка", en: "New" },
   "newtask.title": { uk: "Нова задача", ru: "Новая задача", en: "New task" },
   "newtask.hint": {
-    uk: "Опиши завдання вільним текстом — проєкт, суть, виконавець, термін. Я структурую і покажу прев’ю перед постановкою.",
-    ru: "Опиши задание свободным текстом — проект, суть, исполнитель, срок. Я структурирую и покажу превью перед постановкой.",
-    en: "Describe the task in plain text — project, gist, assignee, deadline. I’ll structure it and show a preview before creating.",
+    uk: "Опиши задачу в чаті — я уточню деталі, гляну код і запропоную готові задачі. Можна додавати скриншоти.",
+    ru: "Опиши задачу в чате — я уточню детали, посмотрю код и предложу готовые задачи. Можно прикладывать скриншоты.",
+    en: "Describe the task in chat — I’ll clarify details, check the code, and propose ready tasks. You can attach screenshots.",
   },
   "newtask.placeholder": {
     uk: "напр.: на shulex додати експорт справ у PDF, віддати олександру, термін п’ятниця",

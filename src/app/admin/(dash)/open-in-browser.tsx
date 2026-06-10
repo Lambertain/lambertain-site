@@ -40,7 +40,7 @@ export function OpenInBrowser({ label }: { label: string }) {
   return (
     <>
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={check} />
-      <button onClick={open} disabled={busy} style={{ ...ui.btn, padding: "7px 14px" }}>
+      <button onClick={open} disabled={busy} style={{ ...ui.btnAccent, padding: "7px 14px" }}>
         {busy ? "…" : label}
       </button>
     </>

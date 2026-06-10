@@ -39,7 +39,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           display: "flex",
           alignItems: "center",
           gap: 28,
-          padding: "16px 32px",
+          padding: "16px 130px 16px 24px",
           borderBottom: "1px solid var(--border)",
           background: "rgba(8,8,8,0.9)",
           backdropFilter: "blur(16px)",
@@ -48,6 +48,11 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           zIndex: 50,
         }}
       >
+        {/* Кнопка «В браузере» — всегда в правом верхнем углу хедера */}
+        <div style={{ position: "absolute", top: 12, right: 14, zIndex: 60 }}>
+          <OpenInBrowser label={t(locale, "common.inBrowser")} />
+        </div>
+
         <Link
           href="/admin"
           style={{ fontFamily: "var(--font-display)", fontSize: 20, letterSpacing: "0.08em", color: "var(--text)", textDecoration: "none" }}
@@ -68,7 +73,6 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           <span style={ui.monoLabel}>
             {principal.fullName} · {t(locale, `role.${principal.role}`)}
           </span>
-          <OpenInBrowser label={t(locale, "common.inBrowser")} />
           <form action={logout}>
             <button type="submit" style={{ ...ui.btn, padding: "7px 14px" }}>
               {t(locale, "common.logout")}
