@@ -6,6 +6,7 @@ import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { logout } from "../auth-actions";
 import { OpenInBrowser } from "./open-in-browser";
+import { ViewAs } from "./view-as";
 import { ui } from "../ui-styles";
 
 const NAV: Record<Role, { href: string; key: string }[]> = {
@@ -75,7 +76,19 @@ export default async function DashLayout({ children }: { children: React.ReactNo
         </div>
       </nav>
 
-      <main className="pm-main">{children}</main>
+      <main className="pm-main">
+        {principal.realRole === "admin" && (
+          <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <ViewAs current={principal.role as "admin" | "client" | "contributor"} locale={locale} />
+            {principal.role !== "admin" && (
+              <span style={{ ...ui.monoLabel, color: "#e8b339" }}>
+                {t(locale, "viewas.banner", { role: t(locale, `role.${principal.role}`) })}
+              </span>
+            )}
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

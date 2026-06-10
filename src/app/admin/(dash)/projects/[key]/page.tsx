@@ -1,0 +1,49 @@
+import Link from "next/link";
+import { requireAdmin } from "@/lib/principal";
+import { getProjectFull, getProjectTokens } from "@/lib/db";
+import { getLocale } from "@/lib/i18n-server";
+import { t } from "@/lib/i18n";
+import { MetaForm } from "./meta-form";
+import { TokenRow } from "../token-row";
+import { ui } from "../../../ui-styles";
+
+export const dynamic = "force-dynamic";
+
+export default async function ProjectPage({ params }: { params: Promise<{ key: string }> }) {
+  await requireAdmin();
+  const { key } = await params;
+  const locale = await getLocale();
+  const [proj, tokens] = await Promise.all([getProjectFull(key), getProjectTokens()]);
+
+  if (!proj) {
+    return (
+      <div>
+        <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
+          ← {t(locale, "projects.title")}
+        </Link>
+        <p style={{ color: "#ff5b5b", fontSize: 14, marginTop: 16 }}>404: {key}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
+        ← {t(locale, "projects.title")}
+      </Link>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
+        <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{key}</span>
+        <h1 style={{ ...ui.h1, fontSize: "clamp(24px,5vw,34px)", margin: 0 }}>{proj.name}</h1>
+      </div>
+
+      <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} locale={locale} />
+
+      <div style={{ marginTop: 24 }}>
+        <div style={ui.monoLabel}>{t(locale, "projects.kicker")}</div>
+        <div style={{ marginTop: 10 }}>
+          <TokenRow projectKey={key} name={proj.name} initialToken={tokens.get(key) ?? null} locale={locale} />
+        </div>
+      </div>
+    </div>
+  );
+}

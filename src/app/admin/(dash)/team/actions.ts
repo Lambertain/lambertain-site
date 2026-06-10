@@ -2,43 +2,37 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, deleteAccessRequest } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest } from "@/lib/db";
 import { sendTo } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
 
-export async function createInviteLink(
-  youtrackLogin: string,
-  role: Role,
-): Promise<{ link?: string; error?: string }> {
+export async function createInviteLink(role: Role): Promise<{ link?: string; error?: string }> {
   try {
     await requireAdmin();
-    if (!youtrackLogin) return { error: "Не выбран пользователь" };
     if (role !== "client" && role !== "contributor") return { error: "Недопустимая роль" };
-    const { link } = await generateInvite(youtrackLogin, role);
+    const { link } = await generateInvite(role);
     return { link };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
 }
 
-/** Подтвердить заявку: привязать tg-пользователя к YouTrack-логину и роли. */
+/** Подтвердить заявку: создать участника из Telegram-личности и связать с ролью. */
 export async function approveAccess(
   tgId: number,
+  username: string | null,
   fullName: string,
-  youtrackLogin: string,
   role: Role,
 ): Promise<{ ok?: boolean; error?: string }> {
   try {
     await requireAdmin();
-    if (!youtrackLogin) return { error: "Выберите YouTrack-логин" };
     if (role !== "client" && role !== "contributor") return { error: "Недопустимая роль" };
-    await upsertLink({ tg_id: tgId, youtrack_login: youtrackLogin, role, full_name: fullName });
+    const login = username ? username.toLowerCase() : `tg${tgId}`;
+    await upsertMember(login, fullName || login, role, tgId);
+    await upsertLink({ tg_id: tgId, youtrack_login: login, role, full_name: fullName || login });
     await deleteAccessRequest(tgId);
-    await sendTo(
-      tgId,
-      "✅ Доступ открыт. Откройте PM-портал через меню бота — теперь вы авторизованы.",
-    );
+    await sendTo(tgId, "✅ Доступ открыт. Откройте PM-портал через меню бота — теперь вы авторизованы.");
     revalidatePath("/admin/team");
     return { ok: true };
   } catch (e) {

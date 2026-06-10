@@ -1,4 +1,3 @@
-import { getBackend } from "@/lib/tasks";
 import { requireAdmin } from "@/lib/principal";
 import { listAccessRequests } from "@/lib/db";
 import { getLocale } from "@/lib/i18n-server";
@@ -12,11 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function TeamPage() {
   await requireAdmin();
   const locale = await getLocale();
-  const be = getBackend();
-  const [users, requests] = await Promise.all([be.listUsers(), listAccessRequests()]);
-  const active = users
-    .filter((u) => !u.banned && u.login !== "guest")
-    .map((u) => ({ login: u.login, fullName: u.fullName, role: u.role }));
+  const requests = await listAccessRequests();
   const reqs = requests.map((r) => ({
     tg_id: r.tg_id,
     username: r.username,
@@ -30,12 +25,12 @@ export default async function TeamPage() {
       <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "team.title")}</h1>
       <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12, maxWidth: 560 }}>{t(locale, "team.hint")}</p>
 
-      <AccessRequests requests={reqs} users={active} locale={locale} />
+      <AccessRequests requests={reqs} locale={locale} />
 
       <div style={{ marginTop: 28 }}>
         <div style={ui.monoLabel}>{t(locale, "team.inviteKicker")}</div>
         <h2 style={{ ...ui.h1, fontSize: 22, marginTop: 8 }}>{t(locale, "team.inviteTitle")}</h2>
-        <InviteForm users={active} locale={locale} />
+        <InviteForm locale={locale} />
       </div>
     </div>
   );

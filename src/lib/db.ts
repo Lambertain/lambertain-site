@@ -105,6 +105,20 @@ export async function getLinkByTgId(tgId: number): Promise<TgLink | null> {
   return rows[0] ?? null;
 }
 
+/** Создать/обновить участника (member) — для людей, добавленных через Telegram. */
+export async function upsertMember(
+  login: string,
+  fullName: string | null,
+  role: Role,
+  tgId: number | null,
+): Promise<void> {
+  await q(
+    `INSERT INTO members (login, full_name, role, tg_id) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (login) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, tg_id = EXCLUDED.tg_id`,
+    [login, fullName, role, tgId],
+  );
+}
+
 export async function upsertLink(link: TgLink): Promise<void> {
   await q(
     `INSERT INTO tg_links (tg_id, youtrack_login, role, full_name)
@@ -209,6 +223,29 @@ export async function consumeWebLoginToken(token: string): Promise<number | null
     [token],
   );
   return rows[0]?.tg_id ?? null;
+}
+
+// ---- Проекты: создание и редактирование метаданных ----
+import type { ProjectMeta } from "./tasks/types";
+
+export async function createProject(key: string, name: string): Promise<void> {
+  await q(
+    `INSERT INTO projects (key, name, meta) VALUES ($1,$2,'{}'::jsonb)
+     ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name`,
+    [key, name],
+  );
+}
+
+export async function getProjectFull(key: string): Promise<{ name: string; meta: ProjectMeta } | null> {
+  const rows = await q<{ name: string; meta: ProjectMeta | null }>(
+    "SELECT name, meta FROM projects WHERE key = $1",
+    [key],
+  );
+  return rows[0] ? { name: rows[0].name, meta: rows[0].meta ?? {} } : null;
+}
+
+export async function setProjectMeta(key: string, name: string, meta: ProjectMeta): Promise<void> {
+  await q("UPDATE projects SET name = $2, meta = $3 WHERE key = $1", [key, name, JSON.stringify(meta)]);
 }
 
 // ---- API-токены проектов (для чтения задач Claude'ом разработчика) ----
