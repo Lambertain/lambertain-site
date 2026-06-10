@@ -17,10 +17,10 @@ function pool(): Pool {
   if (!global._pmPool) {
     global._pmPool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      // Railway Postgres требует SSL, локальный — нет.
-      ssl: process.env.DATABASE_URL?.includes("localhost")
-        ? undefined
-        : { rejectUnauthorized: false },
+      // SSL только если явно sslmode=require (внутренний Railway postgres:16 SSL не поддерживает).
+      ssl: process.env.DATABASE_URL?.includes("sslmode=require")
+        ? { rejectUnauthorized: false }
+        : false,
       max: 5,
     });
   }

@@ -25,7 +25,7 @@ const DONE_STATES = ["done", "fixed", "verified", "resolved", "готово", "�
 
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("localhost") ? undefined : { rejectUnauthorized: false },
+  ssl: process.env.DATABASE_URL?.includes("sslmode=require") ? { rejectUnauthorized: false } : false,
   max: 3,
 });
 
