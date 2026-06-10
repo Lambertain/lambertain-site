@@ -144,7 +144,8 @@ body::after {
 .service-tile:hover .service-title { color: var(--accent) !important; }
 
 /* ── PM-портал: адаптив (веб + Telegram Mini App) ─ */
-.pm-main { padding: 32px; max-width: 1000px; margin: 0 auto; }
+.pm-main { padding: 32px; max-width: 1000px; margin: 0 auto; width: 100%; overflow-x: hidden; box-sizing: border-box; }
+.pm-main * { max-width: 100%; }
 @media (max-width: 700px) {
   .pm-nav { padding: 12px 16px !important; gap: 14px !important; flex-wrap: wrap; }
   .pm-nav-links { gap: 14px !important; flex-wrap: wrap; }

@@ -211,11 +211,11 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
         {projects.length > 1 ? (
           <select value={projectKey} onChange={(e) => setProjectKey(e.target.value)} style={{ ...ui.input, width: "auto", flex: 1, padding: "6px 10px" }}>
             {projects.map((p) => (
-              <option key={p.key} value={p.key}>{p.key} — {p.name}</option>
+              <option key={p.key} value={p.key}>{p.name}</option>
             ))}
           </select>
         ) : (
-          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projects[0] ? `${projects[0].key} — ${projects[0].name}` : "—"}</span>
+          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projects[0] ? projects[0].name : "—"}</span>
         )}
       </div>
 

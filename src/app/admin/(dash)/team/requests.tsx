@@ -44,7 +44,7 @@ function RequestRow({ req, projects, locale }: { req: Req; projects: Proj[]; loc
           <option value="">{needsProject ? t(locale, "field.project") : "—"}</option>
           {projects.map((p) => (
             <option key={p.key} value={p.key}>
-              {p.key} — {p.name}
+              {p.name}
             </option>
           ))}
         </select>

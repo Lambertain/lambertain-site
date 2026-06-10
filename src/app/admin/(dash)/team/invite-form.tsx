@@ -43,7 +43,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
             <option value="">{t(locale, "common.choose")}</option>
             {projects.map((p) => (
               <option key={p.key} value={p.key}>
-                {p.key} — {p.name}
+                {p.name}
               </option>
             ))}
           </select>

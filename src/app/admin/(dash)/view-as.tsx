@@ -14,7 +14,7 @@ export function ViewAs({ current, locale }: { current: "admin" | "client" | "con
     { v: "employee", key: "role.employee", active: current === "employee" },
   ];
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
       <span style={{ ...ui.monoLabel, marginRight: 2 }}>{t(locale, "viewas.label")}:</span>
       {opts.map((o) => (
         <button
