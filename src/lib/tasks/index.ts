@@ -5,12 +5,15 @@
  */
 import type { TasksBackend } from "./types";
 import { youtrackBackend } from "./youtrack";
+import { postgresBackend } from "./postgres";
 
 export function getBackend(): TasksBackend {
   const kind = process.env.TASKS_BACKEND || "youtrack";
   switch (kind) {
     case "youtrack":
       return youtrackBackend;
+    case "postgres":
+      return postgresBackend;
     default:
       throw new Error(`Неизвестный TASKS_BACKEND: ${kind}`);
   }

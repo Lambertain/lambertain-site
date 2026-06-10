@@ -168,6 +168,15 @@ export const DICT: Record<string, Entry> = {
   "projects.snippetLabel": { uk: "Рядок для CLAUDE.md розробника", ru: "Строка для CLAUDE.md разработчика", en: "Snippet for the developer’s CLAUDE.md" },
   "projects.noToken": { uk: "токен не створено", ru: "токен не создан", en: "no token yet" },
 
+  // — страница задачи —
+  "task.back": { uk: "← до задач", ru: "← к задачам", en: "← to tasks" },
+  "task.description": { uk: "Опис", ru: "Описание", en: "Description" },
+  "task.noDescription": { uk: "Опис відсутній.", ru: "Описание отсутствует.", en: "No description." },
+  "task.comments": { uk: "Коментарі", ru: "Комментарии", en: "Comments" },
+  "task.noComments": { uk: "Коментарів немає.", ru: "Комментариев нет.", en: "No comments." },
+  "task.addComment": { uk: "Додати коментар", ru: "Добавить комментарий", en: "Add comment" },
+  "task.send": { uk: "Надіслати", ru: "Отправить", en: "Send" },
+
   // — карточка задачи —
   "card.stale": { uk: "висить {n} дн.", ru: "висит {n} дн.", en: "{n}d idle" },
   "card.unassigned": { uk: "не призначено", ru: "не назначен", en: "unassigned" },

@@ -12,8 +12,6 @@ const NAV: Record<Role, { href: string; key: string }[]> = {
   admin: [
     { href: "/admin", key: "nav.newTask" },
     { href: "/admin/tasks", key: "nav.tasks" },
-    { href: "/admin/clients", key: "nav.clients" },
-    { href: "/admin/overdue", key: "nav.overdue" },
     { href: "/admin/projects", key: "nav.projects" },
     { href: "/admin/team", key: "nav.team" },
   ],

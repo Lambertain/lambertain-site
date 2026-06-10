@@ -35,10 +35,7 @@ export async function GET(req: Request) {
 
   // Список задач проекта.
   const all = url.searchParams.get("all") === "1";
-  const query = all
-    ? `project: ${projectKey} sort by: updated desc`
-    : `project: ${projectKey} #Unresolved sort by: updated desc`;
-  const tasks = await be.listTasks(query);
+  const tasks = await be.listTasks({ projectKey, unresolvedOnly: !all, order: "updated_desc" });
   return NextResponse.json({
     project: projectKey,
     count: tasks.length,

@@ -1,4 +1,5 @@
 import { getBackend } from "@/lib/tasks";
+import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal } from "@/lib/principal";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
@@ -8,29 +9,31 @@ import { ui } from "../../ui-styles";
 
 export const dynamic = "force-dynamic";
 
+const STALE_DAYS = 5;
+
 export default async function TasksPage() {
   const me = await getPrincipal();
   if (!me) redirect("/admin/login");
   const locale = await getLocale();
 
   const be = getBackend();
-  let query = "#Unresolved sort by: updated desc";
+  let filter: TaskFilter = { unresolvedOnly: true, order: "updated_desc" };
   let title = t(locale, "tasks.allTitle");
   let kicker = t(locale, "tasks.allKicker");
 
   if (me.role === "contributor" && me.youtrackLogin) {
-    query = `Assignee: ${me.youtrackLogin} #Unresolved sort by: updated desc`;
+    filter = { assigneeLogin: me.youtrackLogin, unresolvedOnly: true, order: "updated_desc" };
     title = t(locale, "tasks.mineTitle");
     kicker = t(locale, "tasks.mineKicker");
   } else if (me.role === "client" && me.youtrackLogin) {
-    query = `created by: ${me.youtrackLogin} sort by: updated desc`;
+    filter = { reporterLogin: me.youtrackLogin, order: "updated_desc" };
     title = t(locale, "tasks.clientTitle");
     kicker = t(locale, "tasks.clientKicker");
   }
 
   let tasks;
   try {
-    tasks = await be.listTasks(query);
+    tasks = await be.listTasks(filter);
   } catch (e) {
     return (
       <div>
@@ -43,11 +46,25 @@ export default async function TasksPage() {
     );
   }
 
+  const threshold = Date.now() - STALE_DAYS * 86400000;
+  const stale = tasks.filter((x) => x.resolved == null && x.updated != null && x.updated < threshold);
+  const fresh = tasks.filter((x) => !stale.includes(x));
+
   return (
     <div>
       <div style={ui.monoLabel}>{kicker}</div>
       <h1 style={{ ...ui.h1, marginTop: 8 }}>{title}</h1>
-      <TaskList tasks={tasks} empty={t(locale, "tasks.empty")} locale={locale} />
+
+      {stale.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{ ...ui.monoLabel, color: "#e8b339" }}>
+            {t(locale, "overdue.title")} · {stale.length}
+          </div>
+          <TaskList tasks={stale} empty="" locale={locale} />
+        </div>
+      )}
+
+      <TaskList tasks={fresh} empty={t(locale, "tasks.empty")} locale={locale} />
     </div>
   );
 }

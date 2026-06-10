@@ -73,11 +73,22 @@ export interface DraftTask {
   confidence: "high" | "low";
 }
 
+/** Структурный фильтр задач — backend-agnostic (вместо YouTrack-строки запроса). */
+export interface TaskFilter {
+  projectKey?: string;
+  assigneeLogin?: string;
+  reporterLogin?: string;
+  /** Только нерешённые (открытые). */
+  unresolvedOnly?: boolean;
+  order?: "updated_desc" | "updated_asc" | "created_desc";
+  limit?: number;
+}
+
 /** Контракт бэкенда. Любая реализация (YouTrack, Postgres) обязана его выполнять. */
 export interface TasksBackend {
   listProjects(): Promise<Project[]>;
   listUsers(): Promise<User[]>;
-  listTasks(query: string): Promise<Task[]>;
+  listTasks(filter?: TaskFilter): Promise<Task[]>;
   getTask(id: string): Promise<Task>;
   createTask(input: {
     projectKey: string;

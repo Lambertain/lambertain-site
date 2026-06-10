@@ -4,6 +4,7 @@
  */
 import type {
   TasksBackend,
+  TaskFilter,
   Project,
   User,
   Task,
@@ -166,8 +167,23 @@ async function toTask(issue: YtIssue, roles: Map<string, Role>): Promise<Task> {
     resolved: issue.resolved ?? null,
     dueDate: null,
     priority: priority?.name ?? null,
-    url: `${URL_BASE}/issue/${issue.idReadable}`,
+    url: `/admin/tasks/${issue.idReadable}`,
   };
+}
+
+function filterToQuery(f: TaskFilter = {}): string {
+  const parts: string[] = [];
+  if (f.projectKey) parts.push(`project: ${f.projectKey}`);
+  if (f.assigneeLogin) parts.push(`Assignee: ${f.assigneeLogin}`);
+  if (f.reporterLogin) parts.push(`created by: ${f.reporterLogin}`);
+  if (f.unresolvedOnly) parts.push("#Unresolved");
+  const sort =
+    f.order === "updated_asc"
+      ? "sort by: updated asc"
+      : f.order === "created_desc"
+        ? "sort by: created desc"
+        : "sort by: updated desc";
+  return `${parts.join(" ")} ${sort}`.trim();
 }
 
 export const youtrackBackend: TasksBackend = {
@@ -197,12 +213,12 @@ export const youtrackBackend: TasksBackend = {
     }));
   },
 
-  async listTasks(query: string): Promise<Task[]> {
+  async listTasks(filter?: TaskFilter): Promise<Task[]> {
     const roles = await rolesByLogin();
     const issues = await yt<YtIssue[]>("/api/issues", {
-      query,
+      query: filterToQuery(filter),
       fields: ISSUE_FIELDS,
-      $top: 200,
+      $top: filter?.limit ?? 200,
     });
     return Promise.all(issues.map((i) => toTask(i, roles)));
   },
