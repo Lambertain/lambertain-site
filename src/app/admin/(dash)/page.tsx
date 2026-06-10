@@ -1,7 +1,7 @@
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
-import { NewTaskForm } from "./new-task-form";
+import { ChatIntake } from "./chat-intake";
 import { ui } from "../ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function NewTaskPage() {
   const be = getBackend();
   const locale = await getLocale();
-  const [projects, users] = await Promise.all([be.listProjects(), be.listUsers()]);
+  const projects = await be.listProjects();
   return (
     <div>
       <div style={ui.monoLabel}>{t(locale, "newtask.kicker")}</div>
@@ -17,13 +17,7 @@ export default async function NewTaskPage() {
       <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12, maxWidth: 560 }}>
         {t(locale, "newtask.hint")}
       </p>
-      <NewTaskForm
-        locale={locale}
-        projects={projects.map((p) => ({ key: p.key, name: p.name }))}
-        users={users
-          .filter((u) => !u.banned)
-          .map((u) => ({ login: u.login, fullName: u.fullName, role: u.role }))}
-      />
+      <ChatIntake locale={locale} projects={projects.map((p) => ({ key: p.key, name: p.name }))} />
     </div>
   );
 }

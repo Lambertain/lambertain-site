@@ -95,6 +95,14 @@ export const DICT: Record<string, Entry> = {
     en: "⚠ Low confidence — check the project and gist",
   },
   "newtask.createBtn": { uk: "Створити задачу", ru: "Создать задачу", en: "Create task" },
+  "chat.placeholder": { uk: "Опишіть задачу, додайте скрін…", ru: "Опишите задачу, добавьте скрин…", en: "Describe the task, attach a screenshot…" },
+  "chat.send": { uk: "Надіслати", ru: "Отправить", en: "Send" },
+  "chat.attach": { uk: "Скрін", ru: "Скрин", en: "Image" },
+  "chat.thinking": { uk: "Аналізую…", ru: "Анализирую…", en: "Analyzing…" },
+  "chat.proposedTitle": { uk: "Запропоновані задачі", ru: "Предложенные задачи", en: "Proposed tasks" },
+  "chat.createAll": { uk: "Створити в портал", ru: "Создать в портал", en: "Create in portal" },
+  "chat.createdOk": { uk: "Створено ✓", ru: "Создано ✓", en: "Created ✓" },
+  "chat.you": { uk: "Ви", ru: "Вы", en: "You" },
 
   // — поля —
   "field.project": { uk: "Проєкт", ru: "Проект", en: "Project" },

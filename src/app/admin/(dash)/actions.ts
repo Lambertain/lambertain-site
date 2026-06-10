@@ -3,10 +3,65 @@
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
+import { runIntake, type ProposedTask } from "@/lib/intake";
+import { repoFromGit } from "@/lib/github";
 import type { DraftTask } from "@/lib/tasks/types";
+import type Anthropic from "@anthropic-ai/sdk";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Один ход диалогового интейка по проекту. */
+export async function intakeTurn(
+  history: Anthropic.MessageParam[],
+  projectKey: string,
+): Promise<{ messages?: Anthropic.MessageParam[]; reply?: string; proposed?: ProposedTask[]; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Не авторизован" };
+  try {
+    const be = getBackend();
+    const [projects, users] = await Promise.all([be.listProjects(), be.listUsers()]);
+    const project = projects.find((p) => p.key === projectKey);
+    if (!project) return { error: "Проект не выбран" };
+    const repo = repoFromGit(project.meta.devGit);
+    const res = await runIntake(history, {
+      projectKey,
+      projectName: project.name,
+      repo,
+      users: users.filter((u) => !u.banned).map((u) => ({ login: u.login, fullName: u.fullName, role: u.role })),
+      today: today(),
+    });
+    return { messages: res.messages, reply: res.reply, proposed: res.proposed };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка интейка" };
+  }
+}
+
+/** Создать предложенные интейком задачи. */
+export async function createProposedTasks(
+  projectKey: string,
+  tasks: ProposedTask[],
+): Promise<{ created?: { id: string; url: string }[]; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Не авторизован" };
+  try {
+    const be = getBackend();
+    const created = [];
+    for (const tk of tasks) {
+      const task = await be.createTask({
+        projectKey,
+        summary: tk.summary,
+        description: tk.description,
+        assigneeLogin: tk.assigneeLogin ?? null,
+        priority: tk.priority ?? null,
+      });
+      created.push({ id: task.id, url: task.url });
+    }
+    return { created };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка создания" };
+  }
 }
 
 /** Структурировать произвольный текст в черновик задачи (превью перед созданием).
