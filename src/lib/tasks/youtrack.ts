@@ -291,6 +291,10 @@ export const youtrackBackend: TasksBackend = {
     throw new Error("Смена статуса доступна только в Postgres-бэкенде");
   },
 
+  async deleteTask(): Promise<void> {
+    throw new Error("Удаление доступно только в Postgres-бэкенде");
+  },
+
   async addComment(id: string, text: string): Promise<Comment> {
     const roles = await rolesByLogin();
     type YtComment = {

@@ -284,6 +284,16 @@ export async function setProjectMeta(key: string, name: string, meta: ProjectMet
   await q("UPDATE projects SET name = $2, meta = $3 WHERE key = $1", [key, name, JSON.stringify(meta)]);
 }
 
+export async function setProjectArchived(key: string, archived: boolean): Promise<void> {
+  await q("UPDATE projects SET archived = $2 WHERE key = $1", [key, archived]);
+}
+
+export async function listAllProjects(): Promise<{ key: string; name: string; archived: boolean }[]> {
+  return q<{ key: string; name: string; archived: boolean }>(
+    "SELECT key, name, archived FROM projects ORDER BY archived, key",
+  );
+}
+
 // ---- API-токены проектов (для чтения задач Claude'ом разработчика) ----
 export async function getProjectKeyByToken(token: string): Promise<string | null> {
   const rows = await q<{ project_key: string }>(

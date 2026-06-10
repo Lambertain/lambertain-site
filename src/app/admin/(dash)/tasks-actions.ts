@@ -18,6 +18,20 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
   }
 }
 
+export async function deleteTask(id: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Не авторизован" };
+  // Удалять могут админ и клиент.
+  if (me.role !== "admin" && me.role !== "client" && me.realRole !== "admin") return { error: "Нет прав" };
+  try {
+    await getBackend().deleteTask(id);
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
 export async function markTaskRead(id: string): Promise<void> {
   const me = await getPrincipal();
   if (!me) return;

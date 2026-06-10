@@ -175,6 +175,13 @@ export const postgresBackend: TasksBackend = {
     await q("UPDATE tasks SET status = $2, updated_at = now() WHERE readable_id = $1", [id, status]);
   },
 
+  async deleteTask(id: string): Promise<void> {
+    const rows = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [id]);
+    if (!rows[0]) return;
+    await q("DELETE FROM comments WHERE task_id = $1", [rows[0].id]);
+    await q("DELETE FROM tasks WHERE id = $1", [rows[0].id]);
+  },
+
   async addComment(id: string, text: string): Promise<Comment> {
     const task = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [id]);
     if (!task[0]) throw new Error(`Задача ${id} не найдена`);

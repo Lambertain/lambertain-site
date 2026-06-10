@@ -107,4 +107,5 @@ export interface TasksBackend {
   getComments(id: string): Promise<Comment[]>;
   addComment(id: string, text: string): Promise<Comment>;
   updateStatus(id: string, status: string): Promise<void>;
+  deleteTask(id: string): Promise<void>;
 }

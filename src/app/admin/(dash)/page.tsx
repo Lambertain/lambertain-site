@@ -49,6 +49,7 @@ export default async function HomePage() {
   }));
 
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
+  const canDelete = me.realRole === "admin" || me.role === "client";
 
   return (
     <div>
@@ -56,7 +57,7 @@ export default async function HomePage() {
         <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "nav.tasks")}</h1>
         <ChatModal projects={projects} locale={locale} />
       </div>
-      <TaskBoard tasks={board} locale={locale} canEditStatus={canEditStatus} empty={t(locale, "tasks.empty")} />
+      <TaskBoard tasks={board} locale={locale} canEditStatus={canEditStatus} canDelete={canDelete} empty={t(locale, "tasks.empty")} />
     </div>
   );
 }

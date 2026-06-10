@@ -22,6 +22,12 @@ export const DICT: Record<string, Entry> = {
   "common.copy": { uk: "Копіювати", ru: "Копировать", en: "Copy" },
   "common.copied": { uk: "Скопійовано", ru: "Скопировано", en: "Copied" },
   "common.choose": { uk: "— обрати —", ru: "— выбрать —", en: "— select —" },
+  "common.cancel": { uk: "Скасувати", ru: "Отмена", en: "Cancel" },
+  "common.delete": { uk: "Видалити", ru: "Удалить", en: "Delete" },
+  "task.deleteConfirm": { uk: "Видалити задачу? Дію не скасувати.", ru: "Удалить задачу? Действие необратимо.", en: "Delete the task? This cannot be undone." },
+  "projects.archive": { uk: "В архів", ru: "В архив", en: "Archive" },
+  "projects.restore": { uk: "З архіву", ru: "Из архива", en: "Restore" },
+  "projects.archived": { uk: "Архів", ru: "Архив", en: "Archived" },
 
   // — роли —
   "role.admin": { uk: "адмін", ru: "админ", en: "admin" },

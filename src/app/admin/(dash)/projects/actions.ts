@@ -2,7 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/principal";
-import { setProjectToken, createProject, setProjectMeta } from "@/lib/db";
+import { setProjectToken, createProject, setProjectMeta, setProjectArchived } from "@/lib/db";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -31,6 +31,17 @@ export async function addProject(
   if (!/^[A-Z0-9]+$/.test(key)) return { error: "Ключ — латиница/цифры" };
   await createProject(key, name);
   redirect(`/admin/projects/${key}`);
+}
+
+export async function archiveProject(key: string, archived: boolean): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    await setProjectArchived(key, archived);
+    revalidatePath("/admin/projects");
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
 }
 
 export async function saveMeta(
