@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getPrincipal } from "@/lib/principal";
 import type { Role } from "@/lib/tasks/types";
 import { logout } from "../auth-actions";
+import { OpenInBrowser } from "./open-in-browser";
 import { ui } from "../ui-styles";
 
 const NAV: Record<Role, { href: string; label: string }[]> = {
@@ -73,6 +74,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           <span style={ui.monoLabel}>
             {principal.fullName} · {principal.role}
           </span>
+          <OpenInBrowser />
           <form action={logout}>
             <button type="submit" style={{ ...ui.btn, padding: "7px 14px" }}>
               Выйти

@@ -1,7 +1,8 @@
 /**
- * Авторизация Telegram Mini App: фронт присылает initData,
- * сервер валидирует подпись, при наличии инвайта привязывает пользователя,
- * ставит сессионную куку и возвращает роль.
+ * Авторизация Telegram Mini App: фронт присылает initData, сервер валидирует подпись.
+ * - admin / привязанный пользователь -> сессия + роль.
+ * - есть инвайт в start_param -> привязка и вход.
+ * - иначе -> needRole: апка покажет выбор роли (Клиент/Разработчик).
  */
 import { NextResponse } from "next/server";
 import { validateInitData } from "@/lib/telegram-auth";
@@ -19,21 +20,19 @@ export async function POST(req: Request) {
   const { user, startParam } = result;
   const adminId = process.env.ADMIN_TELEGRAM_ID ? Number(process.env.ADMIN_TELEGRAM_ID) : null;
 
-  // Инвайт в start_param — пробуем привязать.
   if (startParam) await redeemInvite(startParam, user);
 
-  // Резолвим роль.
   let role: string | null = null;
-  if (adminId && user.id === adminId) {
-    role = "admin";
-  } else {
-    const link = await getLinkByTgId(user.id);
-    role = link?.role ?? null;
-  }
+  if (adminId && user.id === adminId) role = "admin";
+  else role = (await getLinkByTgId(user.id))?.role ?? null;
 
   if (!role) {
-    // Авторизация Telegram прошла, но пользователь не привязан — нужен инвайт.
-    return NextResponse.json({ ok: false, error: "not_linked", needInvite: true }, { status: 403 });
+    // Telegram подтвердил личность, но роли нет — апка предложит выбрать роль.
+    return NextResponse.json({
+      ok: false,
+      needRole: true,
+      user: { id: user.id, firstName: user.firstName, username: user.username },
+    });
   }
 
   await setSession(`tg:${user.id}`);

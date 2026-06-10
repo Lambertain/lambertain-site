@@ -21,6 +21,12 @@ CREATE TABLE IF NOT EXISTS invites (
   used_at TIMESTAMPTZ, used_by_tg_id BIGINT);
 CREATE TABLE IF NOT EXISTS poller_state (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS role_overrides (login TEXT PRIMARY KEY, role TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS access_requests (
+  tg_id BIGINT PRIMARY KEY, username TEXT, full_name TEXT,
+  requested_role TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS web_login_tokens (
+  token TEXT PRIMARY KEY, tg_id BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ);
 `;
 
 // Авторитетная раскладка ролей (от Никиты). ON CONFLICT DO NOTHING — ручные правки не затираются.

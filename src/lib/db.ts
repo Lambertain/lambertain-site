@@ -52,6 +52,20 @@ CREATE TABLE IF NOT EXISTS role_overrides (
   login  TEXT PRIMARY KEY,
   role   TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS access_requests (
+  tg_id          BIGINT PRIMARY KEY,
+  username       TEXT,
+  full_name      TEXT,
+  requested_role TEXT NOT NULL,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS web_login_tokens (
+  token       TEXT PRIMARY KEY,
+  tg_id       BIGINT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at  TIMESTAMPTZ NOT NULL,
+  used_at     TIMESTAMPTZ
+);
 `;
 
 /** Гарантирует, что схема создана (один раз на процесс). */
@@ -136,6 +150,60 @@ export async function markInviteUsed(token: string, tgId: number): Promise<void>
 export async function getRoleOverrides(): Promise<Map<string, Role>> {
   const rows = await q<{ login: string; role: Role }>("SELECT login, role FROM role_overrides");
   return new Map(rows.map((r) => [r.login, r.role]));
+}
+
+// ---- Заявки на доступ (новый пользователь выбрал роль, ждёт подтверждения) ----
+export interface AccessRequest {
+  tg_id: number;
+  username: string | null;
+  full_name: string | null;
+  requested_role: Role;
+  created_at: string;
+}
+
+export async function upsertAccessRequest(
+  tgId: number,
+  username: string | null,
+  fullName: string | null,
+  role: Role,
+): Promise<void> {
+  await q(
+    `INSERT INTO access_requests (tg_id, username, full_name, requested_role)
+     VALUES ($1,$2,$3,$4)
+     ON CONFLICT (tg_id) DO UPDATE
+       SET username=EXCLUDED.username, full_name=EXCLUDED.full_name,
+           requested_role=EXCLUDED.requested_role, created_at=now()`,
+    [tgId, username, fullName, role],
+  );
+}
+
+export async function listAccessRequests(): Promise<AccessRequest[]> {
+  return q<AccessRequest>(
+    "SELECT tg_id, username, full_name, requested_role, created_at FROM access_requests ORDER BY created_at",
+  );
+}
+
+export async function deleteAccessRequest(tgId: number): Promise<void> {
+  await q("DELETE FROM access_requests WHERE tg_id = $1", [tgId]);
+}
+
+// ---- Одноразовые токены для входа в веб из апки ----
+export async function createWebLoginToken(token: string, tgId: number, ttlMin: number): Promise<void> {
+  await q(
+    `INSERT INTO web_login_tokens (token, tg_id, expires_at)
+     VALUES ($1,$2, now() + ($3 || ' minutes')::interval)`,
+    [token, tgId, String(ttlMin)],
+  );
+}
+
+export async function consumeWebLoginToken(token: string): Promise<number | null> {
+  const rows = await q<{ tg_id: number }>(
+    `UPDATE web_login_tokens SET used_at = now()
+     WHERE token = $1 AND used_at IS NULL AND expires_at > now()
+     RETURNING tg_id`,
+    [token],
+  );
+  return rows[0]?.tg_id ?? null;
 }
 
 // ---- Состояние поллера ----
