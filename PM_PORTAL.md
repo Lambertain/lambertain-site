@@ -52,7 +52,7 @@ UI и бот не меняются.
 ```
 YOUTRACK_URL, YOUTRACK_TOKEN        доступ к YouTrack
 TASKS_BACKEND=youtrack
-ANTHROPIC_API_KEY, STRUCTURER_MODEL  Claude API (модель: claude-sonnet-4-6)
+ANTHROPIC_API_KEY, STRUCTURER_MODEL  Claude API (модель: claude-opus-4-8)
 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID Telegram-бот и чат для уведомлений
 TELEGRAM_BOT_USERNAME, TELEGRAM_MINIAPP_SHORTNAME  для invite-ссылок
 ADMIN_PASSWORD                       вход в /admin (web)

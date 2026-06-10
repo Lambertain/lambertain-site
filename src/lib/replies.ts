@@ -5,7 +5,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Task, Comment } from "./tasks/types";
 
-const MODEL = process.env.STRUCTURER_MODEL || "claude-sonnet-4-6";
+const MODEL = process.env.STRUCTURER_MODEL || "claude-opus-4-8";
 
 export async function draftClientReply(
   task: Task,

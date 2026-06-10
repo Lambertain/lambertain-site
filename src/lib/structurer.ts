@@ -5,7 +5,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { DraftTask, Project, User } from "./tasks/types";
 
-const MODEL = process.env.STRUCTURER_MODEL || "claude-sonnet-4-6";
+const MODEL = process.env.STRUCTURER_MODEL || "claude-opus-4-8";
 
 const TASK_TOOL: Anthropic.Tool = {
   name: "create_task",
