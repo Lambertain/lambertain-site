@@ -28,6 +28,8 @@ export function validateInitData(initData: string): InitDataResult | null {
   const hash = params.get("hash");
   if (!hash) return null;
   params.delete("hash");
+  // Новые клиенты добавляют отдельное поле signature (Ed25519) — в hash-проверку не входит.
+  params.delete("signature");
 
   const dataCheckString = [...params.entries()]
     .map(([k, v]) => `${k}=${v}`)

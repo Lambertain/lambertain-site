@@ -16,7 +16,7 @@ export default function LoginPage() {
         <div>
           <div style={ui.monoLabel}>Lambertain</div>
           <h1 style={{ ...ui.h1, fontSize: 30, marginTop: 8 }}>
-            PM<span style={{ color: "var(--accent)" }}>.</span>
+            Dev<span style={{ color: "var(--accent)" }}>.</span>
           </h1>
         </div>
 

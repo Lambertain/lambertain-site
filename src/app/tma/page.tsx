@@ -81,7 +81,7 @@ export default function TmaPage() {
     <div style={{ ...ui.page, display: "grid", placeItems: "center", padding: 24 }}>
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={authenticate} />
       <div style={{ ...ui.card, maxWidth: 360, textAlign: "center" }}>
-        <div style={ui.monoLabel}>Lambertain PM</div>
+        <div style={ui.monoLabel}>Lambertain Dev</div>
 
         {phase === "choose_role" ? (
           <>

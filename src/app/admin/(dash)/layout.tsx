@@ -55,7 +55,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           }}
         >
           LAMB<span style={{ color: "var(--accent)" }}>.</span>
-          <span style={{ ...ui.monoLabel, marginLeft: 10 }}>PM</span>
+          <span style={{ ...ui.monoLabel, marginLeft: 10 }}>Dev</span>
         </Link>
 
         <div style={{ display: "flex", gap: 22 }}>
