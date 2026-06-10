@@ -42,8 +42,9 @@ export default async function DashLayout({ children }: { children: React.ReactNo
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 28,
-          padding: "16px 130px 16px 24px",
+          gap: 16,
+          padding: "14px 56px 12px 20px",
+          flexWrap: "wrap",
           borderBottom: "1px solid var(--border)",
           background: "rgba(8,8,8,0.9)",
           backdropFilter: "blur(16px)",
@@ -80,16 +81,13 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           <span style={{ ...ui.monoLabel, marginLeft: 10 }}>Dev</span>
         </Link>
 
-        <div className="pm-nav-links" style={{ display: "flex", gap: 22 }}>
+        <div className="pm-nav-links" style={{ display: "flex", gap: 22, flexWrap: "wrap", flexBasis: "100%", marginTop: 6 }}>
           {nav.map((n) => (
             <Link key={n.href} href={n.href} style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
               {t(locale, n.key)}
             </Link>
           ))}
-        </div>
-
-        <div className="pm-nav-right" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 16 }}>
-          <span style={ui.monoLabel}>
+          <span style={{ ...ui.monoLabel, marginLeft: "auto" }}>
             {principal.fullName} · {t(locale, `role.${principal.role}`)}
           </span>
         </div>

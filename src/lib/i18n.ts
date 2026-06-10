@@ -114,7 +114,9 @@ export const DICT: Record<string, Entry> = {
   "chat.attachFile": { uk: "Прикріпити файл", ru: "Прикрепить файл", en: "Attach file" },
   "chat.voice": { uk: "Надиктувати", ru: "Надиктовать", en: "Dictate" },
   "chat.voiceStop": { uk: "Стоп", ru: "Стоп", en: "Stop" },
-  "chat.empty": { uk: "Опишіть задачу або надиктуйте голосом. Можна вставити скрін через Ctrl+V.", ru: "Опишите задачу или надиктуйте голосом. Можно вставить скрин через Ctrl+V.", en: "Describe the task or dictate by voice. Paste a screenshot with Ctrl+V." },
+  "chat.recording": { uk: "Запис…", ru: "Запись…", en: "Recording…" },
+  "chat.lockHint": { uk: "вгору — замок, вліво — видалити", ru: "вверх — замок, влево — удалить", en: "up — lock, left — delete" },
+  "chat.empty": { uk: "Опишіть задачу. Затисніть кнопку відправки для голосового вводу. Скрін — через Ctrl+V або скріпку.", ru: "Опишите задачу. Зажмите кнопку отправки для голосового ввода. Скрин — через Ctrl+V или скрепку.", en: "Describe the task. Hold the send button for voice input. Paste a screenshot with Ctrl+V or the clip." },
 
   // — поля —
   "field.project": { uk: "Проєкт", ru: "Проект", en: "Project" },

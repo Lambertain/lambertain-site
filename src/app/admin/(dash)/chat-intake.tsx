@@ -34,6 +34,7 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
   const [created, setCreated] = useState<{ id: string; url: string }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [pending, start] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -66,17 +67,15 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
     }
   }
 
-  function toggleVoice() {
+  const preVoiceRef = useRef("");
+  function startVoice() {
     // @ts-expect-error — Web Speech API
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
       setError("Голосовой ввод не поддерживается этим браузером.");
       return;
     }
-    if (recording) {
-      (recRef.current as { stop: () => void } | null)?.stop();
-      return;
-    }
+    preVoiceRef.current = input;
     const rec = new SR();
     rec.lang = SPEECH_LANG[locale];
     rec.interimResults = true;
@@ -86,11 +85,51 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
       const txt = Array.from(e.results).map((r) => r[0].transcript).join("");
       setInput(baseTextRef.current + txt);
     };
-    rec.onend = () => setRecording(false);
-    rec.onerror = () => setRecording(false);
+    rec.onerror = () => { setRecording(false); setLocked(false); };
     recRef.current = rec;
     rec.start();
     setRecording(true);
+  }
+  function stopVoice() {
+    (recRef.current as { stop: () => void } | null)?.stop();
+    setRecording(false);
+  }
+  function cancelVoice() {
+    stopVoice();
+    setLocked(false);
+    setInput(preVoiceRef.current); // вернуть текст до записи — голосовое отменено
+  }
+  function finishVoice() {
+    stopVoice();
+    setLocked(false);
+    setTimeout(() => send(), 250);
+  }
+
+  // Зажать «Отправить» = запись; потянуть вверх = замок (руки свободны); отпустить = стоп+отправка; тап = отправка.
+  const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heldRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const startYRef = useRef(0);
+  const startXRef = useRef(0);
+  function sendDown(e: React.PointerEvent) {
+    heldRef.current = false;
+    cancelledRef.current = false;
+    startYRef.current = e.clientY;
+    startXRef.current = e.clientX;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    holdRef.current = setTimeout(() => { heldRef.current = true; startVoice(); }, 350);
+  }
+  function sendMove(e: React.PointerEvent) {
+    if (!heldRef.current || locked || cancelledRef.current) return;
+    if (startYRef.current - e.clientY > 40) setLocked(true); // вверх — замок
+    else if (startXRef.current - e.clientX > 60) { cancelVoice(); cancelledRef.current = true; heldRef.current = false; } // влево — удалить
+  }
+  function sendUp() {
+    if (holdRef.current) clearTimeout(holdRef.current);
+    if (cancelledRef.current) { cancelledRef.current = false; return; }
+    if (locked) return; // замок — продолжаем запись, управление кнопками
+    if (heldRef.current) finishVoice();
+    else send();
   }
 
   function send() {
@@ -139,14 +178,18 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 210px)", minHeight: 380, marginTop: 14, border: "1px solid var(--border)", background: "var(--surface)" }}>
-      {/* проект */}
+      {/* проект (селект только если проектов больше одного) */}
       <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={ui.monoLabel}>{t(locale, "field.project")}:</span>
-        <select value={projectKey} onChange={(e) => setProjectKey(e.target.value)} style={{ ...ui.input, width: "auto", flex: 1, padding: "6px 10px" }}>
-          {projects.map((p) => (
-            <option key={p.key} value={p.key}>{p.key} — {p.name}</option>
-          ))}
-        </select>
+        {projects.length > 1 ? (
+          <select value={projectKey} onChange={(e) => setProjectKey(e.target.value)} style={{ ...ui.input, width: "auto", flex: 1, padding: "6px 10px" }}>
+            {projects.map((p) => (
+              <option key={p.key} value={p.key}>{p.key} — {p.name}</option>
+            ))}
+          </select>
+        ) : (
+          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projects[0] ? `${projects[0].key} — ${projects[0].name}` : "—"}</span>
+        )}
       </div>
 
       {/* сообщения */}
@@ -213,25 +256,50 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
       )}
 
       {/* ввод */}
-      <div style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid var(--border)", alignItems: "flex-end" }}>
-        <input ref={fileRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
-        <button onClick={() => fileRef.current?.click()} title={t(locale, "chat.attachFile")} style={iconBtn}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
-        </button>
-        <button onClick={toggleVoice} title={t(locale, "chat.voice")} style={{ ...iconBtn, borderColor: recording ? "var(--accent)" : "var(--border-2)", color: recording ? "var(--accent)" : "var(--muted)" }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /></svg>
-        </button>
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onPaste={onPaste}
-          onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } }}
-          rows={1}
-          placeholder={t(locale, "chat.placeholder")}
-          style={{ ...ui.input, resize: "none", minHeight: 40, maxHeight: 120, flex: 1 }}
-        />
-        <button onClick={send} disabled={pending || (!input.trim() && !atts.length)} style={{ ...ui.btnAccent, height: 40, padding: "0 16px", opacity: pending || (!input.trim() && !atts.length) ? 0.5 : 1 }}>{t(locale, "chat.send")}</button>
-      </div>
+      {locked ? (
+        <div style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid var(--border)", alignItems: "center" }}>
+          <button onClick={cancelVoice} title="" style={{ ...iconBtn, color: "#ff5b5b", borderColor: "#ff5b5b" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+          </button>
+          <span style={{ ...ui.monoLabel, color: "#ff5b5b", flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ff5b5b", display: "inline-block" }} />
+            {t(locale, "chat.recording")}
+          </span>
+          <button onClick={finishVoice} title={t(locale, "chat.send")} style={{ ...iconBtn, width: 40, height: 40, background: "var(--accent)", borderColor: "var(--accent)", color: "#000" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid var(--border)", alignItems: "flex-end" }}>
+          <input ref={fileRef} type="file" multiple hidden onChange={(e) => addFiles(e.target.files)} />
+          <button onClick={() => fileRef.current?.click()} title={t(locale, "chat.attachFile")} style={iconBtn}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+          </button>
+          <textarea
+            value={input}
+            onChange={(e) => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px"; }}
+            onPaste={onPaste}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } }}
+            rows={1}
+            placeholder={recording ? `${t(locale, "chat.recording")} · ${t(locale, "chat.lockHint")}` : t(locale, "chat.placeholder")}
+            style={{ ...ui.input, resize: "none", height: 40, maxHeight: 140, overflowY: "auto", flex: 1 }}
+          />
+          <button
+            onPointerDown={(e) => { e.preventDefault(); sendDown(e); }}
+            onPointerMove={sendMove}
+            onPointerUp={(e) => { e.preventDefault(); sendUp(); }}
+            disabled={pending}
+            title={t(locale, "chat.send")}
+            style={{ ...iconBtn, width: 40, height: 40, background: recording ? "#ff5b5b" : "var(--accent)", borderColor: recording ? "#ff5b5b" : "var(--accent)", color: "#000", opacity: pending ? 0.5 : 1, touchAction: "none" }}
+          >
+            {recording ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7" /></svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
