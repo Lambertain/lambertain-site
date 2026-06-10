@@ -111,6 +111,10 @@ export const DICT: Record<string, Entry> = {
   "chat.createAll": { uk: "Створити в портал", ru: "Создать в портал", en: "Create in portal" },
   "chat.createdOk": { uk: "Створено ✓", ru: "Создано ✓", en: "Created ✓" },
   "chat.you": { uk: "Ви", ru: "Вы", en: "You" },
+  "chat.attachFile": { uk: "Прикріпити файл", ru: "Прикрепить файл", en: "Attach file" },
+  "chat.voice": { uk: "Надиктувати", ru: "Надиктовать", en: "Dictate" },
+  "chat.voiceStop": { uk: "Стоп", ru: "Стоп", en: "Stop" },
+  "chat.empty": { uk: "Опишіть задачу або надиктуйте голосом. Можна вставити скрін через Ctrl+V.", ru: "Опишите задачу или надиктуйте голосом. Можно вставить скрин через Ctrl+V.", en: "Describe the task or dictate by voice. Paste a screenshot with Ctrl+V." },
 
   // — поля —
   "field.project": { uk: "Проєкт", ru: "Проект", en: "Project" },

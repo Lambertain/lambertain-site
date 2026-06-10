@@ -48,13 +48,17 @@ export async function createProposedTasks(
   if (!me) return { error: "Не авторизован" };
   try {
     const be = getBackend();
+    const projects = await be.listProjects();
+    const project = projects.find((p) => p.key === projectKey);
+    const defaultAssignee = project?.meta.defaultAssignee || null;
     const created = [];
     for (const tk of tasks) {
       const task = await be.createTask({
         projectKey,
         summary: tk.summary,
         description: tk.description,
-        assigneeLogin: tk.assigneeLogin ?? null,
+        // Если исполнитель не задан — ставим ответственного по проекту.
+        assigneeLogin: tk.assigneeLogin ?? defaultAssignee,
         priority: tk.priority ?? null,
       });
       created.push({ id: task.id, url: task.url });

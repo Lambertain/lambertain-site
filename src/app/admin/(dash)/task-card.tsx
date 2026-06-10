@@ -14,17 +14,16 @@ function daysSince(ms?: number | null): number | null {
   return Math.floor((Date.now() - ms) / 86400000);
 }
 
-export function TaskCard({ task, locale }: { task: Task; locale: Locale }) {
+export function TaskCard({ task, locale, unread }: { task: Task; locale: Locale; unread?: boolean }) {
   const stale = daysSince(task.updated);
   const isStale = task.resolved == null && stale != null && stale >= 5;
   return (
     <a
       href={task.url}
-      target="_blank"
-      rel="noreferrer"
-      style={{ ...ui.card, display: "block", textDecoration: "none", color: "var(--text)", padding: 18 }}
+      style={{ ...ui.card, display: "block", textDecoration: "none", color: "var(--text)", padding: 18, borderColor: unread ? "var(--accent-line)" : "var(--border)" }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        {unread && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />}
         <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>
         {task.state && <span style={ui.monoLabel}>{task.state}</span>}
         {task.priority && <span style={ui.monoLabel}>· {task.priority}</span>}
@@ -51,14 +50,14 @@ export function TaskCard({ task, locale }: { task: Task; locale: Locale }) {
   );
 }
 
-export function TaskList({ tasks, empty, locale }: { tasks: Task[]; empty: string; locale: Locale }) {
+export function TaskList({ tasks, empty, locale, unreadIds }: { tasks: Task[]; empty: string; locale: Locale; unreadIds?: Set<string> }) {
   if (!tasks.length) {
     return <p style={{ color: "var(--muted)", fontSize: 14 }}>{empty}</p>;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
       {tasks.map((t) => (
-        <TaskCard key={t.id} task={t} locale={locale} />
+        <TaskCard key={t.id} task={t} locale={locale} unread={unreadIds?.has(t.id)} />
       ))}
     </div>
   );

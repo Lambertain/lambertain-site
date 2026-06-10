@@ -343,6 +343,23 @@ export async function createSkill(
   );
 }
 
+// ---- Прочитанность задач (login -> task -> время) ----
+export async function getReads(login: string): Promise<Map<string, number>> {
+  const rows = await q<{ task_id: string; last_read_at: string }>(
+    "SELECT task_id, last_read_at FROM task_reads WHERE login = $1",
+    [login],
+  );
+  return new Map(rows.map((r) => [r.task_id, new Date(r.last_read_at).getTime()]));
+}
+
+export async function markRead(login: string, taskId: string): Promise<void> {
+  await q(
+    `INSERT INTO task_reads (login, task_id, last_read_at) VALUES ($1,$2, now())
+     ON CONFLICT (login, task_id) DO UPDATE SET last_read_at = now()`,
+    [login, taskId],
+  );
+}
+
 // ---- Расход токенов ----
 export async function logUsage(model: string, kind: string, inTok: number, outTok: number): Promise<void> {
   await q(
