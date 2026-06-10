@@ -22,6 +22,10 @@ const NAV: Record<Role, { href: string; key: string }[]> = {
     { href: "/admin", key: "nav.newTask" },
     { href: "/admin/tasks", key: "nav.myProjects" },
   ],
+  employee: [
+    { href: "/admin", key: "nav.newTask" },
+    { href: "/admin/tasks", key: "nav.myProjects" },
+  ],
   unknown: [],
 };
 
@@ -48,10 +52,25 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           zIndex: 50,
         }}
       >
-        {/* Кнопка «В браузере» — всегда в правом верхнем углу хедера */}
-        <div style={{ position: "absolute", top: 12, right: 14, zIndex: 60 }}>
+        {/* «В браузере» — по центру хедера */}
+        <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", zIndex: 60 }}>
           <OpenInBrowser label={t(locale, "common.inBrowser")} />
         </div>
+        {/* «Выйти» — SVG-иконка в правом верхнем углу */}
+        <form action={logout} style={{ position: "absolute", top: 12, right: 14, zIndex: 60 }}>
+          <button
+            type="submit"
+            title={t(locale, "common.logout")}
+            aria-label={t(locale, "common.logout")}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid var(--border-2)", color: "var(--muted)", padding: 7, cursor: "pointer", borderRadius: 2 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </button>
+        </form>
 
         <Link
           href="/admin"
@@ -73,18 +92,13 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           <span style={ui.monoLabel}>
             {principal.fullName} · {t(locale, `role.${principal.role}`)}
           </span>
-          <form action={logout}>
-            <button type="submit" style={{ ...ui.btn, padding: "7px 14px" }}>
-              {t(locale, "common.logout")}
-            </button>
-          </form>
         </div>
       </nav>
 
       <main className="pm-main">
         {principal.realRole === "admin" && (
           <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <ViewAs current={principal.role as "admin" | "client" | "contributor"} locale={locale} />
+            <ViewAs current={principal.role as "admin" | "client" | "contributor" | "employee"} locale={locale} />
             {principal.role !== "admin" && (
               <span style={{ ...ui.monoLabel, color: "#e8b339" }}>
                 {t(locale, "viewas.banner", { role: t(locale, `role.${principal.role}`) })}

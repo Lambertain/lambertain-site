@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "invalid initData" }, { status: 401 });
   }
   const role: Role | null =
-    body.role === "client" ? "client" : body.role === "contributor" ? "contributor" : null;
+    body.role === "client" || body.role === "contributor" || body.role === "employee" ? body.role : null;
   if (!role) {
     return NextResponse.json({ ok: false, error: "bad role" }, { status: 400 });
   }
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   const { user } = result;
   await upsertAccessRequest(user.id, user.username ?? null, user.firstName ?? null, role);
 
-  const roleRu = role === "client" ? "Клиент" : "Разработчик";
+  const roleRu = role === "client" ? "Клиент" : role === "employee" ? "Сотрудник" : "Разработчик";
   const uname = user.username ? `@${user.username}` : `id ${user.id}`;
   await notifyAdmin(
     `🔑 <b>Заявка на доступ</b>\n${user.firstName || ""} (${uname})\nРоль: <b>${roleRu}</b>\n` +

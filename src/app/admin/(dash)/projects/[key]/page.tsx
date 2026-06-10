@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/principal";
 import { getProjectFull, getProjectTokens } from "@/lib/db";
+import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { MetaForm } from "./meta-form";
@@ -13,7 +14,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
   await requireAdmin();
   const { key } = await params;
   const locale = await getLocale();
-  const [proj, tokens] = await Promise.all([getProjectFull(key), getProjectTokens()]);
+  const [proj, tokens, users] = await Promise.all([getProjectFull(key), getProjectTokens(), getBackend().listUsers()]);
+  const contributors = users
+    .filter((u) => u.role === "contributor" || u.role === "admin")
+    .map((u) => ({ login: u.login, fullName: u.fullName }));
 
   if (!proj) {
     return (
@@ -36,7 +40,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
         <h1 style={{ ...ui.h1, fontSize: "clamp(24px,5vw,34px)", margin: 0 }}>{proj.name}</h1>
       </div>
 
-      <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} locale={locale} />
+      <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>{t(locale, "projects.kicker")}</div>

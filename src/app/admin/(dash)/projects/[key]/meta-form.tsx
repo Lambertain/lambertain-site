@@ -33,15 +33,18 @@ export function MetaForm({
   projectKey,
   initialName,
   initialMeta,
+  contributors,
   locale,
 }: {
   projectKey: string;
   initialName: string;
   initialMeta: ProjectMeta;
+  contributors: { login: string; fullName: string }[];
   locale: Locale;
 }) {
   const m = initialMeta;
   const [name, setName] = useState(initialName);
+  const [defaultAssignee, setDefaultAssignee] = useState(m.defaultAssignee ?? "");
   const [clientGit, setClientGit] = useState(m.clientGit ?? "");
   const [devGit, setDevGit] = useState(m.devGit ?? "");
   const [localPath, setLocalPath] = useState(m.localPath ?? "");
@@ -67,6 +70,7 @@ export function MetaForm({
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
       design: design || undefined,
       conventions: conventions || undefined,
+      defaultAssignee: defaultAssignee || undefined,
       credentials: textToCreds(creds),
     };
     start(async () => {
@@ -79,6 +83,18 @@ export function MetaForm({
   return (
     <div style={{ ...ui.card, marginTop: 16 }}>
       <Field label={t(locale, "projects.name")} value={name} onChange={setName} />
+
+      <div style={{ marginTop: 14 }}>
+        <label style={ui.fieldLabel}>{t(locale, "projects.defaultAssignee")}</label>
+        <select value={defaultAssignee} onChange={(e) => setDefaultAssignee(e.target.value)} style={ui.input}>
+          <option value="">{t(locale, "field.unassigned")}</option>
+          {contributors.map((c) => (
+            <option key={c.login} value={c.login}>
+              {c.fullName} ({c.login})
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.repos")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

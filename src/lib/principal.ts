@@ -14,15 +14,17 @@ export interface Principal {
   role: Role;
   /** Реальная роль (для админа всегда admin, даже когда он смотрит как клиент/разраб). */
   realRole: Role;
-  /** Логин (для контрибьютора/клиента); у веб-админа отсутствует. */
+  /** Логин (для контрибьютора/клиента/сотрудника); у веб-админа отсутствует. */
   youtrackLogin?: string;
+  /** Проект клиента/сотрудника (1 проект). */
+  projectKey?: string;
   tgId?: number;
   fullName: string;
 }
 
 async function viewAs(): Promise<Role | null> {
   const v = (await cookies()).get("view_as")?.value;
-  return v === "client" || v === "contributor" ? v : null;
+  return v === "client" || v === "contributor" || v === "employee" ? v : null;
 }
 
 function adminTgId(): number | null {
@@ -55,6 +57,7 @@ export async function getPrincipal(): Promise<Principal | null> {
       role: link.role,
       realRole: link.role,
       youtrackLogin: link.youtrack_login,
+      projectKey: link.project_key ?? undefined,
       tgId,
       fullName: link.full_name || link.youtrack_login,
     };

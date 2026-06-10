@@ -27,6 +27,7 @@ export const DICT: Record<string, Entry> = {
   "role.admin": { uk: "адмін", ru: "админ", en: "admin" },
   "role.contributor": { uk: "Розробник", ru: "Разработчик", en: "Developer" },
   "role.client": { uk: "Клієнт", ru: "Клиент", en: "Client" },
+  "role.employee": { uk: "Співробітник", ru: "Сотрудник", en: "Employee" },
 
   // — навигация —
   "nav.newTask": { uk: "Нова задача", ru: "Новая задача", en: "New task" },
@@ -204,6 +205,7 @@ export const DICT: Record<string, Entry> = {
   "projects.devBranch": { uk: "Гілка dev", ru: "Ветка dev", en: "Dev branch" },
   "projects.design": { uk: "Дизайн (Figma)", ru: "Дизайн (Figma)", en: "Design (Figma)" },
   "projects.creds": { uk: "Доступи (рядок: роль|env|логін|пароль)", ru: "Доступы (строка: роль|env|логин|пароль)", en: "Credentials (line: role|env|login|pass)" },
+  "projects.defaultAssignee": { uk: "Відповідальний (розробник)", ru: "Ответственный (разработчик)", en: "Responsible (developer)" },
   "projects.conventions": { uk: "Конвенції / правила (для інтейку)", ru: "Конвенции / правила (для интейка)", en: "Conventions / rules (for intake)" },
   "projects.conventionsHint": { uk: "Для проєктів з клієнтським репо (де CLAUDE.md у .gitignore). Інтейк читає звідси.", ru: "Для проектов с клиентским репо (где CLAUDE.md в .gitignore). Интейк читает отсюда.", en: "For projects with a client repo (CLAUDE.md gitignored). Intake reads from here." },
 

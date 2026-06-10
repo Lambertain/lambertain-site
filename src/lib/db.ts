@@ -88,6 +88,14 @@ CREATE TABLE IF NOT EXISTS token_usage (
   output_tokens INT NOT NULL DEFAULT 0,
   cost_usd      NUMERIC NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS task_reads (
+  login        TEXT NOT NULL,
+  task_id      TEXT NOT NULL,
+  last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (login, task_id)
+);
+ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 `;
 
 // Цены Opus 4.8 ($/млн токенов). Поправить при изменении тарифа.
@@ -119,11 +127,12 @@ export interface TgLink {
   youtrack_login: string;
   role: Role;
   full_name: string | null;
+  project_key?: string | null;
 }
 
 export async function getLinkByTgId(tgId: number): Promise<TgLink | null> {
   const rows = await q<TgLink>(
-    "SELECT tg_id, youtrack_login, role, full_name FROM tg_links WHERE tg_id = $1",
+    "SELECT tg_id, youtrack_login, role, full_name, project_key FROM tg_links WHERE tg_id = $1",
     [tgId],
   );
   return rows[0] ?? null;
@@ -145,13 +154,14 @@ export async function upsertMember(
 
 export async function upsertLink(link: TgLink): Promise<void> {
   await q(
-    `INSERT INTO tg_links (tg_id, youtrack_login, role, full_name)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO tg_links (tg_id, youtrack_login, role, full_name, project_key)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (tg_id) DO UPDATE
        SET youtrack_login = EXCLUDED.youtrack_login,
            role = EXCLUDED.role,
-           full_name = EXCLUDED.full_name`,
-    [link.tg_id, link.youtrack_login, link.role, link.full_name],
+           full_name = EXCLUDED.full_name,
+           project_key = EXCLUDED.project_key`,
+    [link.tg_id, link.youtrack_login, link.role, link.full_name, link.project_key ?? null],
   );
 }
 
@@ -162,6 +172,7 @@ export interface Invite {
   role: Role;
   expires_at: string;
   used_at: string | null;
+  project_key: string | null;
 }
 
 export async function createInvite(
@@ -169,17 +180,18 @@ export async function createInvite(
   youtrackLogin: string,
   role: Role,
   ttlHours: number,
+  projectKey: string | null,
 ): Promise<void> {
   await q(
-    `INSERT INTO invites (token, youtrack_login, role, expires_at)
-     VALUES ($1, $2, $3, now() + ($4 || ' hours')::interval)`,
-    [token, youtrackLogin, role, String(ttlHours)],
+    `INSERT INTO invites (token, youtrack_login, role, expires_at, project_key)
+     VALUES ($1, $2, $3, now() + ($4 || ' hours')::interval, $5)`,
+    [token, youtrackLogin, role, String(ttlHours), projectKey],
   );
 }
 
 export async function getInvite(token: string): Promise<Invite | null> {
   const rows = await q<Invite>(
-    "SELECT token, youtrack_login, role, expires_at, used_at FROM invites WHERE token = $1",
+    "SELECT token, youtrack_login, role, expires_at, used_at, project_key FROM invites WHERE token = $1",
     [token],
   );
   return rows[0] ?? null;

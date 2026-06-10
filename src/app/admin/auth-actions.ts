@@ -22,7 +22,7 @@ export async function logout(): Promise<void> {
 }
 
 /** Превью интерфейса роли админом ("" = обычный админ). */
-export async function setViewAs(role: "" | "client" | "contributor"): Promise<void> {
+export async function setViewAs(role: "" | "client" | "contributor" | "employee"): Promise<void> {
   const store = await cookies();
   if (role) store.set("view_as", role, { httpOnly: true, sameSite: "lax", path: "/" });
   else store.delete("view_as");

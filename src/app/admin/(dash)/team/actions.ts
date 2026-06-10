@@ -7,30 +7,36 @@ import { sendTo } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
 
-export async function createInviteLink(role: Role): Promise<{ link?: string; error?: string }> {
+const PERSON_ROLES: Role[] = ["client", "contributor", "employee"];
+
+export async function createInviteLink(
+  role: Role,
+  projectKey: string,
+): Promise<{ link?: string; error?: string }> {
   try {
     await requireAdmin();
-    if (role !== "client" && role !== "contributor") return { error: "Недопустимая роль" };
-    const { link } = await generateInvite(role);
+    if (!PERSON_ROLES.includes(role)) return { error: "Недопустимая роль" };
+    const { link } = await generateInvite(role, projectKey || null);
     return { link };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
 }
 
-/** Подтвердить заявку: создать участника из Telegram-личности и связать с ролью. */
+/** Подтвердить заявку: создать участника из Telegram-личности и связать с ролью и проектом. */
 export async function approveAccess(
   tgId: number,
   username: string | null,
   fullName: string,
   role: Role,
+  projectKey: string,
 ): Promise<{ ok?: boolean; error?: string }> {
   try {
     await requireAdmin();
-    if (role !== "client" && role !== "contributor") return { error: "Недопустимая роль" };
+    if (!PERSON_ROLES.includes(role)) return { error: "Недопустимая роль" };
     const login = username ? username.toLowerCase() : `tg${tgId}`;
     await upsertMember(login, fullName || login, role, tgId);
-    await upsertLink({ tg_id: tgId, youtrack_login: login, role, full_name: fullName || login });
+    await upsertLink({ tg_id: tgId, youtrack_login: login, role, full_name: fullName || login, project_key: projectKey || null });
     await deleteAccessRequest(tgId);
     await sendTo(tgId, "✅ Доступ открыт. Откройте PM-портал через меню бота — теперь вы авторизованы.");
     revalidatePath("/admin/team");

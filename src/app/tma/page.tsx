@@ -50,7 +50,7 @@ export default function TmaPage() {
     }
   }
 
-  async function requestRole(role: "client" | "contributor") {
+  async function requestRole(role: "client" | "contributor" | "employee") {
     const initData = getInitData();
     if (!initData) return;
     setPhase("loading");
@@ -92,6 +92,9 @@ export default function TmaPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
               <button onClick={() => requestRole("client")} style={ui.btnAccent}>
                 {t(locale, "role.client")}
+              </button>
+              <button onClick={() => requestRole("employee")} style={ui.btn}>
+                {t(locale, "role.employee")}
               </button>
               <button onClick={() => requestRole("contributor")} style={ui.btn}>
                 {t(locale, "role.contributor")}

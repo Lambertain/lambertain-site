@@ -7,7 +7,7 @@
  */
 
 /** Роль пользователя в трекере. */
-export type Role = "client" | "contributor" | "admin" | "unknown";
+export type Role = "client" | "contributor" | "admin" | "employee" | "unknown";
 
 export interface User {
   login: string;
@@ -39,6 +39,8 @@ export interface ProjectMeta {
   deploy?: { prodBranch?: string; devBranch?: string };
   /** Конвенции/правила проекта для интейка (для проектов с клиентским репо, где CLAUDE.md в .gitignore). */
   conventions?: string;
+  /** Логин ответственного разработчика (автоназначение + видимость проекта у контрибьютора). */
+  defaultAssignee?: string;
 }
 
 export interface Task {

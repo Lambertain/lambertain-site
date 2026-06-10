@@ -50,6 +50,12 @@ CREATE TABLE IF NOT EXISTS token_usage (
   id SERIAL PRIMARY KEY, ts TIMESTAMPTZ NOT NULL DEFAULT now(), model TEXT, kind TEXT,
   input_tokens INT NOT NULL DEFAULT 0, output_tokens INT NOT NULL DEFAULT 0, cost_usd NUMERIC NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS idx_token_usage_ts ON token_usage(ts);
+CREATE TABLE IF NOT EXISTS task_reads (
+  login TEXT NOT NULL, task_id TEXT NOT NULL, last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (login, task_id));
+ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
 `;
 
 // Стартовые скилы (плейбуки под типы задач). ON CONFLICT DO NOTHING — авто/ручные не затираются.

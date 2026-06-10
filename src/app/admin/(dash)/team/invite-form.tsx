@@ -5,8 +5,11 @@ import { createInviteLink } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
 
-export function InviteForm({ locale }: { locale: Locale }) {
-  const [role, setRole] = useState<"contributor" | "client">("contributor");
+type Proj = { key: string; name: string };
+
+export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Locale }) {
+  const [role, setRole] = useState<"contributor" | "client" | "employee">("contributor");
+  const [projectKey, setProjectKey] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -17,7 +20,7 @@ export function InviteForm({ locale }: { locale: Locale }) {
     setLink(null);
     setCopied(false);
     start(async () => {
-      const res = await createInviteLink(role);
+      const res = await createInviteLink(role, projectKey);
       if (res.error) setError(res.error);
       else setLink(res.link ?? null);
     });
@@ -25,20 +28,31 @@ export function InviteForm({ locale }: { locale: Locale }) {
 
   return (
     <div style={{ ...ui.card, marginTop: 20, maxWidth: 560 }}>
-      <label style={ui.fieldLabel}>{t(locale, "field.role")}</label>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as "contributor" | "client")}
-          style={{ ...ui.input, maxWidth: 220 }}
-        >
-          <option value="contributor">{t(locale, "role.contributor")}</option>
-          <option value="client">{t(locale, "role.client")}</option>
-        </select>
-        <button onClick={gen} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>
-          {pending ? t(locale, "common.generating") : t(locale, "team.createInvite")}
-        </button>
+      <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.role")}</label>
+          <select value={role} onChange={(e) => setRole(e.target.value as typeof role)} style={ui.input}>
+            <option value="contributor">{t(locale, "role.contributor")}</option>
+            <option value="client">{t(locale, "role.client")}</option>
+            <option value="employee">{t(locale, "role.employee")}</option>
+          </select>
+        </div>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.project")}</label>
+          <select value={projectKey} onChange={(e) => setProjectKey(e.target.value)} style={ui.input}>
+            <option value="">{t(locale, "common.choose")}</option>
+            {projects.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.key} — {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      <button onClick={gen} disabled={pending || (role !== "contributor" && !projectKey)} style={{ ...ui.btnAccent, marginTop: 14, opacity: pending || (role !== "contributor" && !projectKey) ? 0.5 : 1 }}>
+        {pending ? t(locale, "common.generating") : t(locale, "team.createInvite")}
+      </button>
 
       {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 12 }}>{error}</p>}
 

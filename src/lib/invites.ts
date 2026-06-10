@@ -15,13 +15,14 @@ export function memberLogin(user: TgUser): string {
   return user.username ? user.username.toLowerCase() : `tg${user.id}`;
 }
 
-/** Создать инвайт под роль, вернуть токен и ссылку для Mini App. */
+/** Создать инвайт под роль и проект, вернуть токен и ссылку для Mini App. */
 export async function generateInvite(
   role: Role,
+  projectKey: string | null,
   ttlHours = DEFAULT_TTL_HOURS,
 ): Promise<{ token: string; link: string }> {
   const token = randomBytes(16).toString("hex");
-  await createInvite(token, "", role, ttlHours);
+  await createInvite(token, "", role, ttlHours, projectKey);
   return { token, link: inviteLink(token) };
 }
 
@@ -40,7 +41,7 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   const login = memberLogin(user);
   const fullName = user.firstName || user.username || login;
   await upsertMember(login, fullName, inv.role, user.id);
-  await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName });
+  await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: inv.project_key });
   await markInviteUsed(token, user.id);
   return true;
 }
