@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
+import { t, detectClientLocale, type Locale } from "@/lib/i18n";
 import { ui } from "../admin/ui-styles";
 
 type Phase = "loading" | "choose_role" | "requested" | "error";
@@ -10,7 +11,8 @@ type Phase = "loading" | "choose_role" | "requested" | "error";
 export default function TmaPage() {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
-  const [msg, setMsg] = useState("Авторизация через Telegram…");
+  const [errKey, setErrKey] = useState("tma.authing");
+  const [locale, setLocale] = useState<Locale>("uk");
 
   function getInitData(): string | null {
     // @ts-expect-error — SDK Telegram подгружается скриптом
@@ -18,6 +20,7 @@ export default function TmaPage() {
     if (!wa || !wa.initData) return null;
     wa.ready();
     wa.expand?.();
+    setLocale(detectClientLocale());
     return wa.initData as string;
   }
 
@@ -25,7 +28,7 @@ export default function TmaPage() {
     const initData = getInitData();
     if (!initData) {
       setPhase("error");
-      setMsg("Открой это приложение внутри Telegram.");
+      setErrKey("tma.openInTelegram");
       return;
     }
     try {
@@ -35,17 +38,15 @@ export default function TmaPage() {
         body: JSON.stringify({ initData }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.ok) {
-        router.replace("/admin");
-      } else if (data.needRole) {
-        setPhase("choose_role");
-      } else {
+      if (res.ok && data.ok) router.replace("/admin");
+      else if (data.needRole) setPhase("choose_role");
+      else {
         setPhase("error");
-        setMsg(data.error || "Не удалось авторизоваться.");
+        setErrKey("tma.authFailed");
       }
     } catch {
       setPhase("error");
-      setMsg("Ошибка сети при авторизации.");
+      setErrKey("tma.netError");
     }
   }
 
@@ -53,7 +54,7 @@ export default function TmaPage() {
     const initData = getInitData();
     if (!initData) return;
     setPhase("loading");
-    setMsg("Отправляю заявку…");
+    setErrKey("common.sending");
     try {
       const res = await fetch("/api/tma/request-access", {
         method: "POST",
@@ -63,15 +64,16 @@ export default function TmaPage() {
       if (res.ok) setPhase("requested");
       else {
         setPhase("error");
-        setMsg("Не удалось отправить заявку.");
+        setErrKey("tma.requestFailed");
       }
     } catch {
       setPhase("error");
-      setMsg("Ошибка сети.");
+      setErrKey("tma.netError");
     }
   }
 
   useEffect(() => {
+    setLocale(detectClientLocale());
     // @ts-expect-error — SDK Telegram
     if (typeof window !== "undefined" && window.Telegram?.WebApp) authenticate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,38 +87,34 @@ export default function TmaPage() {
 
         {phase === "choose_role" ? (
           <>
-            <h1 style={{ ...ui.h1, fontSize: 24, marginTop: 14 }}>Кто вы?</h1>
-            <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 8 }}>
-              Выберите роль — после подтверждения откроется доступ.
-            </p>
+            <h1 style={{ ...ui.h1, fontSize: 24, marginTop: 14 }}>{t(locale, "tma.whoAreYou")}</h1>
+            <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 8 }}>{t(locale, "tma.chooseRoleHint")}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
               <button onClick={() => requestRole("client")} style={ui.btnAccent}>
-                Клиент
+                {t(locale, "role.client")}
               </button>
               <button onClick={() => requestRole("contributor")} style={ui.btn}>
-                Разработчик
+                {t(locale, "role.contributor")}
               </button>
             </div>
           </>
         ) : phase === "requested" ? (
           <>
-            <h1 style={{ ...ui.h1, fontSize: 22, marginTop: 14 }}>Заявка отправлена</h1>
-            <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12 }}>
-              Для активации доступа напишите в личные сообщения:
-            </p>
+            <h1 style={{ ...ui.h1, fontSize: 22, marginTop: 14 }}>{t(locale, "tma.requestSent")}</h1>
+            <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12 }}>{t(locale, "tma.requestSentHint")}</p>
             <a
               href="https://t.me/soloveynik"
               target="_blank"
               rel="noreferrer"
               style={{ ...ui.btnAccent, display: "inline-block", marginTop: 14, textDecoration: "none" }}
             >
-              Написать @soloveynik
+              {t(locale, "tma.writeAdmin")}
             </a>
           </>
         ) : (
           <>
             <p style={{ marginTop: 16, fontSize: 14, color: phase === "loading" ? "var(--text)" : "var(--muted)" }}>
-              {msg}
+              {t(locale, errKey)}
             </p>
             {phase === "loading" && <div style={{ ...ui.monoLabel, color: "var(--accent)", marginTop: 12 }}>···</div>}
           </>

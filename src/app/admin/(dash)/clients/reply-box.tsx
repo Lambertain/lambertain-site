@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { draftReply, publishReply } from "./actions";
+import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
 
-export function ReplyBox({ taskId, question }: { taskId: string; question: string }) {
+export function ReplyBox({ taskId, question, locale }: { taskId: string; question: string; locale: Locale }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [published, setPublished] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export function ReplyBox({ taskId, question }: { taskId: string; question: strin
   }
 
   if (published) {
-    return <p style={{ ...ui.monoLabel, color: "var(--accent)", marginTop: 10 }}>Ответ опубликован ✓</p>;
+    return <p style={{ ...ui.monoLabel, color: "var(--accent)", marginTop: 10 }}>{t(locale, "clients.published")}</p>;
   }
 
   return (
@@ -45,13 +46,13 @@ export function ReplyBox({ taskId, question }: { taskId: string; question: strin
           color: "var(--text)",
         }}
       >
-        <span style={{ color: "#e8b339" }}>Вопрос клиента: </span>
+        <span style={{ color: "#e8b339" }}>{t(locale, "clients.question")}</span>
         {question}
       </div>
 
       {draft == null ? (
         <button onClick={gen} disabled={pending} style={{ ...ui.btn, marginTop: 10, opacity: pending ? 0.5 : 1 }}>
-          {pending ? "Генерация…" : "Черновик ответа"}
+          {pending ? t(locale, "common.generating") : t(locale, "clients.draftReply")}
         </button>
       ) : (
         <>
@@ -63,10 +64,10 @@ export function ReplyBox({ taskId, question }: { taskId: string; question: strin
           />
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <button onClick={publish} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>
-              {pending ? "Публикация…" : "Опубликовать ответ"}
+              {pending ? t(locale, "common.publishing") : t(locale, "clients.publish")}
             </button>
             <button onClick={gen} disabled={pending} style={ui.btn}>
-              Перегенерировать
+              {t(locale, "clients.regen")}
             </button>
           </div>
         </>

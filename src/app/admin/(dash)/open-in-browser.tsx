@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Script from "next/script";
 import { ui } from "../ui-styles";
 
-export function OpenInBrowser() {
+export function OpenInBrowser({ label }: { label: string }) {
   const [inTelegram, setInTg] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -41,7 +41,7 @@ export function OpenInBrowser() {
     <>
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="afterInteractive" onLoad={check} />
       <button onClick={open} disabled={busy} style={{ ...ui.btn, padding: "7px 14px" }}>
-        {busy ? "…" : "В браузере"}
+        {busy ? "…" : label}
       </button>
     </>
   );

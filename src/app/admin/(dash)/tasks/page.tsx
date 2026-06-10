@@ -1,6 +1,8 @@
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal } from "@/lib/principal";
 import { redirect } from "next/navigation";
+import { getLocale } from "@/lib/i18n-server";
+import { t } from "@/lib/i18n";
 import { TaskList } from "../task-card";
 import { ui } from "../../ui-styles";
 
@@ -9,20 +11,21 @@ export const dynamic = "force-dynamic";
 export default async function TasksPage() {
   const me = await getPrincipal();
   if (!me) redirect("/admin/login");
+  const locale = await getLocale();
 
   const be = getBackend();
   let query = "#Unresolved sort by: updated desc";
-  let title = "Все задачи";
-  let label = "Активные";
+  let title = t(locale, "tasks.allTitle");
+  let kicker = t(locale, "tasks.allKicker");
 
   if (me.role === "contributor" && me.youtrackLogin) {
     query = `Assignee: ${me.youtrackLogin} #Unresolved sort by: updated desc`;
-    title = "Мои задачи";
-    label = "Назначено мне";
+    title = t(locale, "tasks.mineTitle");
+    kicker = t(locale, "tasks.mineKicker");
   } else if (me.role === "client" && me.youtrackLogin) {
     query = `created by: ${me.youtrackLogin} sort by: updated desc`;
-    title = "Мои проекты";
-    label = "Мои заявки";
+    title = t(locale, "tasks.clientTitle");
+    kicker = t(locale, "tasks.clientKicker");
   }
 
   let tasks;
@@ -33,7 +36,8 @@ export default async function TasksPage() {
       <div>
         <h1 style={ui.h1}>{title}</h1>
         <p style={{ color: "#ff5b5b", fontSize: 14 }}>
-          Ошибка загрузки: {e instanceof Error ? e.message : "неизвестно"}
+          {t(locale, "error.load")}
+          {e instanceof Error ? e.message : "—"}
         </p>
       </div>
     );
@@ -41,9 +45,9 @@ export default async function TasksPage() {
 
   return (
     <div>
-      <div style={ui.monoLabel}>{label}</div>
+      <div style={ui.monoLabel}>{kicker}</div>
       <h1 style={{ ...ui.h1, marginTop: 8 }}>{title}</h1>
-      <TaskList tasks={tasks} empty="Активных задач нет." />
+      <TaskList tasks={tasks} empty={t(locale, "tasks.empty")} locale={locale} />
     </div>
   );
 }

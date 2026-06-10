@@ -3,12 +3,13 @@
 import { useState, useTransition } from "react";
 import { structureDraft, createFromDraft } from "./actions";
 import type { DraftTask } from "@/lib/tasks/types";
+import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
 
 type Proj = { key: string; name: string };
 type Usr = { login: string; fullName: string; role: string };
 
-export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[] }) {
+export function NewTaskForm({ projects, users, locale }: { projects: Proj[]; users: Usr[]; locale: Locale }) {
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<DraftTask | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +50,7 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={5}
-        placeholder="напр.: на shulex добавить экспорт дел в PDF, отдать александру, срок пятница"
+        placeholder={t(locale, "newtask.placeholder")}
         style={{ ...ui.input, resize: "vertical", marginTop: 20 }}
       />
       <button
@@ -57,7 +58,7 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
         disabled={pending || !text.trim()}
         style={{ ...ui.btnAccent, marginTop: 14, opacity: pending || !text.trim() ? 0.5 : 1 }}
       >
-        {pending ? "Обработка…" : "Структурировать"}
+        {pending ? t(locale, "common.processing") : t(locale, "newtask.structure")}
       </button>
 
       {error && (
@@ -66,7 +67,7 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
 
       {done && (
         <div style={{ ...ui.card, marginTop: 16, borderColor: "var(--accent-line)" }}>
-          <span style={{ color: "var(--accent)" }}>Задача создана: </span>
+          <span style={{ color: "var(--accent)" }}>{t(locale, "newtask.created")}</span>
           <a href={done.url} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
             {done.id}
           </a>
@@ -77,12 +78,12 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
         <div style={{ ...ui.card, marginTop: 16 }}>
           {draft.confidence === "low" && (
             <p style={{ ...ui.monoLabel, color: "#e8b339", marginTop: 0, marginBottom: 16 }}>
-              ⚠ Низкая уверенность — проверь проект и суть
+              {t(locale, "newtask.lowConfidence")}
             </p>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <label style={ui.fieldLabel}>Проект</label>
+              <label style={ui.fieldLabel}>{t(locale, "field.project")}</label>
               <select value={draft.projectKey} onChange={(e) => upd("projectKey", e.target.value)} style={ui.input}>
                 {projects.map((p) => (
                   <option key={p.key} value={p.key}>
@@ -92,13 +93,13 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
               </select>
             </div>
             <div>
-              <label style={ui.fieldLabel}>Исполнитель</label>
+              <label style={ui.fieldLabel}>{t(locale, "field.assignee")}</label>
               <select
                 value={draft.assigneeLogin ?? ""}
                 onChange={(e) => upd("assigneeLogin", e.target.value || null)}
                 style={ui.input}
               >
-                <option value="">— не назначен —</option>
+                <option value="">{t(locale, "field.unassigned")}</option>
                 {users.map((u) => (
                   <option key={u.login} value={u.login}>
                     {u.fullName} ({u.login})
@@ -109,12 +110,12 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
           </div>
 
           <div style={{ marginTop: 16 }}>
-            <label style={ui.fieldLabel}>Заголовок</label>
+            <label style={ui.fieldLabel}>{t(locale, "field.title")}</label>
             <input value={draft.summary} onChange={(e) => upd("summary", e.target.value)} style={ui.input} />
           </div>
 
           <div style={{ marginTop: 16 }}>
-            <label style={ui.fieldLabel}>Описание</label>
+            <label style={ui.fieldLabel}>{t(locale, "field.description")}</label>
             <textarea
               value={draft.description}
               onChange={(e) => upd("description", e.target.value)}
@@ -125,7 +126,7 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
             <div>
-              <label style={ui.fieldLabel}>Приоритет</label>
+              <label style={ui.fieldLabel}>{t(locale, "field.priority")}</label>
               <input
                 value={draft.priority ?? ""}
                 onChange={(e) => upd("priority", e.target.value || null)}
@@ -134,7 +135,7 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
               />
             </div>
             <div>
-              <label style={ui.fieldLabel}>Дедлайн (в описание)</label>
+              <label style={ui.fieldLabel}>{t(locale, "field.due")}</label>
               <input
                 value={draft.dueDate ?? ""}
                 onChange={(e) => upd("dueDate", e.target.value || null)}
@@ -145,7 +146,7 @@ export function NewTaskForm({ projects, users }: { projects: Proj[]; users: Usr[
           </div>
 
           <button onClick={doCreate} disabled={pending} style={{ ...ui.btnAccent, marginTop: 20, opacity: pending ? 0.5 : 1 }}>
-            {pending ? "Создание…" : "Создать в YouTrack"}
+            {pending ? t(locale, "common.creating") : t(locale, "newtask.createBtn")}
           </button>
         </div>
       )}

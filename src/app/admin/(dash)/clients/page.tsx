@@ -1,5 +1,7 @@
 import { getBackend } from "@/lib/tasks";
 import { requireAdmin } from "@/lib/principal";
+import { getLocale } from "@/lib/i18n-server";
+import { t } from "@/lib/i18n";
 import { TaskCard } from "../task-card";
 import { ReplyBox } from "./reply-box";
 import { ui } from "../../ui-styles";
@@ -10,6 +12,7 @@ const MAX_SCAN = 20; // ограничение на скан комментар�
 
 export default async function ClientsPage() {
   await requireAdmin();
+  const locale = await getLocale();
   const be = getBackend();
   const all = await be.listTasks("#Unresolved sort by: updated desc");
   const clientTasks = all.filter((t) => t.reporter?.role === "client").slice(0, MAX_SCAN);
@@ -30,19 +33,17 @@ export default async function ClientsPage() {
 
   return (
     <div>
-      <div style={ui.monoLabel}>Заявки и вопросы</div>
-      <h1 style={{ ...ui.h1, marginTop: 8 }}>Клиенты</h1>
+      <div style={ui.monoLabel}>{t(locale, "clients.kicker")}</div>
+      <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "clients.title")}</h1>
 
       {!enriched.length ? (
-        <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 20 }}>
-          Активных задач от клиентов нет.
-        </p>
+        <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 20 }}>{t(locale, "clients.empty")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 20 }}>
           {enriched.map(({ task, pending }) => (
             <div key={task.id}>
-              <TaskCard task={task} />
-              {pending && <ReplyBox taskId={task.id} question={pending} />}
+              <TaskCard task={task} locale={locale} />
+              {pending && <ReplyBox taskId={task.id} question={pending} locale={locale} />}
             </div>
           ))}
         </div>

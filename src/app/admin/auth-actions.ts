@@ -9,7 +9,7 @@ export async function login(
 ): Promise<{ error?: string }> {
   const password = String(formData.get("password") || "");
   if (!checkPassword(password)) {
-    return { error: "Неверный пароль" };
+    return { error: "wrong" };
   }
   await setSession("web");
   redirect("/admin");
