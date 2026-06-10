@@ -32,6 +32,7 @@ const pool = new pg.Pool({
 async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS poller_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
   await pool.query(`CREATE TABLE IF NOT EXISTS role_overrides (login TEXT PRIMARY KEY, role TEXT NOT NULL)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS token_usage (id SERIAL PRIMARY KEY, ts TIMESTAMPTZ NOT NULL DEFAULT now(), model TEXT, kind TEXT, input_tokens INT NOT NULL DEFAULT 0, output_tokens INT NOT NULL DEFAULT 0, cost_usd NUMERIC NOT NULL DEFAULT 0)`);
 }
 async function getState(key) {
   const r = await pool.query("SELECT value FROM poller_state WHERE key=$1", [key]);
@@ -173,12 +174,28 @@ async function checkDone(rmap) {
   return fresh.length;
 }
 
+async function checkTokenDigest() {
+  const today = new Date().toISOString().slice(0, 10);
+  const last = await getState("token_digest_day");
+  if (last === today) return;
+  if (last) {
+    const r = await pool.query(
+      "SELECT COALESCE(SUM(cost_usd),0) usd, COALESCE(SUM(input_tokens+output_tokens),0) tok FROM token_usage WHERE ts::date = $1",
+      [last],
+    );
+    const usd = Number(r.rows[0].usd), tok = Number(r.rows[0].tok);
+    if (tok > 0) await tg(`💰 <b>Расход токенов за ${last}</b>\n${tok.toLocaleString()} токенов · ~$${usd.toFixed(2)}`);
+  }
+  await setState("token_digest_day", today);
+}
+
 async function cycle() {
   const rmap = await roles();
   let total = 0;
   if (flag("NOTIFY_NEW_TASK")) total += await checkNewTasks(rmap).catch((e) => (console.error("newTasks:", e.message), 0));
   if (flag("NOTIFY_CLIENT_COMMENT")) total += await checkClientComments(rmap).catch((e) => (console.error("comments:", e.message), 0));
   if (flag("NOTIFY_DONE")) total += await checkDone(rmap).catch((e) => (console.error("done:", e.message), 0));
+  if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
   console.log(new Date().toISOString(), `цикл завершён, событий: ${total}`);
 }
 
