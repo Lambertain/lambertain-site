@@ -37,6 +37,8 @@ export interface ProjectMeta {
   credentials?: Array<{ role?: string; env?: string; login?: string; pass?: string }>;
   design?: string;
   deploy?: { prodBranch?: string; devBranch?: string };
+  /** Конвенции/правила проекта для интейка (для проектов с клиентским репо, где CLAUDE.md в .gitignore). */
+  conventions?: string;
 }
 
 export interface Task {

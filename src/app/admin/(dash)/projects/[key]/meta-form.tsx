@@ -50,6 +50,7 @@ export function MetaForm({
   const [prodBranch, setProdBranch] = useState(m.deploy?.prodBranch ?? "");
   const [devBranch, setDevBranch] = useState(m.deploy?.devBranch ?? "");
   const [design, setDesign] = useState(m.design ?? "");
+  const [conventions, setConventions] = useState(m.conventions ?? "");
   const [creds, setCreds] = useState(credsToText(m));
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +66,7 @@ export function MetaForm({
       apps: { prod: { url: prodUrl || undefined, host: "" }, dev: { url: devUrl || undefined, host: "" } },
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
       design: design || undefined,
+      conventions: conventions || undefined,
       credentials: textToCreds(creds),
     };
     start(async () => {
@@ -99,6 +101,12 @@ export function MetaForm({
 
       <div style={{ marginTop: 18 }}>
         <Field label={t(locale, "projects.design")} value={design} onChange={setDesign} />
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <label style={ui.fieldLabel}>{t(locale, "projects.conventions")}</label>
+        <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.conventionsHint")}</div>
+        <textarea value={conventions} onChange={(e) => setConventions(e.target.value)} rows={10} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
       </div>
 
       <div style={{ marginTop: 18 }}>

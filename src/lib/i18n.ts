@@ -204,6 +204,8 @@ export const DICT: Record<string, Entry> = {
   "projects.devBranch": { uk: "Гілка dev", ru: "Ветка dev", en: "Dev branch" },
   "projects.design": { uk: "Дизайн (Figma)", ru: "Дизайн (Figma)", en: "Design (Figma)" },
   "projects.creds": { uk: "Доступи (рядок: роль|env|логін|пароль)", ru: "Доступы (строка: роль|env|логин|пароль)", en: "Credentials (line: role|env|login|pass)" },
+  "projects.conventions": { uk: "Конвенції / правила (для інтейку)", ru: "Конвенции / правила (для интейка)", en: "Conventions / rules (for intake)" },
+  "projects.conventionsHint": { uk: "Для проєктів з клієнтським репо (де CLAUDE.md у .gitignore). Інтейк читає звідси.", ru: "Для проектов с клиентским репо (где CLAUDE.md в .gitignore). Интейк читает отсюда.", en: "For projects with a client repo (CLAUDE.md gitignored). Intake reads from here." },
 
   // — страница задачи —
   "task.back": { uk: "← до задач", ru: "← к задачам", en: "← to tasks" },

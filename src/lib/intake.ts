@@ -20,6 +20,8 @@ export interface IntakeCtx {
   projectKey: string;
   projectName: string;
   repo: string | null;
+  /** Конвенции из портала (БД) — приоритетнее CLAUDE.md из репо. */
+  conventions?: string;
   users: Array<{ login: string; fullName: string; role: string }>;
   today: string;
 }
@@ -122,7 +124,12 @@ export interface IntakeResult {
 export async function runIntake(history: Anthropic.MessageParam[], ctx: IntakeCtx): Promise<IntakeResult> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const skills = await listSkills();
-  const conventions = ctx.repo ? await readConventions(ctx.repo) : "";
+  // Конвенции из портала (БД) приоритетнее; иначе CLAUDE.md/README из репо.
+  const conventions = ctx.conventions?.trim()
+    ? `Конвенции проекта (из портала):\n${ctx.conventions.slice(0, 6000)}`
+    : ctx.repo
+      ? await readConventions(ctx.repo)
+      : "";
   const system = systemPrompt(ctx, skills, conventions);
   const messages = [...history];
   let inTok = 0, outTok = 0;

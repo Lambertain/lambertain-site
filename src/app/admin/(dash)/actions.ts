@@ -29,6 +29,7 @@ export async function intakeTurn(
       projectKey,
       projectName: project.name,
       repo,
+      conventions: project.meta.conventions,
       users: users.filter((u) => !u.banned).map((u) => ({ login: u.login, fullName: u.fullName, role: u.role })),
       today: today(),
     });
