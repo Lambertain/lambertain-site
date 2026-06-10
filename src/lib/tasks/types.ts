@@ -57,6 +57,8 @@ export interface Task {
   dueDate?: string | null; // YYYY-MM-DD
   priority?: string | null;
   url: string;
+  commentCount?: number;
+  lastCommentAt?: number | null;
 }
 
 export interface Comment {
@@ -104,4 +106,5 @@ export interface TasksBackend {
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
   addComment(id: string, text: string): Promise<Comment>;
+  updateStatus(id: string, status: string): Promise<void>;
 }

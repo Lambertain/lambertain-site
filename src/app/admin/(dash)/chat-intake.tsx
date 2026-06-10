@@ -68,6 +68,10 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
   }
 
   const preVoiceRef = useRef("");
+  const committedRef = useRef(""); // финализированный текст за все перезапуски сессии
+  const sessionFinalRef = useRef(""); // финал текущего under-the-hood сеанса
+  const manualStopRef = useRef(false);
+
   function startVoice() {
     // @ts-expect-error — Web Speech API
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -76,21 +80,44 @@ export function ChatIntake({ projects, locale }: { projects: Proj[]; locale: Loc
       return;
     }
     preVoiceRef.current = input;
+    baseTextRef.current = input ? input + " " : "";
+    committedRef.current = "";
+    sessionFinalRef.current = "";
+    manualStopRef.current = false;
+    setRecording(true);
+    spawnRecognition(SR);
+  }
+  // @ts-expect-error — SR конструктор
+  function spawnRecognition(SR) {
     const rec = new SR();
     rec.lang = SPEECH_LANG[locale];
     rec.interimResults = true;
     rec.continuous = true;
-    baseTextRef.current = input ? input + " " : "";
-    rec.onresult = (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => {
-      const txt = Array.from(e.results).map((r) => r[0].transcript).join("");
-      setInput(baseTextRef.current + txt);
+    rec.onresult = (e: { results: ArrayLike<{ isFinal: boolean } & ArrayLike<{ transcript: string }>> }) => {
+      let fin = "", interim = "";
+      for (const r of Array.from(e.results)) {
+        if ((r as unknown as { isFinal: boolean }).isFinal) fin += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      sessionFinalRef.current = fin;
+      setInput(baseTextRef.current + committedRef.current + fin + interim);
     };
-    rec.onerror = () => { setRecording(false); setLocked(false); };
+    rec.onend = () => {
+      // Накопить финал текущего сеанса и перезапустить, если не остановили вручную (борьба с авто-стопом на паузе).
+      committedRef.current += sessionFinalRef.current;
+      sessionFinalRef.current = "";
+      if (!manualStopRef.current) {
+        try { rec.start(); } catch { spawnRecognition(SR); }
+      } else {
+        setRecording(false);
+      }
+    };
+    rec.onerror = () => { /* onend всё равно сработает и перезапустит */ };
     recRef.current = rec;
     rec.start();
-    setRecording(true);
   }
   function stopVoice() {
+    manualStopRef.current = true;
     (recRef.current as { stop: () => void } | null)?.stop();
     setRecording(false);
   }

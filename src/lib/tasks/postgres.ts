@@ -27,13 +27,17 @@ interface TaskRow {
   reporter_login: string | null;
   reporter_name: string | null;
   reporter_role: Role | null;
+  comment_count: string | null;
+  last_comment_at: string | null;
 }
 
 const TASK_SELECT = `
   SELECT t.readable_id, p.key AS project_key, t.title, t.description, t.status, t.priority,
          t.created_at, t.updated_at, t.resolved_at,
          a.login AS assignee_login, a.full_name AS assignee_name,
-         r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role
+         r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role,
+         (SELECT count(*) FROM comments c WHERE c.task_id = t.id) AS comment_count,
+         (SELECT max(c.created_at) FROM comments c WHERE c.task_id = t.id) AS last_comment_at
   FROM tasks t
   JOIN projects p ON p.id = t.project_id
   LEFT JOIN members a ON a.id = t.assignee_id
@@ -56,6 +60,8 @@ function rowToTask(t: TaskRow): Task {
     dueDate: null,
     priority: t.priority,
     url: `/admin/tasks/${t.readable_id}`,
+    commentCount: Number(t.comment_count || 0),
+    lastCommentAt: t.last_comment_at ? ms(t.last_comment_at)! : null,
   };
 }
 
@@ -163,6 +169,10 @@ export const postgresBackend: TasksBackend = {
         role: c.author_role ?? "unknown",
       },
     }));
+  },
+
+  async updateStatus(id: string, status: string): Promise<void> {
+    await q("UPDATE tasks SET status = $2, updated_at = now() WHERE readable_id = $1", [id, status]);
   },
 
   async addComment(id: string, text: string): Promise<Comment> {

@@ -287,6 +287,10 @@ export const youtrackBackend: TasksBackend = {
     }));
   },
 
+  async updateStatus(): Promise<void> {
+    throw new Error("Смена статуса доступна только в Postgres-бэкенде");
+  },
+
   async addComment(id: string, text: string): Promise<Comment> {
     const roles = await rolesByLogin();
     type YtComment = {
