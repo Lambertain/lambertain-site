@@ -2,13 +2,13 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, renameMember, setLinkProject } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, renameMember, setLinkProject, setMemberProjects } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { sendTo } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
 
-const PERSON_ROLES: Role[] = ["client", "contributor", "employee"];
+const PERSON_ROLES: Role[] = ["client", "contributor", "employee", "admin"];
 
 export async function createInviteLink(
   role: Role,
@@ -17,7 +17,8 @@ export async function createInviteLink(
   try {
     await requireAdmin();
     if (!PERSON_ROLES.includes(role)) return { error: "Недопустимая роль" };
-    if (role !== "contributor" && projectKeys.length === 0) return { error: "Выберите проект" };
+    // Проект обязателен только клиенту/сотруднику; админ/разработчик — без проекта.
+    if ((role === "client" || role === "employee") && projectKeys.length === 0) return { error: "Выберите проект" };
     const { link } = await generateInvite(role, projectKeys);
     return { link };
   } catch (e) {
@@ -76,8 +77,10 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
     await requireAdmin();
     if (!login) return { error: "no login" };
     const user = (await getBackend().listUsers()).find((u) => u.login === login);
-    if (user?.role === "client" || user?.role === "employee") {
+    if (user?.role === "client") {
       await setLinkProject(login, keys[0] ?? null);
+    } else if (user?.role === "employee") {
+      await setMemberProjects(login, keys); // сотрудник — несколько проектов
     } else {
       await setDevProjects(login, keys);
     }

@@ -5,7 +5,7 @@
  */
 import { cookies } from "next/headers";
 import { readSubject } from "./auth";
-import { getLinkByTgId } from "./db";
+import { getLinkByTgId, getMemberProjects } from "./db";
 import type { Role } from "./tasks/types";
 
 export interface Principal {
@@ -16,8 +16,10 @@ export interface Principal {
   realRole: Role;
   /** Логин (для контрибьютора/клиента/сотрудника); у веб-админа отсутствует. */
   youtrackLogin?: string;
-  /** Проект клиента/сотрудника (1 проект). */
+  /** Проект клиента (1 проект). */
   projectKey?: string;
+  /** Проекты сотрудника (может быть несколько). */
+  projectKeys?: string[];
   tgId?: number;
   fullName: string;
 }
@@ -52,12 +54,18 @@ export async function getPrincipal(): Promise<Principal | null> {
     }
     const link = await getLinkByTgId(tgId);
     if (!link) return null; // не привязан — нужен инвайт
+    // Сотрудник может вести несколько проектов (member_projects); fallback — project_key из связки.
+    const projectKeys =
+      link.role === "employee"
+        ? (await getMemberProjects(link.youtrack_login)) || []
+        : undefined;
     return {
       source: "telegram",
       role: link.role,
       realRole: link.role,
       youtrackLogin: link.youtrack_login,
       projectKey: link.project_key ?? undefined,
+      projectKeys: projectKeys && projectKeys.length ? projectKeys : link.project_key ? [link.project_key] : undefined,
       tgId,
       fullName: link.full_name || link.youtrack_login,
     };

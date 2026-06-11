@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/principal";
-import { listAccessRequests, listProjectsWithMeta, listOrphanAuthors, listLinks } from "@/lib/db";
+import { listAccessRequests, listProjectsWithMeta, listOrphanAuthors, listLinks, memberProjectsMap } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -14,12 +14,13 @@ export const dynamic = "force-dynamic";
 export default async function TeamPage() {
   await requireAdmin();
   const locale = await getLocale();
-  const [requests, projectsMeta, users, orphans, links] = await Promise.all([
+  const [requests, projectsMeta, users, orphans, links, memberProj] = await Promise.all([
     listAccessRequests(),
     listProjectsWithMeta(),
     getBackend().listUsers(),
     listOrphanAuthors(),
     listLinks(),
+    memberProjectsMap(),
   ]);
   const activeProjects = projectsMeta.filter((p) => !p.archived);
   const projOpts = activeProjects.map((p) => ({ key: p.key, name: p.name }));
@@ -31,9 +32,11 @@ export default async function TeamPage() {
     const projectKeys =
       l.role === "contributor"
         ? activeProjects.filter((p) => p.meta.defaultAssignee === l.login).map((p) => p.key)
-        : l.project_key
-          ? [l.project_key]
-          : [];
+        : l.role === "employee"
+          ? memberProj.get(l.login) ?? []
+          : l.project_key
+            ? [l.project_key]
+            : [];
     return {
       login: l.login,
       fullName: m?.fullName || l.full_name || l.login,

@@ -18,7 +18,7 @@ export type PanelUser = {
 const DATE_LOC: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
 
 function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; locale: Locale }) {
-  const single = user.role === "client" || user.role === "employee"; // один проект
+  const single = user.role === "client"; // клиент — один проект; сотрудник/разраб — несколько
   const [open, setOpen] = useState(false);
   const [keys, setKeys] = useState<string[]>(user.projectKeys);
   const [alias, setAlias] = useState(user.alias ?? "");

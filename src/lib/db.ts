@@ -100,6 +100,11 @@ CREATE TABLE IF NOT EXISTS project_reads (
   last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (login, project_key)
 );
+CREATE TABLE IF NOT EXISTS member_projects (
+  login        TEXT NOT NULL,
+  project_key  TEXT NOT NULL,
+  PRIMARY KEY (login, project_key)
+);
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 `;
@@ -149,9 +154,45 @@ export async function renameMember(login: string, alias: string | null): Promise
   await q("UPDATE members SET alias = $2 WHERE login = $1", [login, alias || null]);
 }
 
-/** Сменить проект клиента/сотрудника (его единственный проект). */
+/** Сменить проект клиента (его единственный проект). */
 export async function setLinkProject(login: string, projectKey: string | null): Promise<void> {
   await q("UPDATE tg_links SET project_key = $2 WHERE youtrack_login = $1", [login, projectKey || null]);
+}
+
+// ---- Проекты сотрудника (мульти) ----
+export async function getMemberProjects(login: string): Promise<string[]> {
+  const rows = await q<{ project_key: string }>("SELECT project_key FROM member_projects WHERE login = $1", [login]);
+  return rows.map((r) => r.project_key);
+}
+/** Все членства сотрудников: login → ключи проектов. */
+export async function memberProjectsMap(): Promise<Map<string, string[]>> {
+  const rows = await q<{ login: string; project_key: string }>("SELECT login, project_key FROM member_projects");
+  const m = new Map<string, string[]>();
+  for (const r of rows) {
+    if (!m.has(r.login)) m.set(r.login, []);
+    m.get(r.login)!.push(r.project_key);
+  }
+  return m;
+}
+export async function setMemberProjects(login: string, keys: string[]): Promise<void> {
+  await q("DELETE FROM member_projects WHERE login = $1", [login]);
+  for (const k of keys) {
+    if (k) await q("INSERT INTO member_projects (login, project_key) VALUES ($1,$2) ON CONFLICT DO NOTHING", [login, k]);
+  }
+}
+
+/** Есть ли у проекта привязанный клиент (member роли client, привязанный по tg_link к этому проекту). */
+export async function projectHasClient(projectKey: string): Promise<boolean> {
+  const rows = await q<{ n: number }>(
+    "SELECT count(*)::int AS n FROM tg_links WHERE project_key = $1 AND role = 'client'",
+    [projectKey],
+  );
+  return (rows[0]?.n ?? 0) > 0;
+}
+
+/** Сменить статус утверждения задачи (approved/pending/rejected). */
+export async function setTaskApproval(taskId: string, status: "approved" | "pending" | "rejected"): Promise<void> {
+  await q("UPDATE tasks SET approval_status = $2 WHERE readable_id = $1", [taskId, status]);
 }
 
 /** Создать/обновить участника (member) — для людей, добавленных через Telegram. */

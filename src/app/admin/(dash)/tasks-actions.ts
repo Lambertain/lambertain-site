@@ -2,7 +2,7 @@
 
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
@@ -53,6 +53,20 @@ export async function moveToReview(id: string, ref: string): Promise<{ ok?: bool
     await setReviewRef(id, ref.trim() || null);
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Утвердить/отклонить задачу сотрудника (только админ). */
+export async function setApproval(id: string, status: "approved" | "rejected"): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  try {
+    await setTaskApproval(id, status);
+    revalidatePath(`/admin/tasks/${id}`);
+    revalidatePath("/admin");
     return { ok: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };

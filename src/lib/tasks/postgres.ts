@@ -29,11 +29,12 @@ interface TaskRow {
   reporter_role: Role | null;
   comment_count: string | null;
   last_comment_at: string | null;
+  approval_status: string | null;
 }
 
 const TASK_SELECT = `
   SELECT t.readable_id, p.key AS project_key, t.title, t.description, t.status, t.priority,
-         t.created_at, t.updated_at, t.resolved_at,
+         t.created_at, t.updated_at, t.resolved_at, t.approval_status,
          a.login AS assignee_login, a.full_name AS assignee_name,
          r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role,
          (SELECT count(*) FROM comments c WHERE c.task_id = t.id) AS comment_count,
@@ -62,6 +63,7 @@ function rowToTask(t: TaskRow): Task {
     url: `/admin/tasks/${t.readable_id}`,
     commentCount: Number(t.comment_count || 0),
     lastCommentAt: t.last_comment_at ? ms(t.last_comment_at)! : null,
+    approvalStatus: t.approval_status ?? "approved",
   };
 }
 
@@ -135,9 +137,9 @@ export const postgresBackend: TasksBackend = {
     let description = input.description || "";
     if (input.dueDate) description += `\n\n**Дедлайн:** ${input.dueDate}`;
     await q(
-      `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, created_at, updated_at, source)
-       VALUES ($1,$2,$3,$4,$5,'Open',$6,$7, now(), now(), 'portal')`,
-      [proj[0].id, num, readable, input.summary, description, input.priority || null, assigneeId],
+      `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, created_at, updated_at, source, approval_status, created_by_role)
+       VALUES ($1,$2,$3,$4,$5,'Open',$6,$7, now(), now(), 'portal', $8, $9)`,
+      [proj[0].id, num, readable, input.summary, description, input.priority || null, assigneeId, input.approvalStatus || "approved", input.createdByRole || null],
     );
     return this.getTask(readable);
   },

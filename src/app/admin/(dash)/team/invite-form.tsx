@@ -8,7 +8,7 @@ import { ui } from "../../ui-styles";
 type Proj = { key: string; name: string };
 
 export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Locale }) {
-  const [role, setRole] = useState<"contributor" | "client" | "employee">("contributor");
+  const [role, setRole] = useState<"contributor" | "client" | "employee" | "admin">("contributor");
   const [list, setList] = useState<Proj[]>(projects);
   const [selected, setSelected] = useState<string[]>([]);
   const [link, setLink] = useState<string | null>(null);
@@ -23,13 +23,15 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   const [addErr, setAddErr] = useState<string | null>(null);
 
   const sorted = useMemo(() => [...list].sort((a, b) => a.name.localeCompare(b.name)), [list]);
-  const multi = role === "contributor"; // разраб — несколько проектов; клиент/сотрудник — один
+  const multi = role === "contributor" || role === "employee"; // разраб/сотрудник — несколько; клиент — один
+  const needsProject = role === "client" || role === "employee";
 
   function changeRole(r: typeof role) {
     setLink(null);
     setRole(r);
-    // клиент/сотрудник — оставляем максимум один выбранный проект
-    if (r !== "contributor") setSelected((cur) => cur.slice(0, 1));
+    // клиент — максимум один проект; админ — без проектов
+    if (r === "client") setSelected((cur) => cur.slice(0, 1));
+    if (r === "admin") setSelected([]);
   }
 
   function toggle(key: string) {
@@ -60,7 +62,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
     });
   }
 
-  const needProject = role !== "contributor" && selected.length === 0;
+  const needProject = needsProject && selected.length === 0;
 
   return (
     <div style={{ ...ui.card, marginTop: 20, maxWidth: 560 }}>
@@ -70,14 +72,18 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
           <option value="contributor">{t(locale, "role.contributor")}</option>
           <option value="client">{t(locale, "role.client")}</option>
           <option value="employee">{t(locale, "role.employee")}</option>
+          <option value="admin">{t(locale, "role.admin")}</option>
         </select>
+        {role === "admin" && <p style={{ ...ui.monoLabel, textTransform: "none", color: "#e8b339", marginTop: 6 }}>{t(locale, "invite.adminWarn")}</p>}
       </div>
 
-      {/* проекты — чекбоксы, алфавит */}
+      {/* проекты — чекбоксы, алфавит (для админа не нужны) */}
+      {role !== "admin" && (
+      <>
       <div style={{ marginTop: 16 }}>
         <label style={ui.fieldLabel}>
           {t(locale, "field.project")}
-          {role === "contributor" && <span style={{ textTransform: "none", color: "var(--muted)" }}> · {t(locale, "invite.projectsHint")}</span>}
+          {multi && <span style={{ textTransform: "none", color: "var(--muted)" }}> · {t(locale, "invite.projectsHint")}</span>}
         </label>
         {sorted.length === 0 ? (
           <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 6 }}>{t(locale, "deps.none")}</p>
@@ -110,6 +116,8 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
         </div>
         {addErr && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 8 }}>{addErr}</p>}
       </div>
+      </>
+      )}
 
       <button onClick={gen} disabled={pending || needProject} style={{ ...ui.btnAccent, marginTop: 16, opacity: pending || needProject ? 0.5 : 1 }}>
         {pending ? t(locale, "common.generating") : t(locale, "team.createInvite")}

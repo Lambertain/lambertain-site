@@ -7,6 +7,7 @@ import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
+import { ApprovalBar } from "./approval-bar";
 import { ClientReply } from "./client-reply";
 import { CommentsView, type ViewComment } from "./comments-view";
 import { TaskTools } from "./task-tools";
@@ -81,6 +82,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         )}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
+
+      {task.approvalStatus === "pending" && <ApprovalBar id={task.id} canApprove={isAdmin} locale={locale} />}
 
       {blockers.length > 0 && (
         <div style={{ ...ui.card, marginTop: 16, padding: 14, borderColor: "#ff5b5b" }}>

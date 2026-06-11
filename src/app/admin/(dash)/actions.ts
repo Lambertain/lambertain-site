@@ -5,9 +5,17 @@ import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
 import { runIntake, type ProposedTask } from "@/lib/intake";
 import { repoFromGit } from "@/lib/github";
-import { notifyLogins } from "@/lib/notify";
-import { setTaskDeps } from "@/lib/db";
-import type { DraftTask } from "@/lib/tasks/types";
+import { notifyLogins, notifyAdmin } from "@/lib/notify";
+import { setTaskDeps, projectHasClient } from "@/lib/db";
+import type { DraftTask, Role } from "@/lib/tasks/types";
+
+/** Задачи сотрудника в проектах БЕЗ клиента создаются на утверждение админу. */
+async function approvalFor(role: Role, projectKey: string): Promise<{ approvalStatus: "approved" | "pending"; createdByRole: Role; pending: boolean }> {
+  if (role === "employee" && !(await projectHasClient(projectKey))) {
+    return { approvalStatus: "pending", createdByRole: "employee", pending: true };
+  }
+  return { approvalStatus: "approved", createdByRole: role, pending: false };
+}
 import type Anthropic from "@anthropic-ai/sdk";
 
 /** Уведомить ответственного разработчика о новой задаче (best-effort). */
@@ -64,6 +72,7 @@ export async function createProposedTasks(
     const projects = await be.listProjects();
     const project = projects.find((p) => p.key === projectKey);
     const defaultAssignee = project?.meta.defaultAssignee || null;
+    const appr = await approvalFor(me.role, projectKey);
     const created = [];
     const createdIds: string[] = []; // readable_id по индексу proposed-задачи
     for (const tk of tasks) {
@@ -74,8 +83,11 @@ export async function createProposedTasks(
         // Если исполнитель не задан — ставим ответственного по проекту.
         assigneeLogin: tk.assigneeLogin ?? defaultAssignee,
         priority: tk.priority ?? null,
+        approvalStatus: appr.approvalStatus,
+        createdByRole: appr.createdByRole,
       });
-      await notifyNewTask(task);
+      if (appr.pending) await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${task.id}: ${task.summary}\nОт сотрудника, проект без клиента.`);
+      else await notifyNewTask(task);
       created.push({ id: task.id, url: task.url });
       createdIds.push(task.id);
     }
@@ -123,6 +135,7 @@ export async function createFromDraft(
   if (!me) return { error: "Не авторизован" };
   try {
     const be = getBackend();
+    const appr = await approvalFor(me.role, draft.projectKey);
     const task = await be.createTask({
       projectKey: draft.projectKey,
       summary: draft.summary,
@@ -130,8 +143,11 @@ export async function createFromDraft(
       assigneeLogin: draft.assigneeLogin ?? null,
       dueDate: draft.dueDate ?? null,
       priority: draft.priority ?? null,
+      approvalStatus: appr.approvalStatus,
+      createdByRole: appr.createdByRole,
     });
-    await notifyNewTask(task);
+    if (appr.pending) await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${task.id}: ${task.summary}\nОт сотрудника, проект без клиента.`);
+    else await notifyNewTask(task);
     return { id: task.id, url: task.url };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка создания задачи" };
