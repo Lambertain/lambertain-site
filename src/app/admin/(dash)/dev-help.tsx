@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
@@ -16,8 +16,6 @@ function Section({ title, body }: { title: string; body: string }) {
 
 export function DevHelp({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
 
   const modal = (
     <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.65)", display: "grid", placeItems: "center", padding: 16 }}>
@@ -47,7 +45,7 @@ export function DevHelp({ locale }: { locale: Locale }) {
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
       </button>
-      {open && mounted && createPortal(modal, document.body)}
+      {open && typeof document !== "undefined" && createPortal(modal, document.body)}
     </>
   );
 }
