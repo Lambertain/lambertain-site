@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { updateTaskStatus, markTaskRead, deleteTask, moveToReview } from "./tasks-actions";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { updateTaskStatus, markProjectOpened, deleteTask, moveToReview } from "./tasks-actions";
 import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { t, type Locale } from "@/lib/i18n";
-import { Markdown } from "./markdown";
 import { ui } from "../ui-styles";
 
 export type BoardTask = {
@@ -18,16 +17,15 @@ export type BoardTask = {
   commentCount?: number;
   assignee?: string | null;
   unread?: boolean;
-  /** Задача заблокирована незавершёнными зависимостями (derived). */
   blocked?: boolean;
   blockers?: { id: string; summary: string }[];
 };
 
-const DATE_LOC: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
-function fmt(ms: number | undefined, locale: Locale): string {
-  if (!ms) return "";
-  return new Date(ms).toLocaleString(DATE_LOC[locale], { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
+type Proj = { key: string; name: string; hasNew?: boolean };
+
+const NewBadge = () => (
+  <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 6px", borderRadius: 3, fontWeight: 600 }}>NEW</span>
+);
 
 function Row({
   task,
@@ -40,26 +38,21 @@ function Row({
   locale: Locale;
   canEditStatus: boolean;
   canDelete: boolean;
-  /** "start" — клик по названию берёт задачу в работу; "expand" — раскрывает описание. */
-  mode: "start" | "expand";
+  /** "start" — клик берёт задачу в работу; "open" — переход на страницу задачи. */
+  mode: "start" | "open";
 }) {
   const [status, setStatus] = useState(task.status);
   const [menu, setMenu] = useState(false);
-  const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(!!task.unread);
   const [confirm, setConfirm] = useState(false);
   const [deleted, setDeleted] = useState(false);
-  const [reviewRef, setReviewRef] = useState<string | null>(null); // не null → показываем форму ссылки
+  const [reviewRef, setReviewRef] = useState<string | null>(null);
   const [, start] = useTransition();
 
   if (deleted) return null;
 
   function pick(s: string) {
     setMenu(false);
-    if (statusBucket(s) === "review") {
-      setReviewRef(""); // открыть форму ссылки, статус сменим после подтверждения
-      return;
-    }
+    if (statusBucket(s) === "review") { setReviewRef(""); return; }
     setStatus(s);
     start(() => { updateTaskStatus(task.id, s); });
   }
@@ -72,14 +65,6 @@ function Row({
   function startWork() {
     setStatus("In Progress");
     start(() => { updateTaskStatus(task.id, "In Progress"); });
-  }
-  function onTitle() {
-    if (mode === "start") { startWork(); return; }
-    setOpen((v) => !v);
-    if (!open && unread) {
-      setUnread(false);
-      start(() => { markTaskRead(task.id); });
-    }
   }
 
   return (
@@ -103,11 +88,17 @@ function Row({
             </div>
           )}
         </div>
-        {/* название */}
-        <button onClick={onTitle} title={mode === "start" ? t(locale, "tab.startHint") : undefined} style={{ flex: 1, textAlign: "left", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 15, fontWeight: 600, padding: 0 }}>
-          {task.summary}
-        </button>
-        {unread && <span className="blink" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />}
+        {/* название: переход в задачу (или старт в «Не начатых») */}
+        {mode === "start" ? (
+          <button onClick={startWork} title={t(locale, "tab.startHint")} style={{ flex: 1, textAlign: "left", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 15, fontWeight: 600, padding: 0 }}>
+            {task.summary}
+          </button>
+        ) : (
+          <a href={`/admin/tasks/${task.id}`} style={{ flex: 1, color: "var(--text)", fontSize: 15, fontWeight: 600, textDecoration: "none" }}>
+            {task.summary}
+          </a>
+        )}
+        {task.unread && <NewBadge />}
         {canDelete && (
           <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
@@ -115,18 +106,11 @@ function Row({
         )}
       </div>
 
-      {/* форма ссылки на код при переводе в «Ревью» */}
       {reviewRef !== null && (
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={{ ...ui.monoLabel, textTransform: "none" }}>{t(locale, "review.refLabel")}</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <input
-              autoFocus
-              value={reviewRef}
-              onChange={(e) => setReviewRef(e.target.value)}
-              placeholder={t(locale, "review.refPlaceholder")}
-              style={{ ...ui.input, flex: 1, minWidth: 200 }}
-            />
+            <input autoFocus value={reviewRef} onChange={(e) => setReviewRef(e.target.value)} placeholder={t(locale, "review.refPlaceholder")} style={{ ...ui.input, flex: 1, minWidth: 200 }} />
             <button onClick={submitReview} style={ui.btnAccent}>{t(locale, "review.send")}</button>
             <button onClick={() => setReviewRef(null)} style={ui.btn}>{t(locale, "common.cancel")}</button>
           </div>
@@ -147,9 +131,7 @@ function Row({
         </div>
       )}
 
-      {/* мета */}
       <div style={{ display: "flex", gap: 14, ...ui.monoLabel, textTransform: "none", marginTop: 8, flexWrap: "wrap" }}>
-        {task.created && <span>{fmt(task.created, locale)}</span>}
         {task.assignee && <span>→ {task.assignee}</span>}
         <span>{t(locale, "task.comments")}: {task.commentCount ?? 0}</span>
       </div>
@@ -159,27 +141,15 @@ function Row({
           {t(locale, "deps.blockedBy")} {task.blockers.map((b) => b.id).join(", ")}
         </div>
       )}
-
-      {open && (
-        <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-          {task.description?.trim() ? (
-            <Markdown>{task.description}</Markdown>
-          ) : (
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>{t(locale, "task.noDescription")}</div>
-          )}
-          <a href={`/admin/tasks/${task.id}`} style={{ ...ui.btn, display: "inline-block", marginTop: 12, textDecoration: "none" }}>
-            {t(locale, "task.comments")} →
-          </a>
-        </div>
-      )}
     </div>
   );
 }
 
-const TabBtn = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
+const TabBtn = ({ active, hasNew, onClick, children }: { active: boolean; hasNew?: boolean; onClick: () => void; children: React.ReactNode }) => (
   <button
     onClick={onClick}
     style={{
+      position: "relative",
       ...ui.monoLabel,
       padding: "7px 12px",
       background: active ? "var(--accent)" : "transparent",
@@ -190,6 +160,9 @@ const TabBtn = ({ active, onClick, children }: { active: boolean; onClick: () =>
     }}
   >
     {children}
+    {hasNew && !active && (
+      <span style={{ position: "absolute", top: -4, right: -4, width: 9, height: 9, borderRadius: "50%", background: "var(--accent)", border: "1px solid var(--bg)" }} />
+    )}
   </button>
 );
 
@@ -203,32 +176,47 @@ export function TaskTabs({
   empty,
 }: {
   tasks: BoardTask[];
-  projects: { key: string; name: string }[];
+  projects: Proj[];
   locale: Locale;
   canEditStatus: boolean;
   canDelete: boolean;
-  /** Может ли роль брать не начатые задачи в работу (контрибьютор/админ). */
   canStart: boolean;
   empty: string;
 }) {
   const projectKeys = projects.map((p) => p.key);
   const [activeProject, setActiveProject] = useState<string>(projectKeys[0] ?? "");
+  const [opened, setOpened] = useState<Set<string>>(new Set());
+  const [, startSeen] = useTransition();
 
-  // Задачи активного проекта (если проектов нет в списке — показываем все).
+  function openProject(key: string) {
+    setActiveProject(key);
+    setBucket(null);
+    if (!opened.has(key)) {
+      setOpened((s) => new Set(s).add(key));
+      startSeen(() => { markProjectOpened(key); });
+    }
+  }
+
+  // Открытие апки = просмотр активного проекта (снимаем его метку New).
+  useEffect(() => {
+    if (activeProject && !opened.has(activeProject)) {
+      setOpened((s) => new Set(s).add(activeProject));
+      startSeen(() => { markProjectOpened(activeProject); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const projTasks = useMemo(
     () => (projectKeys.length ? tasks.filter((tk) => tk.projectKey === activeProject) : tasks),
     [tasks, activeProject, projectKeys.length],
   );
 
-  // Раскладка по корзинам + счётчики.
   const byBucket = useMemo(() => {
     const m: Record<Bucket, BoardTask[]> = { inProgress: [], review: [], done: [], notStarted: [], blocked: [] };
-    // Заблокированная зависимостями задача попадает в «Заблок.» поверх своего статуса.
     for (const tk of projTasks) m[tk.blocked ? "blocked" : statusBucket(tk.status)].push(tk);
     return m;
   }, [projTasks]);
 
-  // Дефолтная корзина: «В работе»; если там пусто — «Не начатые».
   const defaultBucket: Bucket = byBucket.inProgress.length ? "inProgress" : "notStarted";
   const [bucket, setBucket] = useState<Bucket | null>(null);
   const activeBucket = bucket ?? defaultBucket;
@@ -236,18 +224,16 @@ export function TaskTabs({
 
   return (
     <div style={{ marginTop: 16 }}>
-      {/* табы проектов (скрыты, если проект один) */}
       {projects.length > 1 && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {projects.map((p) => (
-            <TabBtn key={p.key} active={p.key === activeProject} onClick={() => { setActiveProject(p.key); setBucket(null); }}>
+            <TabBtn key={p.key} active={p.key === activeProject} hasNew={p.hasNew && !opened.has(p.key)} onClick={() => openProject(p.key)}>
               {p.name}
             </TabBtn>
           ))}
         </div>
       )}
 
-      {/* табы статусов */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14, overflowX: "auto" }}>
         {BUCKET_ORDER.map((b) => (
           <TabBtn key={b} active={b === activeBucket} onClick={() => setBucket(b)}>
@@ -267,7 +253,7 @@ export function TaskTabs({
               locale={locale}
               canEditStatus={canEditStatus}
               canDelete={canDelete}
-              mode={activeBucket === "notStarted" && canStart ? "start" : "expand"}
+              mode={activeBucket === "notStarted" && canStart ? "start" : "open"}
             />
           ))}
         </div>

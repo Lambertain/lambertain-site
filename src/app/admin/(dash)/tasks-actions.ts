@@ -2,7 +2,7 @@
 
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, setReviewRef } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
@@ -63,4 +63,11 @@ export async function markTaskRead(id: string): Promise<void> {
   const me = await getPrincipal();
   if (!me) return;
   await markRead(me.youtrackLogin || me.fullName || "admin", id);
+}
+
+/** Отметить проект просмотренным (снимает метку New с проекта). */
+export async function markProjectOpened(projectKey: string): Promise<void> {
+  const me = await getPrincipal();
+  if (!me) return;
+  await markProjectSeen(me.youtrackLogin || me.fullName || "admin", projectKey);
 }

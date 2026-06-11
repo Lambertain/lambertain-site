@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
-import { getReads, listProjectsWithMeta, taskCountsByProject, getDepsFor } from "@/lib/db";
+import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { nowMs } from "@/lib/now";
 import { getLocale } from "@/lib/i18n-server";
@@ -43,9 +44,12 @@ export default async function HomePage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
             <div style={ui.monoLabel}>{t(locale, "dash.kicker")}</div>
-            <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "dash.title")}</h1>
+            <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "nav.projects")}</h1>
           </div>
-          <ChatModal projects={dash.map((p) => ({ key: p.key, name: p.name }))} locale={locale} />
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>{t(locale, "projects.manage")}</Link>
+            <ChatModal projects={dash.map((p) => ({ key: p.key, name: p.name }))} locale={locale} />
+          </div>
         </div>
         <DevDashboard projects={dash} devNames={devNames} now={nowMs()} locale={locale} />
       </div>
@@ -58,16 +62,17 @@ export default async function HomePage() {
   const projects = visible.map((p) => ({ key: p.key, name: p.name }));
   const visibleKeys = new Set(visible.map((p) => p.key));
 
-  let tasks, reads;
+  let tasks, reads, projectSeen;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    // Контрибьютор видит ВСЕ задачи своих проектов (в т.ч. не начатые/не назначенные);
-    // клиент/сотрудник — задачи своего проекта.
+    // Контрибьютор — задачи, назначенные ему; клиент/сотрудник — задачи своего проекта.
     let filter: TaskFilter = { order: "updated_desc", limit: 300 };
-    if ((me.role === "client" || me.role === "employee") && me.projectKey) {
+    if (me.role === "contributor" && me.youtrackLogin) {
+      filter = { assigneeLogin: me.youtrackLogin, order: "updated_desc", limit: 300 };
+    } else if ((me.role === "client" || me.role === "employee") && me.projectKey) {
       filter = { projectKey: me.projectKey, order: "updated_desc", limit: 300 };
     }
-    [tasks, reads] = await Promise.all([be.listTasks(filter), getReads(readKey)]);
+    [tasks, reads, projectSeen] = await Promise.all([be.listTasks(filter), getReads(readKey), getProjectReads(readKey)]);
   } catch (e) {
     return <p style={{ color: "#ff5b5b", fontSize: 14 }}>{e instanceof Error ? e.message : "—"}</p>;
   }
@@ -76,6 +81,9 @@ export default async function HomePage() {
   const depMap = await getDepsFor(filtered.map((tk) => tk.id));
   const board: BoardTask[] = filtered.map((tk) => {
     const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
+    const lastRead = reads.get(tk.id) ?? 0;
+    // New = новый коммент ИЛИ ещё не открытая задача (created позже последнего просмотра).
+    const unread = (tk.lastCommentAt ?? 0) > lastRead || (tk.created ?? 0) > lastRead;
     return {
       id: tk.id,
       projectKey: tk.projectKey,
@@ -86,10 +94,19 @@ export default async function HomePage() {
       updated: tk.updated,
       commentCount: tk.commentCount,
       assignee: me.role === "client" ? null : tk.assignee?.fullName ?? null,
-      unread: (tk.lastCommentAt ?? 0) > (reads.get(tk.id) ?? 0),
+      unread,
       blocked: blockers.length > 0,
       blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
     };
+  });
+
+  // Метка New на проекте: активность задач позже последнего открытия проекта.
+  const projectsWithNew = projects.map((p) => {
+    const seen = projectSeen.get(p.key) ?? 0;
+    const hasNew = filtered.some(
+      (tk) => tk.projectKey === p.key && Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen,
+    );
+    return { key: p.key, name: p.name, hasNew };
   });
 
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
@@ -99,12 +116,12 @@ export default async function HomePage() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "nav.tasks")}</h1>
+        <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, me.role === "contributor" ? "nav.myTasks" : "nav.tasks")}</h1>
         <ChatModal projects={projects} locale={locale} />
       </div>
       <TaskTabs
         tasks={board}
-        projects={projects}
+        projects={projectsWithNew}
         locale={locale}
         canEditStatus={canEditStatus}
         canDelete={canDelete}

@@ -2,12 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal } from "@/lib/principal";
-import { getTaskDeps } from "@/lib/db";
+import { getTaskDeps, getReads } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
 import { ClientReply } from "./client-reply";
+import { CommentsView, type ViewComment } from "./comments-view";
 import { TaskTools } from "./task-tools";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -27,13 +28,17 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const locale = await getLocale();
   const be = getBackend();
 
-  let task, comments, deps;
+  const isAdmin = me.realRole === "admin";
+  const backHref = isAdmin ? "/admin/tasks" : "/admin";
+
+  let task, comments, deps, reads;
+  const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    [task, comments, deps] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id)]);
+    [task, comments, deps, reads] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey)]);
   } catch (e) {
     return (
       <div>
-        <Link href="/admin/tasks" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
+        <Link href={backHref} style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
           {t(locale, "task.back")}
         </Link>
         <p style={{ color: "#ff5b5b", fontSize: 14, marginTop: 16 }}>{e instanceof Error ? e.message : "—"}</p>
@@ -41,22 +46,32 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     );
   }
 
-  const canReview = me.realRole === "admin" || me.role === "contributor";
-  // Клиент не видит внутренние комментарии команды (код-ревью, координация).
-  const visibleComments = me.role === "client" ? comments.filter((c) => c.visibility !== "internal") : comments;
+  const canReview = isAdmin || me.role === "contributor";
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
+  // Новые комменты — появившиеся после последнего открытия задачи.
+  const prevRead = reads.get(id) ?? 0;
+  const viewComments: ViewComment[] = comments.map((c) => ({
+    id: c.id,
+    text: c.text,
+    created: c.created,
+    authorName: c.author.fullName,
+    authorRole: c.author.role,
+    visibility: c.visibility,
+    isNew: c.created > prevRead,
+  }));
+  const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal").length : viewComments.length;
+  // Редактор зависимостей и ИИ-ревью — только админ (зависимости ставит ИИ при формировании задачи).
   let candidates: { id: string; summary: string; status: string | null }[] = [];
-  if (canReview) {
+  if (isAdmin) {
     const siblings = await be.listTasks({ projectKey: task.projectKey, limit: 200 });
     candidates = siblings
       .filter((s) => s.id !== task.id)
       .map((s) => ({ id: s.id, summary: s.summary, status: s.state ?? null }));
   }
 
-  // Клиент видит только клиентский поток (скрытая команда — внутренние комментарии прячем позже).
   return (
     <div>
-      <Link href="/admin/tasks" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
+      <Link href={backHref} style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
         {t(locale, "task.back")}
       </Link>
 
@@ -100,32 +115,15 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <TaskTools id={task.id} candidates={candidates} currentDeps={deps.map((d) => d.id)} canReview={canReview} canAiReview={me.realRole === "admin"} locale={locale} />
+      {isAdmin && (
+        <TaskTools id={task.id} candidates={candidates} currentDeps={deps.map((d) => d.id)} canReview canAiReview locale={locale} />
+      )}
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>
-          {t(locale, "task.comments")} · {visibleComments.length}
+          {t(locale, "task.comments")} · {shownCount}
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-          {visibleComments.length === 0 && <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "task.noComments")}</p>}
-          {visibleComments.map((c) => {
-            const internal = c.visibility === "internal";
-            return (
-              <div key={c.id} style={{ ...ui.card, padding: 14, borderColor: internal ? "var(--border-2)" : "var(--border)", background: internal ? "rgba(255,255,255,0.02)" : undefined }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>
-                  <span style={{ color: c.author.role === "client" ? "#e8b339" : "var(--accent)" }}>
-                    {me.role === "client" && c.author.role !== "client" ? "Lambertain" : c.author.fullName}
-                  </span>
-                  {internal && me.role !== "client" && (
-                    <span style={{ ...ui.monoLabel, color: "#e8b339", border: "1px solid #e8b339", padding: "1px 6px" }}>{t(locale, "comment.internalBadge")}</span>
-                  )}
-                  <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
-                </div>
-                <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.55 }}>{c.text}</div>
-              </div>
-            );
-          })}
-        </div>
+        <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} locale={locale} />
         {canReview && <ClientReply id={task.id} locale={locale} />}
         <CommentBox id={task.id} locale={locale} canChooseVisibility={me.role !== "client"} />
       </div>

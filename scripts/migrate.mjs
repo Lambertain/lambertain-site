@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS token_usage (
 CREATE INDEX IF NOT EXISTS idx_token_usage_ts ON token_usage(ts);
 CREATE TABLE IF NOT EXISTS task_reads (
   login TEXT NOT NULL, task_id TEXT NOT NULL, last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (login, task_id));
+CREATE TABLE IF NOT EXISTS project_reads (
+  login TEXT NOT NULL, project_key TEXT NOT NULL, last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (login, project_key));
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_keys TEXT;

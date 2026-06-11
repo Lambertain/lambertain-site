@@ -14,6 +14,8 @@ export interface ProposedTask {
   description: string;
   assigneeLogin?: string | null;
   priority?: string | null;
+  /** Индексы (0-based) задач из этого же списка, которые должны быть сделаны ДО этой (блокеры). */
+  dependsOn?: number[];
 }
 
 export interface IntakeCtx {
@@ -60,6 +62,7 @@ const TOOLS: Anthropic.Tool[] = [
               description: { type: "string", description: "Детально: что сделать, критерии готовности, что в коде есть и чего не хватает." },
               assigneeLogin: { type: ["string", "null"] },
               priority: { type: ["string", "null"] },
+              dependsOn: { type: "array", items: { type: "integer" }, description: "Индексы (0-based) задач из этого списка, которые надо сделать ДО этой (блокеры). Только при реальной зависимости по порядку." },
             },
             required: ["summary", "description"],
           },
@@ -93,7 +96,8 @@ function systemPrompt(ctx: IntakeCtx, skills: { slug: string; title: string; tri
     "2) Задавай уточняющие вопросы ПО ОДНОМУ, кратко. Проси скрины при необходимости.\n" +
     "3) Сверься с репозиторием (если привязан): найди затронутые файлы, оцени что есть и чего не хватает.\n" +
     "4) Следуй конвенциям проекта.\n" +
-    "5) Когда ясно — propose_tasks (одна/несколько) с описанием: суть, критерии готовности, «Чего не хватает в коде»."
+    "5) Когда ясно — propose_tasks (одна/несколько) с описанием: суть, критерии готовности, «Чего не хватает в коде».\n" +
+    "6) Если задачи зависят по порядку (напр. сначала схема БД → потом API → потом UI) — проставь dependsOn (индексы предшественников). Зависимости ставишь ТЫ, не разработчик."
   );
 }
 

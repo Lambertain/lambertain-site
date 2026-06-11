@@ -94,6 +94,12 @@ CREATE TABLE IF NOT EXISTS task_reads (
   last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (login, task_id)
 );
+CREATE TABLE IF NOT EXISTS project_reads (
+  login        TEXT NOT NULL,
+  project_key  TEXT NOT NULL,
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (login, project_key)
+);
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 `;
@@ -524,6 +530,23 @@ export async function markRead(login: string, taskId: string): Promise<void> {
     `INSERT INTO task_reads (login, task_id, last_read_at) VALUES ($1,$2, now())
      ON CONFLICT (login, task_id) DO UPDATE SET last_read_at = now()`,
     [login, taskId],
+  );
+}
+
+/** Когда логин последний раз «открывал» каждый проект (для метки New на проекте). */
+export async function getProjectReads(login: string): Promise<Map<string, number>> {
+  const rows = await q<{ project_key: string; last_seen_at: string }>(
+    "SELECT project_key, last_seen_at FROM project_reads WHERE login = $1",
+    [login],
+  );
+  return new Map(rows.map((r) => [r.project_key, new Date(r.last_seen_at).getTime()]));
+}
+
+export async function markProjectSeen(login: string, projectKey: string): Promise<void> {
+  await q(
+    `INSERT INTO project_reads (login, project_key, last_seen_at) VALUES ($1,$2, now())
+     ON CONFLICT (login, project_key) DO UPDATE SET last_seen_at = now()`,
+    [login, projectKey],
   );
 }
 

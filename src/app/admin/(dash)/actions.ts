@@ -6,6 +6,7 @@ import { structureTask } from "@/lib/structurer";
 import { runIntake, type ProposedTask } from "@/lib/intake";
 import { repoFromGit } from "@/lib/github";
 import { notifyLogins } from "@/lib/notify";
+import { setTaskDeps } from "@/lib/db";
 import type { DraftTask } from "@/lib/tasks/types";
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -64,6 +65,7 @@ export async function createProposedTasks(
     const project = projects.find((p) => p.key === projectKey);
     const defaultAssignee = project?.meta.defaultAssignee || null;
     const created = [];
+    const createdIds: string[] = []; // readable_id по индексу proposed-задачи
     for (const tk of tasks) {
       const task = await be.createTask({
         projectKey,
@@ -75,6 +77,12 @@ export async function createProposedTasks(
       });
       await notifyNewTask(task);
       created.push({ id: task.id, url: task.url });
+      createdIds.push(task.id);
+    }
+    // Зависимости между задачами — их проставил ИИ (dependsOn = индексы предшественников в этом списке).
+    for (let i = 0; i < tasks.length; i++) {
+      const deps = (tasks[i].dependsOn || []).filter((j) => j >= 0 && j < createdIds.length && j !== i).map((j) => createdIds[j]);
+      if (deps.length) await setTaskDeps(createdIds[i], deps).catch(() => {});
     }
     return { created };
   } catch (e) {

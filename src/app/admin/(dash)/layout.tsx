@@ -11,8 +11,8 @@ import { ui } from "../ui-styles";
 
 const NAV: Record<Role, { href: string; key: string }[]> = {
   admin: [
-    { href: "/admin", key: "nav.tasks" },
-    { href: "/admin/projects", key: "nav.projects" },
+    { href: "/admin", key: "nav.projects" },
+    { href: "/admin/tasks", key: "nav.tasks" },
     { href: "/admin/skills", key: "nav.skills" },
     { href: "/admin/team", key: "nav.team" },
   ],

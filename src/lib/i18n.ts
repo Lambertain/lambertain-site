@@ -204,6 +204,7 @@ export const DICT: Record<string, Entry> = {
   "projects.snippetLabel": { uk: "Рядок для CLAUDE.md розробника", ru: "Строка для CLAUDE.md разработчика", en: "Snippet for the developer’s CLAUDE.md" },
   "projects.noToken": { uk: "токен не створено", ru: "токен не создан", en: "no token yet" },
   "projects.add": { uk: "Додати проєкт", ru: "Добавить проект", en: "Add project" },
+  "projects.manage": { uk: "Управління проєктами →", ru: "Управление проектами →", en: "Manage projects →" },
   "projects.key": { uk: "Ключ (напр. SHU)", ru: "Ключ (напр. SHU)", en: "Key (e.g. SHU)" },
   "projects.name": { uk: "Назва", ru: "Название", en: "Name" },
   "projects.open": { uk: "Відкрити", ru: "Открыть", en: "Open" },
@@ -256,6 +257,7 @@ export const DICT: Record<string, Entry> = {
   "comment.internalOnly": { uk: "Внутрішній — клієнт не побачить", ru: "Внутренний — клиент не увидит", en: "Internal — client won’t see it" },
   "comment.willSeeClient": { uk: "Клієнт побачить цей коментар", ru: "Клиент увидит этот комментарий", en: "The client will see this comment" },
   "comment.internalBadge": { uk: "внутр.", ru: "внутр.", en: "internal" },
+  "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
 
   // — ответ клиенту через ИИ (по фидбеку разраба, от лица Lambertain) —
   "creply.open": { uk: "Відповісти клієнту (ІІ)", ru: "Ответить клиенту (ИИ)", en: "Reply to client (AI)" },
