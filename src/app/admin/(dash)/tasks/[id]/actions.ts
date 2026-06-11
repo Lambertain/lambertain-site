@@ -4,7 +4,7 @@ import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { setTaskDeps } from "@/lib/db";
 import { runReview, taskDiff } from "@/lib/review";
-import { draftReplyFromDevFeedback } from "@/lib/replies";
+import { draftClientAnswer } from "@/lib/replies";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 
@@ -63,21 +63,24 @@ export async function requestAiReview(id: string): Promise<{ ok?: boolean; verdi
   }
 }
 
-/** Черновик ответа клиенту по фидбеку разработчика (ИИ сверяет с задачей и кодом). Не публикует. */
+/**
+ * Черновик ответа клиенту: ИИ читает задачу, комменты и код и сам предлагает ответ.
+ * instructions — правки разработчика; priorDraft — текущая версия (переработать). Не публикует.
+ */
 export async function draftClientReply(
   id: string,
-  feedback: string,
+  instructions?: string,
+  priorDraft?: string,
 ): Promise<{ draft?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
   if (me.role !== "contributor" && me.realRole !== "admin") return { error: "Нет прав" };
-  if (!feedback.trim()) return { error: "Опиши, что передать клиенту" };
   try {
     const be = getBackend();
     const [task, comments] = await Promise.all([be.getTask(id), be.getComments(id)]);
     const lastClient = [...comments].reverse().find((c) => c.author.role === "client");
     const code = await taskDiff(id).catch(() => null);
-    const draft = await draftReplyFromDevFeedback(task, lastClient?.text || "", feedback, comments, code);
+    const draft = await draftClientAnswer(task, lastClient?.text || "", comments, code, instructions, priorDraft);
     return { draft };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
