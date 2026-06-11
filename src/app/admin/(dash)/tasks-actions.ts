@@ -59,10 +59,15 @@ export async function moveToReview(id: string, ref: string): Promise<{ ok?: bool
   }
 }
 
-/** Утвердить/отклонить задачу сотрудника (только админ). */
+/** Утвердить/отклонить задачу сотрудника: админ — всегда; клиент — задачи своего проекта. */
 export async function setApproval(id: string, status: "approved" | "rejected"): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
-  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  if (!me) return { error: "Не авторизован" };
+  if (me.realRole !== "admin") {
+    if (me.role !== "client") return { error: "Нет прав" };
+    const task = await getBackend().getTask(id);
+    if (task.projectKey !== me.projectKey) return { error: "Нет прав" };
+  }
   try {
     await setTaskApproval(id, status);
     revalidatePath(`/admin/tasks/${id}`);

@@ -83,7 +83,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
 
-      {task.approvalStatus === "pending" && <ApprovalBar id={task.id} canApprove={isAdmin} locale={locale} />}
+      {task.approvalStatus === "pending" && (
+        <ApprovalBar id={task.id} canApprove={isAdmin || me.role === "client"} forClient={me.role === "client"} locale={locale} />
+      )}
 
       {blockers.length > 0 && (
         <div style={{ ...ui.card, marginTop: 16, padding: 14, borderColor: "#ff5b5b" }}>

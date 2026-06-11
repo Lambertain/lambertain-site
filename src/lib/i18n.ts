@@ -212,6 +212,7 @@ export const DICT: Record<string, Entry> = {
   "invite.adminWarn": { uk: "Повний доступ до всього порталу. Запрошуйте лише довірених (партнер).", ru: "Полный доступ ко всему порталу. Приглашайте только доверенных (партнёр).", en: "Full portal access. Invite only trusted people (partner)." },
   "approval.pending": { uk: "🟠 Задача на затвердженні", ru: "🟠 Задача на утверждении", en: "🟠 Task pending approval" },
   "approval.hint": { uk: "Створена співробітником у проєкті без клієнта — потрібне ваше затвердження.", ru: "Создана сотрудником в проекте без клиента — нужно ваше утверждение.", en: "Created by an employee in a client-less project — needs your approval." },
+  "approval.hintClient": { uk: "Нова задача — підтвердіть, щоб взяли в роботу.", ru: "Новая задача — подтвердите, чтобы взяли в работу.", en: "New task — approve it to start work." },
   "approval.approve": { uk: "Затвердити", ru: "Утвердить", en: "Approve" },
   "approval.reject": { uk: "Відхилити", ru: "Отклонить", en: "Reject" },
   "approval.approvedOk": { uk: "Затверджено ✓", ru: "Утверждено ✓", en: "Approved ✓" },

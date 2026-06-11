@@ -5,16 +5,24 @@ import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
 import { runIntake, type ProposedTask } from "@/lib/intake";
 import { repoFromGit } from "@/lib/github";
-import { notifyLogins, notifyAdmin } from "@/lib/notify";
+import { notifyLogins, notifyAdmin, notifyProjectClients } from "@/lib/notify";
 import { setTaskDeps, projectHasClient } from "@/lib/db";
 import type { DraftTask, Role } from "@/lib/tasks/types";
 
-/** Задачи сотрудника в проектах БЕЗ клиента создаются на утверждение админу. */
-async function approvalFor(role: Role, projectKey: string): Promise<{ approvalStatus: "approved" | "pending"; createdByRole: Role; pending: boolean }> {
-  if (role === "employee" && !(await projectHasClient(projectKey))) {
-    return { approvalStatus: "pending", createdByRole: "employee", pending: true };
-  }
-  return { approvalStatus: "approved", createdByRole: role, pending: false };
+/**
+ * Задачи сотрудника создаются на утверждение: если в проекте есть клиент — утверждает клиент,
+ * если клиента нет — админ. Остальные роли — без утверждения.
+ */
+async function approvalFor(role: Role, projectKey: string): Promise<{ approvalStatus: "approved" | "pending"; createdByRole: Role; pending: boolean; approver: "client" | "admin" | null }> {
+  if (role !== "employee") return { approvalStatus: "approved", createdByRole: role, pending: false, approver: null };
+  const approver = (await projectHasClient(projectKey)) ? "client" : "admin";
+  return { approvalStatus: "pending", createdByRole: "employee", pending: true, approver };
+}
+
+async function notifyPendingApproval(approver: "client" | "admin", projectKey: string, taskId: string, summary: string): Promise<void> {
+  const text = `🟠 <b>Новая задача — нужно подтверждение</b> · ${taskId}: ${summary}`;
+  if (approver === "client") await notifyProjectClients(projectKey, text);
+  else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${taskId}: ${summary}\nОт сотрудника, проект без клиента.`);
 }
 import type Anthropic from "@anthropic-ai/sdk";
 
@@ -86,7 +94,7 @@ export async function createProposedTasks(
         approvalStatus: appr.approvalStatus,
         createdByRole: appr.createdByRole,
       });
-      if (appr.pending) await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${task.id}: ${task.summary}\nОт сотрудника, проект без клиента.`);
+      if (appr.pending && appr.approver) await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
       else await notifyNewTask(task);
       created.push({ id: task.id, url: task.url });
       createdIds.push(task.id);
@@ -146,7 +154,7 @@ export async function createFromDraft(
       approvalStatus: appr.approvalStatus,
       createdByRole: appr.createdByRole,
     });
-    if (appr.pending) await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${task.id}: ${task.summary}\nОт сотрудника, проект без клиента.`);
+    if (appr.pending && appr.approver) await notifyPendingApproval(appr.approver, draft.projectKey, task.id, task.summary);
     else await notifyNewTask(task);
     return { id: task.id, url: task.url };
   } catch (e) {
