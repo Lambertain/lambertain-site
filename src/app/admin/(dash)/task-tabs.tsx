@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { updateTaskStatus, markTaskRead, deleteTask, moveToReview } from "./tasks-actions";
 import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { t, type Locale } from "@/lib/i18n";
+import { Markdown } from "./markdown";
 import { ui } from "../ui-styles";
 
 export type BoardTask = {
@@ -161,9 +162,11 @@ function Row({
 
       {open && (
         <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
-          <div style={{ whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.55, color: "var(--text)" }}>
-            {task.description?.trim() || t(locale, "task.noDescription")}
-          </div>
+          {task.description?.trim() ? (
+            <Markdown>{task.description}</Markdown>
+          ) : (
+            <div style={{ fontSize: 13, color: "var(--muted)" }}>{t(locale, "task.noDescription")}</div>
+          )}
           <a href={`/admin/tasks/${task.id}`} style={{ ...ui.btn, display: "inline-block", marginTop: 12, textDecoration: "none" }}>
             {t(locale, "task.comments")} →
           </a>

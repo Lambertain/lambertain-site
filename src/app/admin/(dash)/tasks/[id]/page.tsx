@@ -8,6 +8,7 @@ import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
 import { TaskTools } from "./task-tools";
+import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -85,8 +86,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       <div style={{ ...ui.card, marginTop: 20 }}>
         <div style={ui.fieldLabel}>{t(locale, "task.description")}</div>
-        <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>
-          {task.description?.trim() || t(locale, "task.noDescription")}
+        <div style={{ marginTop: 8 }}>
+          {task.description?.trim() ? (
+            <Markdown>{task.description}</Markdown>
+          ) : (
+            <span style={{ fontSize: 14, color: "var(--muted)" }}>{t(locale, "task.noDescription")}</span>
+          )}
         </div>
       </div>
 

@@ -346,6 +346,15 @@ export async function getReviewRef(taskId: string): Promise<string | null> {
   return rows[0]?.review_ref ?? null;
 }
 
+// ---- Вложения (картинки задач, скачанные из YouTrack) ----
+export async function getAttachment(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
+  const rows = await q<{ mime: string | null; data: Buffer }>(
+    "SELECT mime, data FROM attachments WHERE id = $1",
+    [id],
+  );
+  return rows[0] ?? null;
+}
+
 // ---- Зависимости задач (блокеры) ----
 export interface DepInfo {
   id: string; // readable_id блокера

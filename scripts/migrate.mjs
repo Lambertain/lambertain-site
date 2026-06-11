@@ -62,6 +62,15 @@ CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   PRIMARY KEY (task_id, depends_on_id));
+CREATE TABLE IF NOT EXISTS attachments (
+  id         SERIAL PRIMARY KEY,
+  task_id    INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  name       TEXT NOT NULL,
+  mime       TEXT,
+  data       BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (task_id, name));
+CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
 `;
 
 // Стартовые скилы — реальные полные плейбуки (SKILL.md) из открытых источников:
