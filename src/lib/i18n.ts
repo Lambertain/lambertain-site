@@ -232,6 +232,65 @@ export const DICT: Record<string, Entry> = {
   "task.addComment": { uk: "Додати коментар", ru: "Добавить комментарий", en: "Add comment" },
   "task.send": { uk: "Надіслати", ru: "Отправить", en: "Send" },
 
+  // — табы статусов —
+  "tab.inProgress": { uk: "В роботі", ru: "В работе", en: "In progress" },
+  "tab.review": { uk: "Ревʼю", ru: "Ревью", en: "Review" },
+  "tab.done": { uk: "Готово", ru: "Готово", en: "Done" },
+  "tab.notStarted": { uk: "Не розпочаті", ru: "Не начатые", en: "Not started" },
+  "tab.blocked": { uk: "Заблоковані", ru: "Заблок.", en: "Blocked" },
+  "tab.startHint": { uk: "Клік — взяти в роботу", ru: "Клик — взять в работу", en: "Click — take to work" },
+  "tab.allProjects": { uk: "Усі", ru: "Все", en: "All" },
+
+  // — ревью кода (ИИ, on-demand) —
+  "review.refLabel": { uk: "Посилання на коміт/PR/гілку (необовʼязково)", ru: "Ссылка на коммит/PR/ветку (необязательно)", en: "Commit/PR/branch link (optional)" },
+  "review.refPlaceholder": { uk: "напр. https://github.com/org/repo/pull/12", ru: "напр. https://github.com/org/repo/pull/12", en: "e.g. https://github.com/org/repo/pull/12" },
+  "review.send": { uk: "На ревʼю", ru: "На ревью", en: "To review" },
+  "review.request": { uk: "ІІ-ревʼю коду", ru: "ИИ-ревью кода", en: "AI code review" },
+  "review.running": { uk: "ІІ перевіряє…", ru: "ИИ проверяет…", en: "AI reviewing…" },
+  "review.doneApprove": { uk: "✅ ІІ: готово", ru: "✅ ИИ: готово", en: "✅ AI: approved" },
+  "review.doneRework": { uk: "🔧 ІІ: є зауваження — див. коментар", ru: "🔧 ИИ: есть замечания — см. комментарий", en: "🔧 AI: needs rework — see comment" },
+  "review.hint": { uk: "Друга пара очей по дифу. Рантайм перевіряєш сам на dev.", ru: "Вторая пара глаз по диффу. Рантайм проверяешь сам на dev.", en: "A second pair of eyes on the diff. You still verify runtime on dev." },
+
+  // — блокеры (зависимости задач) —
+  "deps.title": { uk: "Залежить від", ru: "Зависит от", en: "Depends on" },
+  "deps.hint": { uk: "Поки блокери не «Готово» — задача заблокована, її не можна взяти в роботу.", ru: "Пока блокеры не «Готово» — задача заблокирована, её нельзя взять в работу.", en: "Until blockers are Done, the task is blocked and can’t be started." },
+  "deps.none": { uk: "немає кандидатів", ru: "нет кандидатов", en: "no candidates" },
+  "deps.save": { uk: "Зберегти залежності", ru: "Сохранить зависимости", en: "Save dependencies" },
+  "deps.blockedBy": { uk: "Заблоковано:", ru: "Заблокировано:", en: "Blocked by:" },
+
+  // — дашборд загрузки разработчиков —
+  "dash.kicker": { uk: "Завантаженість команди", ru: "Загрузка команды", en: "Team workload" },
+  "dash.title": { uk: "Дашборд", ru: "Дашборд", en: "Dashboard" },
+  "dash.totalCost": { uk: "Сумарна вартість", ru: "Суммарная стоимость", en: "Total value" },
+  "dash.projectsCount": { uk: "проєктів", ru: "проектов", en: "projects" },
+  "dash.openTasks": { uk: "відкритих задач", ru: "открытых задач", en: "open tasks" },
+  "dash.daysRunning": { uk: "ведеться, дн.", ru: "ведётся, дн.", en: "days running" },
+  "dash.daysLeft": { uk: "до кінця, дн.", ru: "до конца, дн.", en: "days left" },
+  "dash.overdueDays": { uk: "прострочка, дн.", ru: "просрочка, дн.", en: "days overdue" },
+  "dash.byTime": { uk: "за часом", ru: "по времени", en: "by time" },
+  "dash.byTasks": { uk: "за задачами", ru: "по задачам", en: "by tasks" },
+  "dash.tasks": { uk: "задачі", ru: "задачи", en: "tasks" },
+  "dash.noDeadline": { uk: "без дедлайну", ru: "без дедлайна", en: "no deadline" },
+  "dash.unassigned": { uk: "Без відповідального", ru: "Без ответственного", en: "Unassigned" },
+  "dash.empty": { uk: "Проєктів поки немає.", ru: "Проектов пока нет.", en: "No projects yet." },
+
+  // — команда: разработчики и их проекты —
+  "team.devsKicker": { uk: "Розробники та проєкти", ru: "Разработчики и проекты", en: "Developers & projects" },
+  "team.devsTitle": { uk: "Розробники", ru: "Разработчики", en: "Developers" },
+  "team.devsHint": {
+    uk: "Признач розробнику проєкти — він стає відповідальним і бачить їх задачі. Один проєкт — один розробник.",
+    ru: "Назначь разработчику проекты — он становится ответственным и видит их задачи. Один проект — один разработчик.",
+    en: "Assign projects to a developer — they become responsible and see those tasks. One project — one developer.",
+  },
+  "team.noProjects": { uk: "немає проєктів", ru: "нет проектов", en: "no projects" },
+  "team.saveProjects": { uk: "Зберегти проєкти", ru: "Сохранить проекты", en: "Save projects" },
+
+  // — поля проекта: экономика —
+  "field.cost": { uk: "Вартість", ru: "Стоимость", en: "Cost" },
+  "field.currency": { uk: "Валюта", ru: "Валюта", en: "Currency" },
+  "field.startedAt": { uk: "Старт (дата)", ru: "Старт (дата)", en: "Start date" },
+  "field.deadline": { uk: "Дедлайн (дата)", ru: "Дедлайн (дата)", en: "Deadline" },
+
   // — карточка задачи —
   "card.stale": { uk: "висить {n} дн.", ru: "висит {n} дн.", en: "{n}d idle" },
   "card.unassigned": { uk: "не призначено", ru: "не назначен", en: "unassigned" },

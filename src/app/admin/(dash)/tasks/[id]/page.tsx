@@ -2,9 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal } from "@/lib/principal";
+import { getTaskDeps } from "@/lib/db";
+import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
+import { TaskTools } from "./task-tools";
 import { ui } from "../../../ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +25,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const locale = await getLocale();
   const be = getBackend();
 
-  let task, comments;
+  let task, comments, deps;
   try {
-    [task, comments] = await Promise.all([be.getTask(id), be.getComments(id)]);
+    [task, comments, deps] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id)]);
   } catch (e) {
     return (
       <div>
@@ -34,6 +37,16 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <p style={{ color: "#ff5b5b", fontSize: 14, marginTop: 16 }}>{e instanceof Error ? e.message : "—"}</p>
       </div>
     );
+  }
+
+  const canReview = me.realRole === "admin" || me.role === "contributor";
+  const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
+  let candidates: { id: string; summary: string; status: string | null }[] = [];
+  if (canReview) {
+    const siblings = await be.listTasks({ projectKey: task.projectKey, limit: 200 });
+    candidates = siblings
+      .filter((s) => s.id !== task.id)
+      .map((s) => ({ id: s.id, summary: s.summary, status: s.state ?? null }));
   }
 
   // Клиент видит только клиентский поток (скрытая команда — внутренние комментарии прячем позже).
@@ -56,12 +69,28 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
 
+      {blockers.length > 0 && (
+        <div style={{ ...ui.card, marginTop: 16, padding: 14, borderColor: "#ff5b5b" }}>
+          <div style={{ ...ui.monoLabel, color: "#ff5b5b" }}>{t(locale, "deps.blockedBy")}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8 }}>
+            {blockers.map((b) => (
+              <Link key={b.id} href={`/admin/tasks/${b.id}`} style={{ fontSize: 13, color: "var(--text)", textDecoration: "none" }}>
+                <span style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginRight: 8 }}>{b.id}</span>
+                {b.summary}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div style={{ ...ui.card, marginTop: 20 }}>
         <div style={ui.fieldLabel}>{t(locale, "task.description")}</div>
         <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>
           {task.description?.trim() || t(locale, "task.noDescription")}
         </div>
       </div>
+
+      <TaskTools id={task.id} candidates={candidates} currentDeps={deps.map((d) => d.id)} canReview={canReview} locale={locale} />
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>

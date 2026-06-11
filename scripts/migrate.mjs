@@ -57,6 +57,11 @@ ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_ref TEXT;
+CREATE TABLE IF NOT EXISTS task_deps (
+  task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, depends_on_id));
 `;
 
 // Стартовые скилы — реальные полные плейбуки (SKILL.md) из открытых источников:

@@ -3,11 +3,14 @@ import { getBackend } from "@/lib/tasks";
 import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
-import { getReads } from "@/lib/db";
+import { getReads, listProjectsWithMeta, taskCountsByProject, getDepsFor } from "@/lib/db";
+import { statusBucket } from "@/lib/statuses";
+import { nowMs } from "@/lib/now";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { ChatModal } from "./chat-modal";
-import { TaskBoard, type BoardTask } from "./task-board";
+import { TaskTabs, type BoardTask } from "./task-tabs";
+import { DevDashboard, type DashProject } from "./dev-dashboard";
 import { ui } from "../ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -18,38 +21,80 @@ export default async function HomePage() {
   const locale = await getLocale();
   const be = getBackend();
 
-  const all = await be.listProjects();
-  const projects = visibleProjects(me, all).map((p) => ({ key: p.key, name: p.name }));
+  // —— Админ: дашборд загрузки разработчиков ——
+  if (me.realRole === "admin" && me.role === "admin") {
+    let projects, counts, users;
+    try {
+      [projects, counts, users] = await Promise.all([listProjectsWithMeta(), taskCountsByProject(), be.listUsers()]);
+    } catch (e) {
+      return <p style={{ color: "#ff5b5b", fontSize: 14 }}>{e instanceof Error ? e.message : "—"}</p>;
+    }
+    const countMap = new Map(counts.map((c) => [c.projectKey, c]));
+    const dash: DashProject[] = projects
+      .filter((p) => !p.archived)
+      .map((p) => {
+        const c = countMap.get(p.key);
+        return { key: p.key, name: p.name, meta: p.meta, createdAt: p.createdAt, total: c?.total ?? 0, done: c?.done ?? 0 };
+      });
+    const devNames: Record<string, string> = Object.fromEntries(users.map((u) => [u.login, u.fullName]));
 
-  // Скоуп задач по роли.
-  let filter: TaskFilter = { order: "updated_desc", limit: 150 };
-  if (me.realRole !== "admin") {
-    if (me.role === "contributor" && me.youtrackLogin) filter = { assigneeLogin: me.youtrackLogin, order: "updated_desc" };
-    else if ((me.role === "client" || me.role === "employee") && me.projectKey) filter = { projectKey: me.projectKey, order: "updated_desc" };
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={ui.monoLabel}>{t(locale, "dash.kicker")}</div>
+            <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "dash.title")}</h1>
+          </div>
+          <ChatModal projects={dash.map((p) => ({ key: p.key, name: p.name }))} locale={locale} />
+        </div>
+        <DevDashboard projects={dash} devNames={devNames} now={nowMs()} locale={locale} />
+      </div>
+    );
   }
 
-  const readKey = me.youtrackLogin || me.fullName || "admin";
+  // —— Контрибьютор/клиент/сотрудник: задачи с табами проект→статус ——
+  const all = await be.listProjects();
+  const visible = visibleProjects(me, all);
+  const projects = visible.map((p) => ({ key: p.key, name: p.name }));
+  const visibleKeys = new Set(visible.map((p) => p.key));
+
   let tasks, reads;
+  const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
+    // Контрибьютор видит ВСЕ задачи своих проектов (в т.ч. не начатые/не назначенные);
+    // клиент/сотрудник — задачи своего проекта.
+    let filter: TaskFilter = { order: "updated_desc", limit: 300 };
+    if ((me.role === "client" || me.role === "employee") && me.projectKey) {
+      filter = { projectKey: me.projectKey, order: "updated_desc", limit: 300 };
+    }
     [tasks, reads] = await Promise.all([be.listTasks(filter), getReads(readKey)]);
   } catch (e) {
     return <p style={{ color: "#ff5b5b", fontSize: 14 }}>{e instanceof Error ? e.message : "—"}</p>;
   }
 
-  const board: BoardTask[] = tasks.map((tk) => ({
-    id: tk.id,
-    summary: tk.summary,
-    status: tk.state || "Open",
-    description: tk.description,
-    created: tk.created,
-    updated: tk.updated,
-    commentCount: tk.commentCount,
-    assignee: me.role === "client" ? null : tk.assignee?.fullName ?? null,
-    unread: (tk.lastCommentAt ?? 0) > (reads.get(tk.id) ?? 0),
-  }));
+  const filtered = tasks.filter((tk) => (me.role === "admin" ? true : visibleKeys.has(tk.projectKey)));
+  const depMap = await getDepsFor(filtered.map((tk) => tk.id));
+  const board: BoardTask[] = filtered.map((tk) => {
+    const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
+    return {
+      id: tk.id,
+      projectKey: tk.projectKey,
+      summary: tk.summary,
+      status: tk.state || "Open",
+      description: tk.description,
+      created: tk.created,
+      updated: tk.updated,
+      commentCount: tk.commentCount,
+      assignee: me.role === "client" ? null : tk.assignee?.fullName ?? null,
+      unread: (tk.lastCommentAt ?? 0) > (reads.get(tk.id) ?? 0),
+      blocked: blockers.length > 0,
+      blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
+    };
+  });
 
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
   const canDelete = me.realRole === "admin" || me.role === "client";
+  const canStart = me.realRole === "admin" || me.role === "contributor";
 
   return (
     <div>
@@ -57,7 +102,15 @@ export default async function HomePage() {
         <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "nav.tasks")}</h1>
         <ChatModal projects={projects} locale={locale} />
       </div>
-      <TaskBoard tasks={board} locale={locale} canEditStatus={canEditStatus} canDelete={canDelete} empty={t(locale, "tasks.empty")} />
+      <TaskTabs
+        tasks={board}
+        projects={projects}
+        locale={locale}
+        canEditStatus={canEditStatus}
+        canDelete={canDelete}
+        canStart={canStart}
+        empty={t(locale, "tasks.empty")}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { TaskList } from "../task-card";
+import { nowMs } from "@/lib/now";
 import { ui } from "../../ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export default async function TasksPage() {
     );
   }
 
-  const threshold = Date.now() - STALE_DAYS * 86400000;
+  const threshold = nowMs() - STALE_DAYS * 86400000;
   const stale = tasks.filter((x) => x.resolved == null && x.updated != null && x.updated < threshold);
   const fresh = tasks.filter((x) => !stale.includes(x));
 

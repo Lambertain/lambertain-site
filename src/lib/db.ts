@@ -294,6 +294,105 @@ export async function listAllProjects(): Promise<{ key: string; name: string; ar
   );
 }
 
+/** Проекты с метаданными (для дашборда загрузки и видимости по defaultAssignee). */
+export async function listProjectsWithMeta(): Promise<
+  { key: string; name: string; meta: ProjectMeta; archived: boolean; createdAt: string | null }[]
+> {
+  const rows = await q<{ key: string; name: string; meta: ProjectMeta | null; archived: boolean; created_at: string | null }>(
+    "SELECT key, name, meta, archived, created_at FROM projects ORDER BY archived, key",
+  );
+  return rows.map((r) => ({ key: r.key, name: r.name, meta: r.meta ?? {}, archived: r.archived, createdAt: r.created_at }));
+}
+
+/** Счётчики задач по проекту (total и done по корзине done). */
+export async function taskCountsByProject(): Promise<{ projectKey: string; total: number; done: number }[]> {
+  // done — по тем же ключевым словам, что и корзина done в statuses.ts.
+  const rows = await q<{ project_key: string; total: string; done: string }>(
+    `SELECT p.key AS project_key,
+            count(t.id) AS total,
+            count(t.id) FILTER (WHERE t.status ~* '(done|закры|готов|fixed|complete|verified|выполн)') AS done
+       FROM projects p
+       LEFT JOIN tasks t ON t.project_id = p.id
+      GROUP BY p.key`,
+  );
+  return rows.map((r) => ({ projectKey: r.project_key, total: Number(r.total), done: Number(r.done) }));
+}
+
+/**
+ * Задать точный набор проектов разработчика (один дев на проект, но дев ведёт несколько проектов).
+ * Делает его ответственным (defaultAssignee) на проектах из keys и снимает с остальных,
+ * где ответственным был он. Чужие назначения не трогает.
+ */
+export async function setDevProjects(login: string, keys: string[]): Promise<void> {
+  const projects = await listProjectsWithMeta();
+  const want = new Set(keys);
+  for (const p of projects) {
+    const isMine = p.meta.defaultAssignee === login;
+    const shouldBeMine = want.has(p.key);
+    if (isMine === shouldBeMine) continue;
+    const meta: ProjectMeta = { ...p.meta, defaultAssignee: shouldBeMine ? login : undefined };
+    await setProjectMeta(p.key, p.name, meta);
+  }
+}
+
+/** Сохранить ссылку на код (коммит/PR/ветка) — её использует on-demand ИИ-ревью. */
+export async function setReviewRef(taskId: string, ref: string | null): Promise<void> {
+  await q("UPDATE tasks SET review_ref = $2 WHERE readable_id = $1", [taskId, ref]);
+}
+
+/** Ссылка на код для ревью (review_ref) задачи. */
+export async function getReviewRef(taskId: string): Promise<string | null> {
+  const rows = await q<{ review_ref: string | null }>("SELECT review_ref FROM tasks WHERE readable_id = $1", [taskId]);
+  return rows[0]?.review_ref ?? null;
+}
+
+// ---- Зависимости задач (блокеры) ----
+export interface DepInfo {
+  id: string; // readable_id блокера
+  summary: string;
+  status: string | null;
+}
+
+/** Блокеры для набора задач: readable_id задачи → список задач-блокеров. */
+export async function getDepsFor(taskIds: string[]): Promise<Map<string, DepInfo[]>> {
+  const map = new Map<string, DepInfo[]>();
+  if (!taskIds.length) return map;
+  const rows = await q<{ task_readable: string; dep_readable: string; dep_title: string; dep_status: string | null }>(
+    `SELECT tk.readable_id AS task_readable,
+            dep.readable_id AS dep_readable, dep.title AS dep_title, dep.status AS dep_status
+       FROM task_deps d
+       JOIN tasks tk ON tk.id = d.task_id
+       JOIN tasks dep ON dep.id = d.depends_on_id
+      WHERE tk.readable_id = ANY($1::text[])`,
+    [taskIds],
+  );
+  for (const r of rows) {
+    const arr = map.get(r.task_readable) ?? [];
+    arr.push({ id: r.dep_readable, summary: r.dep_title, status: r.dep_status });
+    map.set(r.task_readable, arr);
+  }
+  return map;
+}
+
+/** Текущие блокеры одной задачи (readable_id). */
+export async function getTaskDeps(taskId: string): Promise<DepInfo[]> {
+  return (await getDepsFor([taskId])).get(taskId) ?? [];
+}
+
+/** Задать точный набор блокеров задачи (readable_id блокеров). Само-зависимость игнорируется. */
+export async function setTaskDeps(taskId: string, dependsOn: string[]): Promise<void> {
+  const self = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [taskId]);
+  if (!self[0]) throw new Error(`Задача ${taskId} не найдена`);
+  const ids = dependsOn.filter((d) => d && d !== taskId);
+  const depRows = ids.length
+    ? await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = ANY($1::text[])", [ids])
+    : [];
+  await q("DELETE FROM task_deps WHERE task_id = $1", [self[0].id]);
+  for (const d of depRows) {
+    await q("INSERT INTO task_deps (task_id, depends_on_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [self[0].id, d.id]);
+  }
+}
+
 // ---- API-токены проектов (для чтения задач Claude'ом разработчика) ----
 export async function getProjectKeyByToken(token: string): Promise<string | null> {
   const rows = await q<{ project_key: string }>(

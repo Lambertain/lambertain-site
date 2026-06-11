@@ -53,17 +53,20 @@ async function yt(path, params = {}) {
   return r.json();
 }
 
-async function tg(text) {
+async function sendToDev(chatId, text) {
   if (DRY) {
-    console.log("[DRY] →", text.replace(/\n/g, " ⏎ "));
+    console.log(`[DRY] →${chatId}`, text.replace(/\n/g, " ⏎ "));
     return;
   }
   const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
   });
   if (!r.ok) console.error("TG error:", await r.text());
+}
+async function tg(text) {
+  return sendToDev(TG_CHAT, text);
 }
 
 // login -> role ("client" | "contributor" | "admin" | "unknown")
@@ -200,10 +203,13 @@ async function cycle() {
 }
 
 async function main() {
-  if (!URL_BASE || !TOKEN || !TG_TOKEN || !TG_CHAT || !process.env.DATABASE_URL) {
-    console.error("Не хватает env (YOUTRACK_*, TELEGRAM_*, DATABASE_URL)");
+  // DATABASE_URL обязателен (нужен и для ревью). YouTrack/Telegram — для отдельных шагов; их отсутствие не валит ревью.
+  if (!process.env.DATABASE_URL) {
+    console.error("Не хватает DATABASE_URL");
     process.exit(1);
   }
+  if (!URL_BASE || !TOKEN) console.warn("YOUTRACK_* не заданы — шаги уведомлений YouTrack пропускаются.");
+  if (!TG_TOKEN || !TG_CHAT) console.warn("TELEGRAM_* не заданы — уведомления отключены.");
   await ensureSchema();
   // Первый запуск: инициализируем отметки текущим временем, чтобы не слать историю.
   if ((await getState("last_created")) == null) {

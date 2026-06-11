@@ -45,6 +45,10 @@ export function MetaForm({
   const m = initialMeta;
   const [name, setName] = useState(initialName);
   const [defaultAssignee, setDefaultAssignee] = useState(m.defaultAssignee ?? "");
+  const [cost, setCost] = useState(m.cost != null ? String(m.cost) : "");
+  const [currency, setCurrency] = useState(m.currency ?? "₴");
+  const [startedAt, setStartedAt] = useState(m.startedAt ?? "");
+  const [deadline, setDeadline] = useState(m.deadline ?? "");
   const [clientGit, setClientGit] = useState(m.clientGit ?? "");
   const [devGit, setDevGit] = useState(m.devGit ?? "");
   const [localPath, setLocalPath] = useState(m.localPath ?? "");
@@ -71,6 +75,10 @@ export function MetaForm({
       design: design || undefined,
       conventions: conventions || undefined,
       defaultAssignee: defaultAssignee || undefined,
+      cost: cost.trim() !== "" && Number.isFinite(Number(cost)) ? Number(cost) : undefined,
+      currency: currency || undefined,
+      startedAt: startedAt || undefined,
+      deadline: deadline || undefined,
       credentials: textToCreds(creds),
     };
     start(async () => {
@@ -94,6 +102,30 @@ export function MetaForm({
             </option>
           ))}
         </select>
+      </div>
+
+      <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "dash.kicker")}</div>
+      <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.cost")}</label>
+          <input value={cost} onChange={(e) => setCost(e.target.value)} inputMode="numeric" style={ui.input} />
+        </div>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.currency")}</label>
+          <select value={currency} onChange={(e) => setCurrency(e.target.value)} style={ui.input}>
+            <option value="₴">₴</option>
+            <option value="$">$</option>
+            <option value="€">€</option>
+          </select>
+        </div>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.startedAt")}</label>
+          <input type="date" value={startedAt} onChange={(e) => setStartedAt(e.target.value)} style={ui.input} />
+        </div>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.deadline")}</label>
+          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={ui.input} />
+        </div>
       </div>
 
       <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.repos")}</div>
