@@ -35,6 +35,39 @@ export const DICT: Record<string, Entry> = {
   "role.client": { uk: "Клієнт", ru: "Клиент", en: "Client" },
   "role.employee": { uk: "Співробітник", ru: "Сотрудник", en: "Employee" },
 
+  // — подсказка разработчику (как работать с Claude Code + порталом) —
+  "help.label": { uk: "Підказка", ru: "Подсказка", en: "Help" },
+  "help.title": { uk: "Як працювати з задачами", ru: "Как работать с задачами", en: "How to work on tasks" },
+  "help.startT": { uk: "1. Старт", ru: "1. Старт", en: "1. Start" },
+  "help.startB": {
+    uk: "Відкрий репозиторій проєкту, запусти Claude Code і скажи: «візьми мою задачу з порталу і зроби її». Claude сам прочитає CLAUDE.md, знайде задачу по токену і почне — копіювати задачу вручну не треба.",
+    ru: "Открой репозиторий проекта, запусти Claude Code и скажи: «возьми мою задачу из портала и сделай её». Claude сам прочитает CLAUDE.md, найдёт задачу по токену и начнёт — копировать задачу вручную не надо.",
+    en: "Open the project repo, run Claude Code and say: “take my task from the portal and do it.” Claude reads CLAUDE.md, fetches the task by token and starts — no manual copying.",
+  },
+  "help.optionsT": { uk: "2. Якщо Claude питає «який варіант обрати»", ru: "2. Если Claude спрашивает «какой вариант выбрать»", en: "2. If Claude asks “which option”" },
+  "help.optionsB": {
+    uk: "Технічні розвилки він має вирішувати сам. Якщо все ж питає — скажи: «виріши сам розумним дефолтом за конвенціями проєкту». Якщо питання для клієнта — скажи: «ескалюй це питання клієнту через портал», і нічого пересилати не треба.",
+    ru: "Технические развилки он должен решать сам. Если всё же спрашивает — скажи: «реши сам разумным дефолтом по конвенциям проекта». Если вопрос для клиента — скажи: «эскалируй этот вопрос клиенту через портал», пересылать ничего не надо.",
+    en: "Technical choices he should make himself. If he still asks — say: “decide yourself with a sensible default per project conventions.” If it’s for the client — say: “escalate this question to the client via the portal”, nothing to forward.",
+  },
+  "help.answeredT": { uk: "3. Коли клієнт відповів", ru: "3. Когда клиент ответил", en: "3. When the client answered" },
+  "help.answeredB": {
+    uk: "Просто скажи Claude «продовжуй» — він перечитає задачу з порталу і побачить відповідь клієнта. Переказувати відповідь не треба.",
+    ru: "Просто скажи Claude «продолжай» — он перечитает задачу из портала и увидит ответ клиента. Пересказывать ответ не надо.",
+    en: "Just tell Claude “continue” — he re-reads the task from the portal and sees the client’s answer. No need to relay it.",
+  },
+  "help.phrasesT": { uk: "Корисні фрази Claude", ru: "Полезные фразы Claude", en: "Useful phrases for Claude" },
+  "help.phrasesB": {
+    uk: "• «візьми задачу з порталу» / «покажи мої задачі»\n• «виріши технічну розвилку сам»\n• «ескалюй це питання клієнту»\n• «продовжуй — перевір, чи відповів клієнт»",
+    ru: "• «возьми задачу из портала» / «покажи мои задачи»\n• «реши техническую развилку сам»\n• «эскалируй этот вопрос клиенту»\n• «продолжай — проверь, ответил ли клиент»",
+    en: "• “take the task from the portal” / “show my tasks”\n• “decide the technical choice yourself”\n• “escalate this question to the client”\n• “continue — check if the client replied”",
+  },
+  "help.note": {
+    uk: "Токен проєкту вже лежить у CLAUDE.md репозиторія — налаштовувати нічого не треба.",
+    ru: "Токен проекта уже лежит в CLAUDE.md репозитория — настраивать ничего не надо.",
+    en: "The project token is already in the repo’s CLAUDE.md — nothing to set up.",
+  },
+
   // — навигация —
   "nav.newTask": { uk: "Нова задача", ru: "Новая задача", en: "New task" },
   "nav.tasks": { uk: "Задачі", ru: "Задачи", en: "Tasks" },
