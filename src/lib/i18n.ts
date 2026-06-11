@@ -232,6 +232,26 @@ export const DICT: Record<string, Entry> = {
   "task.comments": { uk: "Коментарі", ru: "Комментарии", en: "Comments" },
   "task.noComments": { uk: "Коментарів немає.", ru: "Комментариев нет.", en: "No comments." },
   "task.addComment": { uk: "Додати коментар", ru: "Добавить комментарий", en: "Add comment" },
+  "comment.visibleToClient": { uk: "Видно клієнту", ru: "Видно клиенту", en: "Visible to client" },
+  "comment.internalOnly": { uk: "Внутрішній — клієнт не побачить", ru: "Внутренний — клиент не увидит", en: "Internal — client won’t see it" },
+  "comment.willSeeClient": { uk: "Клієнт побачить цей коментар", ru: "Клиент увидит этот комментарий", en: "The client will see this comment" },
+  "comment.internalBadge": { uk: "внутр.", ru: "внутр.", en: "internal" },
+
+  // — ответ клиенту через ИИ (по фидбеку разраба, от лица Lambertain) —
+  "creply.open": { uk: "Відповісти клієнту (ІІ)", ru: "Ответить клиенту (ИИ)", en: "Reply to client (AI)" },
+  "creply.title": { uk: "Відповідь клієнту через ІІ", ru: "Ответ клиенту через ИИ", en: "AI reply to client" },
+  "creply.hint": {
+    uk: "Опиши суть своїми словами — ІІ звірить із задачею та кодом і складе відповідь від імені Lambertain. Перед публікацією перевіриш і за потреби виправиш.",
+    ru: "Опиши суть своими словами — ИИ сверит с задачей и кодом и составит ответ от имени Lambertain. Перед публикацией проверишь и при необходимости поправишь.",
+    en: "Describe the gist in your own words — AI checks it against the task and code and drafts a reply as Lambertain. You review and edit before publishing.",
+  },
+  "creply.feedbackLabel": { uk: "Що передати клієнту", ru: "Что передать клиенту", en: "What to convey to the client" },
+  "creply.feedbackPlaceholder": { uk: "напр.: баг із кешем виправлено, експорт у PDF додамо до пʼятниці", ru: "напр.: баг с кешем исправлен, экспорт в PDF добавим к пятнице", en: "e.g.: the caching bug is fixed, PDF export will be added by Friday" },
+  "creply.generate": { uk: "Сформувати відповідь", ru: "Сформировать ответ", en: "Draft reply" },
+  "creply.regenerate": { uk: "Перегенерувати", ru: "Перегенерировать", en: "Regenerate" },
+  "creply.draftLabel": { uk: "Чернетка (перевір і виправ)", ru: "Черновик (проверь и поправь)", en: "Draft (review and edit)" },
+  "creply.publish": { uk: "Опублікувати клієнту", ru: "Опубликовать клиенту", en: "Publish to client" },
+  "creply.published": { uk: "Опубліковано клієнту ✓", ru: "Опубликовано клиенту ✓", en: "Published to client ✓" },
   "task.send": { uk: "Надіслати", ru: "Отправить", en: "Send" },
 
   // — табы статусов —

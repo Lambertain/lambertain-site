@@ -25,12 +25,14 @@ export async function intakeTurn(
     const project = projects.find((p) => p.key === projectKey);
     if (!project) return { error: "Проект не выбран" };
     const repo = repoFromGit(project.meta.devGit);
+    // Клиент не должен видеть исполнителей: не передаём команду в контекст ИИ (иначе он может их назвать).
+    const ctxUsers = me.role === "client" ? [] : users.filter((u) => !u.banned);
     const res = await runIntake(history, {
       projectKey,
       projectName: project.name,
       repo,
       conventions: project.meta.conventions,
-      users: users.filter((u) => !u.banned).map((u) => ({ login: u.login, fullName: u.fullName, role: u.role })),
+      users: ctxUsers.map((u) => ({ login: u.login, fullName: u.fullName, role: u.role })),
       today: today(),
     });
     return { messages: res.messages, reply: res.reply, proposed: res.proposed };

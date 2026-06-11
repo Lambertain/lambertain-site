@@ -13,12 +13,15 @@ export function TaskTools({
   candidates,
   currentDeps,
   canReview,
+  canAiReview,
   locale,
 }: {
   id: string;
   candidates: Candidate[];
   currentDeps: string[];
   canReview: boolean;
+  /** ИИ-ревью кода — только админ (разработчики ревьюят через свой Claude + глазами). */
+  canAiReview: boolean;
   locale: Locale;
 }) {
   const [deps, setDeps] = useState<string[]>(currentDeps);
@@ -47,21 +50,25 @@ export function TaskTools({
     });
   }
 
-  if (!canReview) return null;
+  if (!canReview && !canAiReview) return null;
 
   return (
     <div style={{ ...ui.card, marginTop: 20 }}>
-      {/* ИИ-ревью (on-demand) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <button onClick={review} disabled={reviewing} style={{ ...ui.btn, opacity: reviewing ? 0.5 : 1 }}>
-          {reviewing ? t(locale, "review.running") : t(locale, "review.request")}
-        </button>
-        <span style={{ ...ui.monoLabel, textTransform: "none" }}>{t(locale, "review.hint")}</span>
-      </div>
-      {reviewMsg && <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)", marginTop: 8 }}>{reviewMsg}</p>}
+      {/* ИИ-ревью (on-demand) — только админ */}
+      {canAiReview && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <button onClick={review} disabled={reviewing} style={{ ...ui.btn, opacity: reviewing ? 0.5 : 1 }}>
+              {reviewing ? t(locale, "review.running") : t(locale, "review.request")}
+            </button>
+            <span style={{ ...ui.monoLabel, textTransform: "none" }}>{t(locale, "review.hint")}</span>
+          </div>
+          {reviewMsg && <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)", marginTop: 8 }}>{reviewMsg}</p>}
+        </>
+      )}
 
-      {/* Зависимости (блокеры) */}
-      <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+      {/* Зависимости (блокеры) — команда */}
+      <div style={{ marginTop: canAiReview ? 18 : 0, borderTop: canAiReview ? "1px solid var(--border)" : "none", paddingTop: canAiReview ? 16 : 0 }}>
         <label style={ui.fieldLabel}>{t(locale, "deps.title")}</label>
         <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 8 }}>{t(locale, "deps.hint")}</div>
         {candidates.length === 0 ? (

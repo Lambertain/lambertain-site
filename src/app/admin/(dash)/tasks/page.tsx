@@ -61,11 +61,11 @@ export default async function TasksPage() {
           <div style={{ ...ui.monoLabel, color: "#e8b339" }}>
             {t(locale, "overdue.title")} · {stale.length}
           </div>
-          <TaskList tasks={stale} empty="" locale={locale} />
+          <TaskList tasks={stale} empty="" locale={locale} hideWorkers={me.role === "client"} />
         </div>
       )}
 
-      <TaskList tasks={fresh} empty={t(locale, "tasks.empty")} locale={locale} />
+      <TaskList tasks={fresh} empty={t(locale, "tasks.empty")} locale={locale} hideWorkers={me.role === "client"} />
     </div>
   );
 }

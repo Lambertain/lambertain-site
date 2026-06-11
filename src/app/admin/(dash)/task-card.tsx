@@ -14,9 +14,11 @@ function daysSince(ms?: number | null): number | null {
   return Math.floor((Date.now() - ms) / 86400000);
 }
 
-export function TaskCard({ task, locale, unread }: { task: Task; locale: Locale; unread?: boolean }) {
+export function TaskCard({ task, locale, unread, hideWorkers }: { task: Task; locale: Locale; unread?: boolean; hideWorkers?: boolean }) {
   const stale = daysSince(task.updated);
   const isStale = task.resolved == null && stale != null && stale >= 5;
+  // Клиент не должен видеть исполнителей-работников: имя исполнителя скрыто, чужой репортёр → Lambertain.
+  const showReporter = task.reporter && (!hideWorkers || task.reporter.role === "client");
   return (
     <a
       href={task.url}
@@ -35,11 +37,11 @@ export function TaskCard({ task, locale, unread }: { task: Task; locale: Locale;
       </div>
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>{task.summary}</div>
       <div style={{ display: "flex", gap: 16, ...ui.monoLabel, textTransform: "none" }}>
-        <span>{task.assignee ? `→ ${task.assignee.fullName}` : t(locale, "card.unassigned")}</span>
-        {task.reporter && (
+        {!hideWorkers && <span>{task.assignee ? `→ ${task.assignee.fullName}` : t(locale, "card.unassigned")}</span>}
+        {showReporter && (
           <span>
-            {t(locale, "card.from", { name: task.reporter.fullName })}
-            {task.reporter.role === "client" ? t(locale, "card.clientTag") : ""}
+            {t(locale, "card.from", { name: task.reporter!.fullName })}
+            {task.reporter!.role === "client" ? t(locale, "card.clientTag") : ""}
           </span>
         )}
         {task.updated && (
@@ -50,14 +52,14 @@ export function TaskCard({ task, locale, unread }: { task: Task; locale: Locale;
   );
 }
 
-export function TaskList({ tasks, empty, locale, unreadIds }: { tasks: Task[]; empty: string; locale: Locale; unreadIds?: Set<string> }) {
+export function TaskList({ tasks, empty, locale, unreadIds, hideWorkers }: { tasks: Task[]; empty: string; locale: Locale; unreadIds?: Set<string>; hideWorkers?: boolean }) {
   if (!tasks.length) {
     return <p style={{ color: "var(--muted)", fontSize: 14 }}>{empty}</p>;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
       {tasks.map((t) => (
-        <TaskCard key={t.id} task={t} locale={locale} unread={unreadIds?.has(t.id)} />
+        <TaskCard key={t.id} task={t} locale={locale} unread={unreadIds?.has(t.id)} hideWorkers={hideWorkers} />
       ))}
     </div>
   );

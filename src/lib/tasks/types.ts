@@ -74,6 +74,8 @@ export interface Comment {
   text: string;
   created: number;
   author: { login: string; fullName: string; role: Role };
+  /** "client" — видно клиенту; "internal" — только команде (дев/админ). По умолчанию client. */
+  visibility?: "client" | "internal";
 }
 
 /** Структурированная задача из произвольного текста (результат Claude API). */
@@ -113,7 +115,7 @@ export interface TasksBackend {
     priority?: string | null;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
-  addComment(id: string, text: string): Promise<Comment>;
+  addComment(id: string, text: string, visibility?: "client" | "internal"): Promise<Comment>;
   updateStatus(id: string, status: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
 }

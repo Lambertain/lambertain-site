@@ -7,6 +7,7 @@ import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
+import { ClientReply } from "./client-reply";
 import { TaskTools } from "./task-tools";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -41,6 +42,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   }
 
   const canReview = me.realRole === "admin" || me.role === "contributor";
+  // Клиент не видит внутренние комментарии команды (код-ревью, координация).
+  const visibleComments = me.role === "client" ? comments.filter((c) => c.visibility !== "internal") : comments;
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
   let candidates: { id: string; summary: string; status: string | null }[] = [];
   if (canReview) {
@@ -66,7 +69,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       <div style={{ display: "flex", gap: 16, ...ui.monoLabel, textTransform: "none", marginTop: 10, flexWrap: "wrap" }}>
         {me.role !== "client" && task.assignee && <span>→ {task.assignee.fullName}</span>}
-        {task.reporter && <span>{t(locale, "card.from", { name: task.reporter.fullName })}</span>}
+        {task.reporter && (me.role !== "client" || task.reporter.role === "client") && (
+          <span>{t(locale, "card.from", { name: task.reporter.fullName })}</span>
+        )}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
 
@@ -95,27 +100,34 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      <TaskTools id={task.id} candidates={candidates} currentDeps={deps.map((d) => d.id)} canReview={canReview} locale={locale} />
+      <TaskTools id={task.id} candidates={candidates} currentDeps={deps.map((d) => d.id)} canReview={canReview} canAiReview={me.realRole === "admin"} locale={locale} />
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>
-          {t(locale, "task.comments")} · {comments.length}
+          {t(locale, "task.comments")} · {visibleComments.length}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-          {comments.length === 0 && <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "task.noComments")}</p>}
-          {comments.map((c) => (
-            <div key={c.id} style={{ ...ui.card, padding: 14 }}>
-              <div style={{ display: "flex", gap: 10, ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>
-                <span style={{ color: c.author.role === "client" ? "#e8b339" : "var(--accent)" }}>
-                  {me.role === "client" && c.author.role !== "client" ? "Lambertain" : c.author.fullName}
-                </span>
-                <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
+          {visibleComments.length === 0 && <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "task.noComments")}</p>}
+          {visibleComments.map((c) => {
+            const internal = c.visibility === "internal";
+            return (
+              <div key={c.id} style={{ ...ui.card, padding: 14, borderColor: internal ? "var(--border-2)" : "var(--border)", background: internal ? "rgba(255,255,255,0.02)" : undefined }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>
+                  <span style={{ color: c.author.role === "client" ? "#e8b339" : "var(--accent)" }}>
+                    {me.role === "client" && c.author.role !== "client" ? "Lambertain" : c.author.fullName}
+                  </span>
+                  {internal && me.role !== "client" && (
+                    <span style={{ ...ui.monoLabel, color: "#e8b339", border: "1px solid #e8b339", padding: "1px 6px" }}>{t(locale, "comment.internalBadge")}</span>
+                  )}
+                  <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
+                </div>
+                <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.55 }}>{c.text}</div>
               </div>
-              <div style={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.55 }}>{c.text}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-        <CommentBox id={task.id} locale={locale} />
+        {canReview && <ClientReply id={task.id} locale={locale} />}
+        <CommentBox id={task.id} locale={locale} canChooseVisibility={me.role !== "client"} />
       </div>
     </div>
   );

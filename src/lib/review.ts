@@ -69,6 +69,17 @@ async function codeContext(repo: string, ref: string | null | undefined): Promis
   return null;
 }
 
+/** Контекст кода задачи (дифф по review_ref или HEAD dev-репо) одной строкой — для ревью и ответов клиенту. */
+export async function taskDiff(taskId: string): Promise<string | null> {
+  const be = getBackend();
+  const task = await be.getTask(taskId);
+  const proj = await getProjectFull(task.projectKey);
+  const repo = repoFromGit(proj?.meta.devGit) || repoFromGit(proj?.meta.clientGit);
+  if (!repo) return null;
+  const ctx = await codeContext(repo, await getReviewRef(taskId));
+  return ctx ? `${ctx.title}\n${ctx.diff}` : null;
+}
+
 const TOOL: Anthropic.Tool = {
   name: "submit_review",
   description: "Вынести вердикт код-ревью задачи.",
