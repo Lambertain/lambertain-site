@@ -134,12 +134,17 @@ export const postgresBackend: TasksBackend = {
       const a = await q<{ id: number }>("SELECT id FROM members WHERE login = $1", [input.assigneeLogin]);
       assigneeId = a[0]?.id ?? null;
     }
+    let reporterId: number | null = null;
+    if (input.reporterLogin) {
+      const r = await q<{ id: number }>("SELECT id FROM members WHERE login = $1", [input.reporterLogin]);
+      reporterId = r[0]?.id ?? null;
+    }
     let description = input.description || "";
     if (input.dueDate) description += `\n\n**Дедлайн:** ${input.dueDate}`;
     await q(
-      `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, created_at, updated_at, source, approval_status, created_by_role)
-       VALUES ($1,$2,$3,$4,$5,'Open',$6,$7, now(), now(), 'portal', $8, $9)`,
-      [proj[0].id, num, readable, input.summary, description, input.priority || null, assigneeId, input.approvalStatus || "approved", input.createdByRole || null],
+      `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, reporter_id, created_at, updated_at, source, approval_status, created_by_role)
+       VALUES ($1,$2,$3,$4,$5,'Open',$6,$7,$8, now(), now(), 'portal', $9, $10)`,
+      [proj[0].id, num, readable, input.summary, description, input.priority || null, assigneeId, reporterId, input.approvalStatus || "approved", input.createdByRole || null],
     );
     return this.getTask(readable);
   },

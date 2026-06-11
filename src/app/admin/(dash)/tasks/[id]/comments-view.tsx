@@ -87,7 +87,8 @@ export function CommentsView({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>
                 <span style={{ color: c.authorRole === "client" ? "#e8b339" : "var(--accent)" }}>
-                  {isClient && c.authorRole !== "client" ? "Lambertain" : c.authorName}
+                  {/* Клиент видит сотрудника и клиента по имени; разработчик/админ/эскалации — как «Lambertain». */}
+                  {isClient && c.authorRole !== "client" && c.authorRole !== "employee" ? "Lambertain" : c.authorName}
                 </span>
                 {c.isNew && <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 6px", borderRadius: 3, fontWeight: 600 }}>NEW</span>}
                 {internal && !isClient && (

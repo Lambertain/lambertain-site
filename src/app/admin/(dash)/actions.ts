@@ -90,6 +90,7 @@ export async function createProposedTasks(
         description: tk.description,
         // Если исполнитель не задан — ставим ответственного по проекту.
         assigneeLogin: tk.assigneeLogin ?? defaultAssignee,
+        reporterLogin: me.youtrackLogin ?? null, // создатель (сотрудник/клиент виден)
         priority: tk.priority ?? null,
         approvalStatus: appr.approvalStatus,
         createdByRole: appr.createdByRole,
@@ -149,6 +150,7 @@ export async function createFromDraft(
       summary: draft.summary,
       description: draft.description,
       assigneeLogin: draft.assigneeLogin ?? null,
+      reporterLogin: me.youtrackLogin ?? null,
       dueDate: draft.dueDate ?? null,
       priority: draft.priority ?? null,
       approvalStatus: appr.approvalStatus,

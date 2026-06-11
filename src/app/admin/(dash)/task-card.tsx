@@ -17,8 +17,8 @@ function daysSince(ms?: number | null): number | null {
 export function TaskCard({ task, locale, unread, hideWorkers }: { task: Task; locale: Locale; unread?: boolean; hideWorkers?: boolean }) {
   const stale = daysSince(task.updated);
   const isStale = task.resolved == null && stale != null && stale >= 5;
-  // Клиент не должен видеть исполнителей-работников: имя исполнителя скрыто, чужой репортёр → Lambertain.
-  const showReporter = task.reporter && (!hideWorkers || task.reporter.role === "client");
+  // Клиент не видит разработчиков; сотрудник и клиент-репортёр — видны.
+  const showReporter = task.reporter && (!hideWorkers || task.reporter.role === "client" || task.reporter.role === "employee");
   return (
     <a
       href={task.url}

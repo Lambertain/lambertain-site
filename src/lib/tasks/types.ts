@@ -129,6 +129,7 @@ export interface TasksBackend {
     summary: string;
     description?: string;
     assigneeLogin?: string | null;
+    reporterLogin?: string | null;
     dueDate?: string | null;
     priority?: string | null;
     approvalStatus?: "approved" | "pending";

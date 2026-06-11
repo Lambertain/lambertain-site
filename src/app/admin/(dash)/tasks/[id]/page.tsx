@@ -77,14 +77,15 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       <div style={{ display: "flex", gap: 16, ...ui.monoLabel, textTransform: "none", marginTop: 10, flexWrap: "wrap" }}>
         {me.role !== "client" && task.assignee && <span>→ {task.assignee.fullName}</span>}
-        {task.reporter && (me.role !== "client" || task.reporter.role === "client") && (
+        {/* Сотрудник и клиент-репортёр видны клиенту; разработчик/админ — скрыты (агентство = Lambertain). */}
+        {task.reporter && (me.role !== "client" || task.reporter.role === "client" || task.reporter.role === "employee") && (
           <span>{t(locale, "card.from", { name: task.reporter.fullName })}</span>
         )}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
 
       {task.approvalStatus === "pending" && (
-        <ApprovalBar id={task.id} canApprove={isAdmin || me.role === "client"} forClient={me.role === "client"} locale={locale} />
+        <ApprovalBar id={task.id} canApprove={isAdmin || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />
       )}
 
       {blockers.length > 0 && (
