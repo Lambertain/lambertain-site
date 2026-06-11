@@ -87,7 +87,54 @@ async function main() {
     }
     if (changed) { tasksDone++; console.log(`${task.readable_id}: ${atts.length} img`); }
   }
-  console.log(`Готово: задач ${tasksDone}, картинок ${imgs}.`);
+  console.log(`Задачи: ${tasksDone}, картинок ${imgs}.`);
+
+  // --- Картинки в комментариях ---
+  const { rows: crows } = await pool.query(
+    `SELECT c.id, c.task_id, c.body, t.readable_id, t.yt_id FROM comments c
+       JOIN tasks t ON t.id = c.task_id
+      WHERE t.yt_id IS NOT NULL AND c.body LIKE '%![%' AND c.body NOT LIKE '%/api/files/%'`,
+  );
+  // Группируем по задаче (одна выборка вложений на issue).
+  const byTask = new Map();
+  for (const r of crows) {
+    if (!byTask.has(r.yt_id)) byTask.set(r.yt_id, []);
+    byTask.get(r.yt_id).push(r);
+  }
+  let commentImgs = 0, commentsDone = 0;
+  for (const [ytId, list] of byTask) {
+    let issue;
+    try {
+      issue = await yt(`/api/issues/${ytId}`, { fields: "attachments(name,url,mimeType)" });
+    } catch (e) {
+      console.error(`comments ${ytId}: ${e.message}`);
+      continue;
+    }
+    const atts = (issue.attachments || []).filter((a) => /^image\//.test(a.mimeType || ""));
+    for (const cr of list) {
+      let body = cr.body, changed = false;
+      for (const a of atts) {
+        if (!body.includes(`](${a.name})`)) continue;
+        let attId;
+        if (dry) attId = "DRY";
+        else {
+          const data = await download(a.url);
+          const ins = await pool.query(
+            `INSERT INTO attachments (task_id, name, mime, data) VALUES ($1,$2,$3,$4)
+             ON CONFLICT (task_id, name) DO UPDATE SET mime=EXCLUDED.mime, data=EXCLUDED.data RETURNING id`,
+            [cr.task_id, a.name, a.mimeType, data],
+          );
+          attId = ins.rows[0].id;
+        }
+        body = body.split(`](${a.name})`).join(`](/api/files/${attId})`);
+        changed = true;
+        commentImgs++;
+      }
+      if (changed && !dry) await pool.query("UPDATE comments SET body = $2 WHERE id = $1", [cr.id, body]);
+      if (changed) commentsDone++;
+    }
+  }
+  console.log(`Комментарии: ${commentsDone}, картинок ${commentImgs}.`);
   await pool.end();
 }
 
