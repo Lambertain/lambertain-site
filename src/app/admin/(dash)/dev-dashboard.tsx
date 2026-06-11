@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
@@ -54,12 +55,17 @@ function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: 
   const m = metrics(p, now);
   const cost = money(p.meta.cost, p.meta.currency);
   return (
-    <div style={{ border: "1px solid var(--border)", padding: 14, background: "var(--surface-2)" }}>
+    <Link
+      href={`/admin/projects/${p.key}`}
+      className="pm-dash-card"
+      style={{ display: "block", border: "1px solid var(--border)", padding: 14, background: "var(--surface-2)", color: "inherit", textDecoration: "none" }}
+    >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{p.key}</span>
           <strong style={{ fontSize: 15 }}>{p.name}</strong>
         </div>
+        {/* Стоимость — только на админском дашборде (исполнитель/клиент сюда доступа не имеют). */}
         {cost && <span style={{ ...ui.monoLabel, color: "var(--text)", fontSize: 12 }}>{cost}</span>}
       </div>
 
@@ -83,7 +89,7 @@ function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: 
         {m.timePct != null && <Bar pct={m.timePct} label={t(locale, "dash.byTime")} danger={m.daysLeft != null && m.daysLeft < 0} />}
         <Bar pct={m.taskPct} label={t(locale, "dash.byTasks")} />
       </div>
-    </div>
+    </Link>
   );
 }
 

@@ -192,3 +192,7 @@ body::after {
   .grid-3 { grid-template-columns: 1fr !important; }
 }
 
+
+/* Карточка проекта на дашборде — кликабельна */
+.pm-dash-card { transition: border-color 0.15s ease; }
+.pm-dash-card:hover { border-color: var(--accent) !important; }
