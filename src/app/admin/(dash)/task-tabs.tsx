@@ -145,26 +145,35 @@ function Row({
   );
 }
 
-const TabBtn = ({ active, hasNew, onClick, children }: { active: boolean; hasNew?: boolean; onClick: () => void; children: React.ReactNode }) => (
-  <button
-    onClick={onClick}
-    style={{
-      position: "relative",
-      ...ui.monoLabel,
-      padding: "7px 12px",
-      background: active ? "var(--accent)" : "transparent",
-      color: active ? "#000" : "var(--muted)",
-      border: `1px solid ${active ? "var(--accent)" : "var(--border-2)"}`,
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-    }}
-  >
-    {children}
-    {hasNew && !active && (
-      <span style={{ position: "absolute", top: -4, right: -4, width: 9, height: 9, borderRadius: "50%", background: "var(--accent)", border: "1px solid var(--bg)" }} />
-    )}
-  </button>
-);
+const TabBtn = ({ active, hasNew, onClick, variant = "project", children }: { active: boolean; hasNew?: boolean; onClick: () => void; variant?: "project" | "status"; children: React.ReactNode }) => {
+  // project — заполненные «таблетки» (верхний уровень); status — «подчёркнутые вкладки» (нижний уровень).
+  const style: React.CSSProperties =
+    variant === "project"
+      ? {
+          ...ui.monoLabel,
+          padding: "7px 12px",
+          background: active ? "var(--accent)" : "transparent",
+          color: active ? "#000" : "var(--muted)",
+          border: `1px solid ${active ? "var(--accent)" : "var(--border-2)"}`,
+        }
+      : {
+          ...ui.monoLabel,
+          padding: "6px 4px",
+          background: "transparent",
+          color: active ? "var(--accent)" : "var(--muted)",
+          border: "none",
+          borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
+          borderRadius: 0,
+        };
+  return (
+    <button onClick={onClick} style={{ position: "relative", cursor: "pointer", whiteSpace: "nowrap", ...style }}>
+      {children}
+      {hasNew && !active && (
+        <span style={{ position: "absolute", top: -4, right: -4, width: 9, height: 9, borderRadius: "50%", background: "var(--accent)", border: "1px solid var(--bg)" }} />
+      )}
+    </button>
+  );
+};
 
 export function TaskTabs({
   tasks,
@@ -235,9 +244,9 @@ export function TaskTabs({
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14, overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 16, overflowX: "auto", borderBottom: "1px solid var(--border)", paddingBottom: 2 }}>
         {BUCKET_ORDER.map((b) => (
-          <TabBtn key={b} active={b === activeBucket} onClick={() => setBucket(b)}>
+          <TabBtn key={b} variant="status" active={b === activeBucket} onClick={() => setBucket(b)}>
             {t(locale, BUCKET_LABEL[b])} · {byBucket[b].length}
           </TabBtn>
         ))}

@@ -51,9 +51,20 @@ function money(cost: number | undefined, currency: string | undefined): string |
   return `${cost.toLocaleString()} ${currency || "₴"}`;
 }
 
+/** Оплата проекта: общая сумма, части, сколько оплачено/осталось. */
+function payment(meta: ProjectMeta) {
+  const cost = Number.isFinite(meta.cost) ? (meta.cost as number) : 0;
+  const parts = meta.parts && meta.parts >= 1 ? Math.floor(meta.parts) : 1;
+  const paidParts = Math.min(Math.max(Math.floor(meta.paidParts ?? 0), 0), parts);
+  const paid = cost > 0 ? Math.round((cost * paidParts) / parts) : 0;
+  const unpaid = Math.max(0, cost - paid);
+  return { cost, currency: meta.currency || "₴", parts, paidParts, paid, unpaid, isClient: cost > 0 };
+}
+
 function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: Locale }) {
   const m = metrics(p, now);
   const cost = money(p.meta.cost, p.meta.currency);
+  const pay = payment(p.meta);
   return (
     <Link
       href={`/admin/projects/${p.key}`}
@@ -68,6 +79,14 @@ function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: 
         {/* Стоимость — только на админском дашборде (исполнитель/клиент сюда доступа не имеют). */}
         {cost && <span style={{ ...ui.monoLabel, color: "var(--text)", fontSize: 12 }}>{cost}</span>}
       </div>
+
+      {pay.isClient && (
+        <div style={{ display: "flex", gap: 14, ...ui.monoLabel, textTransform: "none", marginTop: 8, flexWrap: "wrap" }}>
+          <span style={{ color: "var(--accent)" }}>{t(locale, "dash.paid")}: {pay.paid.toLocaleString()} {pay.currency}</span>
+          <span style={{ color: pay.unpaid > 0 ? "#e8b339" : "var(--muted)" }}>{t(locale, "dash.unpaid")}: {pay.unpaid.toLocaleString()} {pay.currency}</span>
+          <span style={{ color: "var(--muted)" }}>{pay.paidParts}/{pay.parts} {t(locale, "dash.parts")}</span>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 16, ...ui.monoLabel, textTransform: "none", marginTop: 10, flexWrap: "wrap" }}>
         {m.daysRunning != null && <span>{m.daysRunning} {t(locale, "dash.daysRunning")}</span>}
@@ -90,6 +109,45 @@ function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: 
         <Bar pct={m.taskPct} label={t(locale, "dash.byTasks")} />
       </div>
     </Link>
+  );
+}
+
+function Stat({ value, label, color }: { value: string; label: string; color?: string }) {
+  return (
+    <div style={{ minWidth: 100 }}>
+      <div style={{ fontFamily: "var(--font-display)", fontSize: 24, letterSpacing: "0.02em", color: color || "var(--text)" }}>{value}</div>
+      <div style={{ ...ui.monoLabel, textTransform: "none", marginTop: 4 }}>{label}</div>
+    </div>
+  );
+}
+
+/** Финансовый блок: проекты (всего/личные/клиентские) и деньги (всего/получено/осталось). */
+function FinBlock({ projects, locale }: { projects: DashProject[]; locale: Locale }) {
+  const client = projects.filter((p) => (p.meta.cost ?? 0) > 0);
+  const personal = projects.length - client.length;
+  const currency = client.find((p) => p.meta.currency)?.meta.currency || "₴";
+  let total = 0, received = 0, notReceived = 0;
+  for (const p of client) {
+    const pay = payment(p.meta);
+    total += pay.cost;
+    received += pay.paid;
+    notReceived += pay.unpaid;
+  }
+  const fmt = (n: number) => `${n.toLocaleString()} ${currency}`;
+
+  return (
+    <div style={{ ...ui.card, marginTop: 16 }}>
+      <div style={ui.monoLabel}>{t(locale, "fin.kicker")}</div>
+      <h2 style={{ ...ui.h1, fontSize: 22, margin: "8px 0 0" }}>{t(locale, "fin.title")}</h2>
+      <div style={{ display: "flex", gap: 28, flexWrap: "wrap", marginTop: 16 }}>
+        <Stat value={String(projects.length)} label={t(locale, "fin.projectsInWork")} />
+        <Stat value={String(personal)} label={t(locale, "fin.personal")} />
+        <Stat value={String(client.length)} label={t(locale, "fin.client")} />
+        <Stat value={fmt(total)} label={t(locale, "fin.total")} color="var(--accent)" />
+        <Stat value={fmt(received)} label={t(locale, "fin.received")} color="var(--accent)" />
+        <Stat value={fmt(notReceived)} label={t(locale, "fin.notReceived")} color={notReceived > 0 ? "#e8b339" : "var(--muted)"} />
+      </div>
+    </div>
   );
 }
 
@@ -168,6 +226,7 @@ export function DevDashboard({
 
   return (
     <div>
+      <FinBlock projects={projects} locale={locale} />
       {devLogins.map((login) => (
         <DevBlock key={login} title={devNames[login] || login} projects={groups.get(login)!} now={now} locale={locale} />
       ))}

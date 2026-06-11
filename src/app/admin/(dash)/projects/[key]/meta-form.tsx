@@ -47,6 +47,8 @@ export function MetaForm({
   const [defaultAssignee, setDefaultAssignee] = useState(m.defaultAssignee ?? "");
   const [cost, setCost] = useState(m.cost != null ? String(m.cost) : "");
   const [currency, setCurrency] = useState(m.currency ?? "₴");
+  const [parts, setParts] = useState(m.parts != null ? String(m.parts) : "1");
+  const [paidParts, setPaidParts] = useState(m.paidParts != null ? String(m.paidParts) : "0");
   const [startedAt, setStartedAt] = useState(m.startedAt ?? "");
   const [deadline, setDeadline] = useState(m.deadline ?? "");
   const cd = m.clientDeploy ?? {};
@@ -83,6 +85,8 @@ export function MetaForm({
       defaultAssignee: defaultAssignee || undefined,
       cost: cost.trim() !== "" && Number.isFinite(Number(cost)) ? Number(cost) : undefined,
       currency: currency || undefined,
+      parts: Number(parts) >= 1 ? Math.floor(Number(parts)) : undefined,
+      paidParts: Number(paidParts) >= 0 ? Math.floor(Number(paidParts)) : undefined,
       startedAt: startedAt || undefined,
       deadline: deadline || undefined,
       clientDeploy:
@@ -133,6 +137,14 @@ export function MetaForm({
             <option value="$">$</option>
             <option value="€">€</option>
           </select>
+        </div>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.parts")}</label>
+          <input value={parts} onChange={(e) => setParts(e.target.value)} inputMode="numeric" style={ui.input} />
+        </div>
+        <div>
+          <label style={ui.fieldLabel}>{t(locale, "field.paidParts")}</label>
+          <input value={paidParts} onChange={(e) => setPaidParts(e.target.value)} inputMode="numeric" style={ui.input} />
         </div>
         <div>
           <label style={ui.fieldLabel}>{t(locale, "field.startedAt")}</label>

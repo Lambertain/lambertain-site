@@ -319,6 +319,17 @@ export const DICT: Record<string, Entry> = {
   "dash.tasks": { uk: "задачі", ru: "задачи", en: "tasks" },
   "dash.noDeadline": { uk: "без дедлайну", ru: "без дедлайна", en: "no deadline" },
   "dash.unassigned": { uk: "Без відповідального", ru: "Без ответственного", en: "Unassigned" },
+  "dash.paid": { uk: "Оплачено", ru: "Оплачено", en: "Paid" },
+  "dash.unpaid": { uk: "Залишок", ru: "Остаток", en: "Remaining" },
+  "dash.parts": { uk: "частин", ru: "частей", en: "parts" },
+  "fin.kicker": { uk: "Фінанси", ru: "Финансы", en: "Finance" },
+  "fin.title": { uk: "Зведення", ru: "Сводка", en: "Summary" },
+  "fin.projectsInWork": { uk: "проєктів у роботі", ru: "проектов в работе", en: "projects in work" },
+  "fin.personal": { uk: "особистих (без вартості)", ru: "личных (без стоимости)", en: "personal (no cost)" },
+  "fin.client": { uk: "клієнтських (з вартістю)", ru: "клиентских (со стоимостью)", en: "client (with cost)" },
+  "fin.total": { uk: "сума всіх клієнтських", ru: "сумма всех клиентских", en: "total client value" },
+  "fin.received": { uk: "отримано", ru: "получено", en: "received" },
+  "fin.notReceived": { uk: "ще не отримано", ru: "ещё не получено", en: "not yet received" },
   "dash.empty": { uk: "Проєктів поки немає.", ru: "Проектов пока нет.", en: "No projects yet." },
 
   // — команда: разработчики и их проекты —
@@ -353,6 +364,8 @@ export const DICT: Record<string, Entry> = {
   // — поля проекта: экономика —
   "field.cost": { uk: "Вартість", ru: "Стоимость", en: "Cost" },
   "field.currency": { uk: "Валюта", ru: "Валюта", en: "Currency" },
+  "field.parts": { uk: "Частин (платежів)", ru: "Частей (платежей)", en: "Parts (payments)" },
+  "field.paidParts": { uk: "Оплачено частин", ru: "Оплачено частей", en: "Parts paid" },
   "field.startedAt": { uk: "Старт (дата)", ru: "Старт (дата)", en: "Start date" },
   "field.deadline": { uk: "Дедлайн (дата)", ru: "Дедлайн (дата)", en: "Deadline" },
 
