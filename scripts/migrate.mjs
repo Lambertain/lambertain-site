@@ -117,6 +117,20 @@ const SEED_SKILLS = [
     "Postgres, PostgreSQL, SQL, запрос, индекс, схема БД, миграция, база данных, БД, query, index, performance, vacuum, explain analyze"],
   ["webapp-testing", "Тестирование веб-приложения (Playwright)", "webapp-testing.md",
     "тестирование UI, проверить в браузере, Playwright, e2e, скриншот браузера, проверить фронт, browser test, QA, smoke, консоль браузера"],
+  ["code-audit", "Аудит кода (баги, тех долг)", "code-audit.md",
+    "аудит кода, ревизия, тех долг, дубли, мёртвый код, рефакторинг, качество кода, проверить код, найти проблемы, code audit, technical debt, smells"],
+  ["security", "Безопасность (security review)", "security.md",
+    "безопасность, уязвимость, дыра, OWASP, инъекция, XSS, CSRF, авторизация, аутентификация, доступы, IDOR, секреты, валидация, security, vulnerability, auth"],
+  ["business-logic", "Бизнес-логика", "business-logic.md",
+    "бизнес-логика, бизнес логика, правила, домен, корректность, состояния, статусы, edge-cases, деньги, оплата, расчёты, идемпотентность, инварианты, business logic"],
+  ["customer-journey", "Путь клиента (UX-флоу)", "customer-journey.md",
+    "путь клиента, путь пользователя, UX, сценарий, флоу, онбординг, конверсия, воронка, трение, пустое состояние, мобильный опыт, customer journey, user flow, funnel"],
+  ["seo", "SEO-оптимизация", "seo.md",
+    "SEO, сео, поисковая оптимизация, метатеги, title, description, sitemap, robots, schema, structured data, canonical, OpenGraph, индексация, ранжирование, search"],
+  ["performance", "Скорость загрузки / производительность", "performance.md",
+    "скорость, производительность, оптимизация загрузки, Core Web Vitals, LCP, CLS, INP, бандл, lazy, кэш, медленно, тормозит, performance, speed, optimize, lighthouse"],
+  ["accessibility", "Доступность (a11y)", "accessibility.md",
+    "доступность, a11y, accessibility, скринридер, клавиатура, фокус, ARIA, контраст, инклюзивность, WCAG"],
 ];
 
 // Срезаем YAML-фронтматтер (--- ... ---) — в плейбук идёт только тело инструкций.

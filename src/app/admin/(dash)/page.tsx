@@ -117,7 +117,8 @@ export default async function HomePage() {
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, me.role === "contributor" ? "nav.myTasks" : "nav.tasks")}</h1>
-        <ChatModal projects={projects} locale={locale} />
+        {/* Разработчик только выполняет задачи — постановка не его роль. Клиенту чат нужен для заявок. */}
+        {me.role !== "contributor" && <ChatModal projects={projects} locale={locale} />}
       </div>
       <TaskTabs
         tasks={board}
