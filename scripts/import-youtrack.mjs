@@ -130,10 +130,14 @@ async function main() {
   }
   console.log(`Люди: ${memberId.size}`);
 
+  // Проекты-исключения (онбординг-демо YouTrack и т.п.) — не импортируем и не воскрешаем.
+  const SKIP_PROJECTS = new Set(["DEMO"]);
+
   // --- Проекты ---
   const projects = await yt("/api/admin/projects", { fields: "shortName,name,description,archived", $top: 500 });
   const projectId = new Map();
   for (const p of projects) {
+    if (SKIP_PROJECTS.has(p.shortName)) continue;
     const res = await pool.query(
       `INSERT INTO projects (key, name, archived) VALUES ($1,$2,$3)
        ON CONFLICT (key) DO UPDATE SET name=EXCLUDED.name, archived=EXCLUDED.archived RETURNING id`,
@@ -151,6 +155,8 @@ async function main() {
     const issues = await yt("/api/issues", { query: "", fields: F, $top: 200, $skip: skip });
     if (!issues.length) break;
     for (const i of issues) {
+      // Пропускаем issue проектов-исключений и тех, чьего проекта нет в портале.
+      if (SKIP_PROJECTS.has(i.project?.shortName) || !projectId.get(i.project?.shortName)) continue;
       const cf = (name) => i.customFields?.find((c) => c.name === name)?.value ?? null;
       const assignee = cf("Assignee");
       const state = cf("State");
