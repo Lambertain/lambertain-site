@@ -23,9 +23,18 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   const [addErr, setAddErr] = useState<string | null>(null);
 
   const sorted = useMemo(() => [...list].sort((a, b) => a.name.localeCompare(b.name)), [list]);
+  const multi = role === "contributor"; // разраб — несколько проектов; клиент/сотрудник — один
+
+  function changeRole(r: typeof role) {
+    setLink(null);
+    setRole(r);
+    // клиент/сотрудник — оставляем максимум один выбранный проект
+    if (r !== "contributor") setSelected((cur) => cur.slice(0, 1));
+  }
 
   function toggle(key: string) {
     setLink(null);
+    if (!multi) { setSelected((cur) => (cur.includes(key) ? [] : [key])); return; }
     setSelected((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
   }
 
@@ -57,7 +66,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
     <div style={{ ...ui.card, marginTop: 20, maxWidth: 560 }}>
       <div>
         <label style={ui.fieldLabel}>{t(locale, "field.role")}</label>
-        <select value={role} onChange={(e) => { setRole(e.target.value as typeof role); setLink(null); }} style={{ ...ui.input, maxWidth: 260 }}>
+        <select value={role} onChange={(e) => changeRole(e.target.value as typeof role)} style={{ ...ui.input, maxWidth: 260 }}>
           <option value="contributor">{t(locale, "role.contributor")}</option>
           <option value="client">{t(locale, "role.client")}</option>
           <option value="employee">{t(locale, "role.employee")}</option>
