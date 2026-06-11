@@ -2,7 +2,8 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, renameMember, setLinkProject } from "@/lib/db";
+import { getBackend } from "@/lib/tasks";
 import { sendTo } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
@@ -69,12 +70,31 @@ export async function approveAccess(
   }
 }
 
-/** Назначить разработчику набор проектов (он становится ответственным на них). */
-export async function saveDevProjects(login: string, keys: string[]): Promise<{ ok?: boolean; error?: string }> {
+/** Сохранить проекты пользователя: разработчик → ответственный на наборе; клиент/сотрудник → один проект. */
+export async function saveUserProjects(login: string, keys: string[]): Promise<{ ok?: boolean; error?: string }> {
   try {
     await requireAdmin();
     if (!login) return { error: "no login" };
-    await setDevProjects(login, keys);
+    const user = (await getBackend().listUsers()).find((u) => u.login === login);
+    if (user?.role === "client" || user?.role === "employee") {
+      await setLinkProject(login, keys[0] ?? null);
+    } else {
+      await setDevProjects(login, keys);
+    }
+    revalidatePath("/admin/team");
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Переименовать пользователя (имя видно только админу). */
+export async function renameUser(login: string, alias: string): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    if (!login) return { error: "no login" };
+    await renameMember(login, alias.trim() || null);
     revalidatePath("/admin/team");
     revalidatePath("/admin");
     return { ok: true };

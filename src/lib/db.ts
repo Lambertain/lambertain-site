@@ -144,6 +144,16 @@ export async function getLinkByTgId(tgId: number): Promise<TgLink | null> {
   return rows[0] ?? null;
 }
 
+/** Кастомное имя участника (видно только админу). */
+export async function renameMember(login: string, alias: string | null): Promise<void> {
+  await q("UPDATE members SET alias = $2 WHERE login = $1", [login, alias || null]);
+}
+
+/** Сменить проект клиента/сотрудника (его единственный проект). */
+export async function setLinkProject(login: string, projectKey: string | null): Promise<void> {
+  await q("UPDATE tg_links SET project_key = $2 WHERE youtrack_login = $1", [login, projectKey || null]);
+}
+
 /** Создать/обновить участника (member) — для людей, добавленных через Telegram. */
 export async function upsertMember(
   login: string,

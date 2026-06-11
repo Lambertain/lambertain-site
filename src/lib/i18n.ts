@@ -332,6 +332,12 @@ export const DICT: Record<string, Entry> = {
   "team.noProjects": { uk: "немає проєктів", ru: "нет проектов", en: "no projects" },
   "team.saveProjects": { uk: "Зберегти проєкти", ru: "Сохранить проекты", en: "Save projects" },
 
+  // — пользователи (присоединившиеся; раскрывающиеся карточки) —
+  "users.kicker": { uk: "Хто приєднався", ru: "Кто присоединился", en: "Who joined" },
+  "users.title": { uk: "Користувачі", ru: "Пользователи", en: "Users" },
+  "users.empty": { uk: "Поки ніхто не приєднався.", ru: "Пока никто не присоединился.", en: "Nobody has joined yet." },
+  "users.alias": { uk: "Імʼя (бачите тільки ви)", ru: "Имя (видите только вы)", en: "Name (only you see it)" },
+
   // — перенос истории (старый ник YouTrack → новый tg-пользователь) —
   "relink.kicker": { uk: "Старі ніки YouTrack", ru: "Старые ники YouTrack", en: "Former YouTrack logins" },
   "relink.title": { uk: "Перенос історії", ru: "Перенос истории", en: "History transfer" },

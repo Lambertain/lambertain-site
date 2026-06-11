@@ -37,7 +37,7 @@ export default async function HomePage() {
         const c = countMap.get(p.key);
         return { key: p.key, name: p.name, meta: p.meta, createdAt: p.createdAt, total: c?.total ?? 0, done: c?.done ?? 0 };
       });
-    const devNames: Record<string, string> = Object.fromEntries(users.map((u) => [u.login, u.fullName]));
+    const devNames: Record<string, string> = Object.fromEntries(users.map((u) => [u.login, u.alias || u.fullName]));
 
     return (
       <div>

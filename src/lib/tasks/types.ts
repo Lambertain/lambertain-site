@@ -15,6 +15,8 @@ export interface User {
   email?: string;
   role: Role;
   banned?: boolean;
+  /** Кастомное имя от админа (отображается только админу). */
+  alias?: string;
 }
 
 export interface Project {

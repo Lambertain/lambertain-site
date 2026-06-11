@@ -74,14 +74,15 @@ export const postgresBackend: TasksBackend = {
   },
 
   async listUsers(): Promise<User[]> {
-    const rows = await q<{ login: string; full_name: string | null; email: string | null; role: Role }>(
-      "SELECT login, full_name, email, role FROM members ORDER BY full_name",
+    const rows = await q<{ login: string; full_name: string | null; email: string | null; role: Role; alias: string | null }>(
+      "SELECT login, full_name, email, role, alias FROM members ORDER BY full_name",
     );
     return rows.map((r) => ({
       login: r.login,
       fullName: r.full_name || r.login,
       email: r.email || undefined,
       role: r.role,
+      alias: r.alias || undefined,
     }));
   },
 

@@ -90,7 +90,6 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
                   <span style={{ width: 15, height: 15, flexShrink: 0, border: `1px solid ${on ? "var(--accent)" : "var(--border-2)"}`, background: on ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {on && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
                   </span>
-                  <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{p.key}</span>
                   <span>{p.name}</span>
                 </button>
               );
