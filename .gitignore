@@ -40,3 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+
+# Локальные выгрузки YouTrack (scratch)
+iss_*.json
+sad_issues.json
