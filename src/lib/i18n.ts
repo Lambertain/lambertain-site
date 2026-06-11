@@ -187,6 +187,9 @@ export const DICT: Record<string, Entry> = {
   "team.login": { uk: "— логін —", ru: "— логин —", en: "— login —" },
   "team.approve": { uk: "Підтвердити", ru: "Подтвердить", en: "Approve" },
   "team.reject": { uk: "Відхилити", ru: "Отклонить", en: "Reject" },
+  "team.linkedKicker": { uk: "Хто приєднався", ru: "Кто присоединился", en: "Who joined" },
+  "team.linkedTitle": { uk: "Привʼязані акаунти", ru: "Привязанные аккаунты", en: "Linked accounts" },
+  "team.linkedEmpty": { uk: "Поки ніхто не приєднався по запрошенню.", ru: "Пока никто не присоединился по приглашению.", en: "Nobody has joined via invite yet." },
   "team.approved": { uk: "доступ відкрито", ru: "доступ открыт", en: "access granted" },
   "team.rejected": { uk: "відхилено", ru: "отклонено", en: "rejected" },
 

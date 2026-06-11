@@ -5,8 +5,11 @@
  */
 import { randomBytes } from "node:crypto";
 import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects } from "./db";
+import { notifyAdmin } from "./notify";
 import type { Role } from "./tasks/types";
 import type { TgUser } from "./telegram-auth";
+
+const ROLE_RU: Record<string, string> = { client: "клиент", contributor: "разработчик", employee: "сотрудник", admin: "админ", unknown: "—" };
 
 const DEFAULT_TTL_HOURS = 72;
 
@@ -46,5 +49,10 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: keys[0] ?? null });
   if (inv.role === "contributor" && keys.length) await setDevProjects(login, keys);
   await markInviteUsed(token, user.id);
+  await notifyAdmin(
+    `✅ <b>${fullName}</b> присоединился по приглашению\n` +
+      `Роль: ${ROLE_RU[inv.role] || inv.role}${keys.length ? ` · проекты: ${keys.join(", ")}` : ""}\n` +
+      `Логин: @${login}`,
+  );
   return true;
 }

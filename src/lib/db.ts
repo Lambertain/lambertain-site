@@ -209,6 +209,20 @@ export async function markInviteUsed(token: string, tgId: number): Promise<void>
   await q("UPDATE invites SET used_at = now(), used_by_tg_id = $2 WHERE token = $1", [token, tgId]);
 }
 
+/** Привязанные к боту аккаунты (кто присоединился) — для экрана команды. */
+export interface LinkedAccount {
+  login: string;
+  role: Role;
+  full_name: string | null;
+  project_key: string | null;
+  linked_at: string;
+}
+export async function listLinks(): Promise<LinkedAccount[]> {
+  return q<LinkedAccount>(
+    "SELECT youtrack_login AS login, role, full_name, project_key, linked_at FROM tg_links ORDER BY linked_at DESC",
+  );
+}
+
 // ---- Оверрайды ролей (login -> role), приоритетнее ролей YouTrack ----
 export async function getRoleOverrides(): Promise<Map<string, Role>> {
   const rows = await q<{ login: string; role: Role }>("SELECT login, role FROM role_overrides");
