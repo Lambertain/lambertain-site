@@ -49,6 +49,16 @@ export interface ProjectMeta {
   startedAt?: string;
   /** Плановая дата завершения (ISO YYYY-MM-DD). Нет — прогресс-бар по времени скрыт. */
   deadline?: string;
+  /** Клиентский Railway (для доставки dev→client: апрув деплоя, мониторинг, URL БД для миграции). */
+  clientDeploy?: {
+    railwayToken?: string;
+    projectId?: string;
+    environmentId?: string;
+    /** App-сервис (его деплой апрувим). */
+    serviceId?: string;
+    /** Postgres-сервис (из него берём внешний URL БД для миграции). */
+    pgServiceId?: string;
+  };
 }
 
 export interface Task {

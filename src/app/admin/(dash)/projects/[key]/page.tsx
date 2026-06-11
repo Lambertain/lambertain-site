@@ -5,6 +5,7 @@ import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { MetaForm } from "./meta-form";
+import { DeliverPanel } from "./deliver-panel";
 import { TokenRow } from "../token-row";
 import { ui } from "../../../ui-styles";
 
@@ -41,6 +42,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
       </div>
 
       <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
+
+      {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} />}
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>{t(locale, "projects.kicker")}</div>

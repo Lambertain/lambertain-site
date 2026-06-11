@@ -1,0 +1,252 @@
+/**
+ * Доставка кода dev → client одним (squash) коммитом через GitHub API.
+ * Портал serverless-friendly: только fetch, без git-бинарника. Server-side only.
+ *
+ * Берём текущее состояние дефолтной ветки dev-репо и кладём его одним коммитом
+ * в client-репо: либо в его дефолтную ветку (main), либо в отдельную ветку (клиент сам смержит).
+ * Промежуточная история dev в client не попадает — это сознательно (squash).
+ *
+ * Требует: GITHUB_TOKEN с доступом (push) к обоим репо (мы коллабораторы клиентских репо).
+ */
+import { repoFromGit } from "./github";
+
+const API = "https://api.github.com";
+
+async function gh(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(API + path, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+    },
+    cache: "no-store",
+  });
+}
+async function ghJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+  const r = await gh(path, init);
+  if (!r.ok) throw new Error(`GitHub ${r.status} ${init?.method || "GET"} ${path}: ${(await r.text()).slice(0, 300)}`);
+  return r.json() as Promise<T>;
+}
+
+interface TreeEntry { path: string; mode: string; type: string; sha?: string }
+
+/** Файл относится к схеме/миграциям БД? (эвристика по пути) */
+function isSchemaFile(path: string): boolean {
+  const p = path.toLowerCase();
+  return (
+    /(^|\/)prisma\/schema\.prisma$/.test(p) ||
+    /(^|\/)(schema\.sql|structure\.sql)$/.test(p) ||
+    /(^|\/)db\/schema\.rb$/.test(p) ||
+    /(^|\/)migrations?\//.test(p) ||
+    /(^|\/)scripts\/migrate\./.test(p) ||
+    /(^|\/)drizzle\//.test(p) ||
+    /\.sql$/.test(p)
+  );
+}
+
+async function repoDefaultTree(repo: string): Promise<{ defaultBranch: string; entries: TreeEntry[] }> {
+  const info = await ghJson<{ default_branch: string }>(`/repos/${repo}`);
+  const ref = await ghJson<{ object: { sha: string } }>(`/repos/${repo}/git/ref/heads/${info.default_branch}`);
+  const commit = await ghJson<{ tree: { sha: string } }>(`/repos/${repo}/git/commits/${ref.object.sha}`);
+  const tree = await ghJson<{ tree: TreeEntry[]; truncated: boolean }>(`/repos/${repo}/git/trees/${commit.tree.sha}?recursive=1`);
+  if (tree.truncated) throw new Error(`Дерево ${repo} слишком большое (truncated).`);
+  return { defaultBranch: info.default_branch, entries: tree.tree };
+}
+
+export interface DeliveryPreview {
+  devRepo: string;
+  clientRepo: string;
+  clientDefaultBranch: string;
+  fileCount: number;
+  /** Schema/миграционные файлы, отличающиеся между dev и client (по содержимому). */
+  schemaChanges: string[];
+}
+
+/** Превью доставки: количество файлов и изменения схемы БД (для подтверждения перед пушем). */
+export async function previewDelivery(input: { devGit?: string; clientGit?: string }): Promise<DeliveryPreview> {
+  const devRepo = repoFromGit(input.devGit);
+  const clientRepo = repoFromGit(input.clientGit);
+  if (!devRepo) throw new Error("Не задан dev-репозиторий проекта");
+  if (!clientRepo) throw new Error("Не задан client-репозиторий проекта");
+
+  const [dev, client] = await Promise.all([repoDefaultTree(devRepo), repoDefaultTree(clientRepo)]);
+  const devBlobs = dev.entries.filter((e) => e.type === "blob" && e.sha);
+  const clientShas = new Map(client.entries.filter((e) => e.type === "blob").map((e) => [e.path, e.sha]));
+
+  // Схема изменилась, если schema-файл новый или его содержимое (sha) отличается; либо удалён.
+  const changed = new Set<string>();
+  for (const e of devBlobs) {
+    if (!isSchemaFile(e.path)) continue;
+    if (clientShas.get(e.path) !== e.sha) changed.add(e.path);
+  }
+  for (const [path, sha] of clientShas) {
+    if (isSchemaFile(path) && !devBlobs.some((e) => e.path === path && e.sha === sha)) changed.add(path);
+  }
+
+  return {
+    devRepo,
+    clientRepo,
+    clientDefaultBranch: client.defaultBranch,
+    fileCount: devBlobs.length,
+    schemaChanges: [...changed].sort(),
+  };
+}
+
+export interface DeliverInput {
+  devGit?: string;
+  clientGit?: string;
+  /** Ветка-приёмник в client-репо. Если совпадает с дефолтной — это «в main». */
+  targetBranch: string;
+  /** Текст коммита. */
+  message: string;
+}
+export interface DeliverResult {
+  clientRepo: string;
+  branch: string;
+  files: number;
+  commitUrl: string;
+  /** true, если пушили в дефолтную ветку клиента (там сработает авто-деплой). */
+  toDefault: boolean;
+}
+
+/** Доставить состояние dev-репо одним коммитом в client-репо в выбранную ветку. */
+export async function deliverDevToClient(input: DeliverInput): Promise<DeliverResult> {
+  const devRepo = repoFromGit(input.devGit);
+  const clientRepo = repoFromGit(input.clientGit);
+  if (!devRepo) throw new Error("Не задан dev-репозиторий проекта");
+  if (!clientRepo) throw new Error("Не задан client-репозиторий проекта");
+
+  // 1. Дефолтные ветки и HEAD dev.
+  const devInfo = await ghJson<{ default_branch: string }>(`/repos/${devRepo}`);
+  const clientInfo = await ghJson<{ default_branch: string }>(`/repos/${clientRepo}`);
+  const devBranch = devInfo.default_branch;
+  const targetBranch = input.targetBranch.trim() || clientInfo.default_branch;
+  const toDefault = targetBranch === clientInfo.default_branch;
+
+  const devRef = await ghJson<{ object: { sha: string } }>(`/repos/${devRepo}/git/ref/heads/${devBranch}`);
+  const devCommit = await ghJson<{ tree: { sha: string } }>(`/repos/${devRepo}/git/commits/${devRef.object.sha}`);
+  const devTree = await ghJson<{ tree: TreeEntry[]; truncated: boolean }>(
+    `/repos/${devRepo}/git/trees/${devCommit.tree.sha}?recursive=1`,
+  );
+  if (devTree.truncated) throw new Error("Дерево dev-репо слишком большое (truncated) — нужен git-mirror, не API.");
+
+  const blobs = devTree.tree.filter((e) => e.type === "blob" && e.sha);
+
+  // 2. Переносим блобы в client-репо (контент одинаковый → sha совпадёт; создаём, чтобы существовали).
+  const batch = 8;
+  const entries: TreeEntry[] = [];
+  for (let i = 0; i < blobs.length; i += batch) {
+    const slice = blobs.slice(i, i + batch);
+    const made = await Promise.all(
+      slice.map(async (e) => {
+        const blob = await ghJson<{ content: string; encoding: string }>(`/repos/${devRepo}/git/blobs/${e.sha}`);
+        const created = await ghJson<{ sha: string }>(`/repos/${clientRepo}/git/blobs`, {
+          method: "POST",
+          body: JSON.stringify({ content: blob.content, encoding: blob.encoding }),
+        });
+        return { path: e.path, mode: e.mode, type: "blob", sha: created.sha } as TreeEntry;
+      }),
+    );
+    entries.push(...made);
+  }
+
+  // 3. Дерево + коммит в client. Родитель — текущий HEAD ветки-приёмника (или дефолтной, если ветки нет).
+  const clientTree = await ghJson<{ sha: string }>(`/repos/${clientRepo}/git/trees`, {
+    method: "POST",
+    body: JSON.stringify({ tree: entries }),
+  });
+
+  let parentSha: string | null = null;
+  let branchExists = false;
+  const refResp = await gh(`/repos/${clientRepo}/git/ref/heads/${targetBranch}`);
+  if (refResp.ok) {
+    parentSha = ((await refResp.json()) as { object: { sha: string } }).object.sha;
+    branchExists = true;
+  } else {
+    const def = await ghJson<{ object: { sha: string } }>(`/repos/${clientRepo}/git/ref/heads/${clientInfo.default_branch}`);
+    parentSha = def.object.sha;
+  }
+
+  const commit = await ghJson<{ sha: string; html_url: string }>(`/repos/${clientRepo}/git/commits`, {
+    method: "POST",
+    body: JSON.stringify({ message: input.message, tree: clientTree.sha, parents: parentSha ? [parentSha] : [] }),
+  });
+
+  // 4. Двигаем/создаём ветку-приёмник на новый коммит.
+  if (branchExists) {
+    await ghJson(`/repos/${clientRepo}/git/refs/heads/${targetBranch}`, {
+      method: "PATCH",
+      body: JSON.stringify({ sha: commit.sha, force: true }),
+    });
+  } else {
+    await ghJson(`/repos/${clientRepo}/git/refs`, {
+      method: "POST",
+      body: JSON.stringify({ ref: `refs/heads/${targetBranch}`, sha: commit.sha }),
+    });
+  }
+
+  return { clientRepo, branch: targetBranch, files: entries.length, commitUrl: commit.html_url, toDefault };
+}
+
+// ---- Апрув/мониторинг клиентского Railway-деплоя ----
+export interface ClientDeploy {
+  railwayToken?: string;
+  projectId?: string;
+  environmentId?: string;
+  serviceId?: string;
+  pgServiceId?: string;
+}
+export interface DeployStatus {
+  status: string;
+  commit: string;
+  approved: boolean;
+}
+
+async function railwayGql(token: string, query: string, variables: Record<string, unknown>): Promise<{ data?: Record<string, unknown>; errors?: unknown }> {
+  const r = await fetch("https://backboard.railway.app/graphql/v2", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+    cache: "no-store",
+  });
+  return r.json();
+}
+
+const Q_DEPLOY = `query($p:String!,$e:String!,$s:String!){ deployments(first:1, input:{projectId:$p,environmentId:$e,serviceId:$s}){ edges{ node{ id status meta } } } }`;
+
+function cdOk(cd: ClientDeploy | undefined): cd is Required<Pick<ClientDeploy, "railwayToken" | "projectId" | "environmentId" | "serviceId">> & ClientDeploy {
+  return !!(cd?.railwayToken && cd.projectId && cd.environmentId && cd.serviceId);
+}
+
+/** Текущий деплой клиентского сервиса (без изменений). */
+export async function clientDeployStatus(cd: ClientDeploy): Promise<DeployStatus | null> {
+  if (!cdOk(cd)) return null;
+  const d = await railwayGql(cd.railwayToken, Q_DEPLOY, { p: cd.projectId, e: cd.environmentId, s: cd.serviceId });
+  const node = (d.data as { deployments?: { edges?: { node: { status: string; meta?: { commitHash?: string } } }[] } })?.deployments?.edges?.[0]?.node;
+  if (!node) return null;
+  return { status: node.status, commit: (node.meta?.commitHash || "").slice(0, 8), approved: node.status !== "NEEDS_APPROVAL" };
+}
+
+/** Апрувнуть ожидающий деплой клиента и опросить статус (ограниченно по времени). */
+export async function approveClientDeploy(cd: ClientDeploy, waitMs = 90000): Promise<DeployStatus> {
+  if (!cdOk(cd)) throw new Error("Клиентский Railway не настроен (нужны token, projectId, environmentId, serviceId)");
+  const get = () => railwayGql(cd.railwayToken!, Q_DEPLOY, { p: cd.projectId, e: cd.environmentId, s: cd.serviceId });
+  const node0 = (await get()).data as { deployments?: { edges?: { node: { id: string; status: string; meta?: { commitHash?: string } } }[] } };
+  const dep = node0?.deployments?.edges?.[0]?.node;
+  if (!dep) throw new Error("Деплой клиента не найден");
+  if (dep.status === "NEEDS_APPROVAL") {
+    await railwayGql(cd.railwayToken!, `mutation($id:String!){ deploymentApprove(id:$id) }`, { id: dep.id });
+  }
+  const terminal = ["SUCCESS", "FAILED", "CRASHED", "REMOVED", "SKIPPED"];
+  const deadline = Date.now() + waitMs;
+  let last = dep;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 8000));
+    const d = (await get()).data as { deployments?: { edges?: { node: { id: string; status: string; meta?: { commitHash?: string } } }[] } };
+    last = d?.deployments?.edges?.[0]?.node ?? last;
+    if (terminal.includes(last.status)) break;
+  }
+  return { status: last.status, commit: (last.meta?.commitHash || "").slice(0, 8), approved: true };
+}

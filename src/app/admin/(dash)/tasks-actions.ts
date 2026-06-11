@@ -3,6 +3,8 @@
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { markRead, setReviewRef } from "@/lib/db";
+import { statusBucket } from "@/lib/statuses";
+import { notifyProjectClients } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 
 export async function updateTaskStatus(id: string, status: string): Promise<{ ok?: boolean; error?: string }> {
@@ -12,6 +14,15 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
     await getBackend().updateStatus(id, status);
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
+    // Задача готова → уведомляем клиента проекта (best-effort).
+    if (statusBucket(status) === "done") {
+      try {
+        const task = await getBackend().getTask(id);
+        await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${id}: ${task.summary}`);
+      } catch {
+        // best-effort
+      }
+    }
     return { ok: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };

@@ -49,6 +49,12 @@ export function MetaForm({
   const [currency, setCurrency] = useState(m.currency ?? "₴");
   const [startedAt, setStartedAt] = useState(m.startedAt ?? "");
   const [deadline, setDeadline] = useState(m.deadline ?? "");
+  const cd = m.clientDeploy ?? {};
+  const [cdToken, setCdToken] = useState(cd.railwayToken ?? "");
+  const [cdProject, setCdProject] = useState(cd.projectId ?? "");
+  const [cdEnv, setCdEnv] = useState(cd.environmentId ?? "");
+  const [cdService, setCdService] = useState(cd.serviceId ?? "");
+  const [cdPg, setCdPg] = useState(cd.pgServiceId ?? "");
   const [clientGit, setClientGit] = useState(m.clientGit ?? "");
   const [devGit, setDevGit] = useState(m.devGit ?? "");
   const [localPath, setLocalPath] = useState(m.localPath ?? "");
@@ -79,6 +85,16 @@ export function MetaForm({
       currency: currency || undefined,
       startedAt: startedAt || undefined,
       deadline: deadline || undefined,
+      clientDeploy:
+        cdToken || cdProject || cdEnv || cdService || cdPg
+          ? {
+              railwayToken: cdToken || undefined,
+              projectId: cdProject || undefined,
+              environmentId: cdEnv || undefined,
+              serviceId: cdService || undefined,
+              pgServiceId: cdPg || undefined,
+            }
+          : undefined,
       credentials: textToCreds(creds),
     };
     start(async () => {
@@ -149,6 +165,18 @@ export function MetaForm({
 
       <div style={{ marginTop: 18 }}>
         <Field label={t(locale, "projects.design")} value={design} onChange={setDesign} />
+      </div>
+
+      <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.clientDeploy")}</div>
+      <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 10 }}>{t(locale, "projects.clientDeployHint")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <Field label={t(locale, "projects.cdToken")} value={cdToken} onChange={setCdToken} />
+        <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label={t(locale, "projects.cdProject")} value={cdProject} onChange={setCdProject} />
+          <Field label={t(locale, "projects.cdEnv")} value={cdEnv} onChange={setCdEnv} />
+          <Field label={t(locale, "projects.cdService")} value={cdService} onChange={setCdService} />
+          <Field label={t(locale, "projects.cdPg")} value={cdPg} onChange={setCdPg} />
+        </div>
       </div>
 
       <div style={{ marginTop: 18 }}>

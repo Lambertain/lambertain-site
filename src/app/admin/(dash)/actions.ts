@@ -5,8 +5,18 @@ import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
 import { runIntake, type ProposedTask } from "@/lib/intake";
 import { repoFromGit } from "@/lib/github";
+import { notifyLogins } from "@/lib/notify";
 import type { DraftTask } from "@/lib/tasks/types";
 import type Anthropic from "@anthropic-ai/sdk";
+
+/** Уведомить ответственного разработчика о новой задаче (best-effort). */
+async function notifyNewTask(task: { id: string; summary: string; assignee?: { login: string } | null }): Promise<void> {
+  try {
+    if (task.assignee?.login) await notifyLogins([task.assignee.login], `🆕 <b>Новая задача</b> · ${task.id}: ${task.summary}`);
+  } catch {
+    // best-effort
+  }
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -63,6 +73,7 @@ export async function createProposedTasks(
         assigneeLogin: tk.assigneeLogin ?? defaultAssignee,
         priority: tk.priority ?? null,
       });
+      await notifyNewTask(task);
       created.push({ id: task.id, url: task.url });
     }
     return { created };
@@ -112,6 +123,7 @@ export async function createFromDraft(
       dueDate: draft.dueDate ?? null,
       priority: draft.priority ?? null,
     });
+    await notifyNewTask(task);
     return { id: task.id, url: task.url };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка создания задачи" };
