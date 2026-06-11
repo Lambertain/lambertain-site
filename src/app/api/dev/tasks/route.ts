@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
+import { ESCALATION_MARK } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -30,7 +31,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "task not in project" }, { status: 403 });
     }
     const [task, comments] = await Promise.all([be.getTask(id), be.getComments(id)]);
-    return NextResponse.json({ task, comments });
+    // Эскалации (вопросы клиенту) и ответы клиента — чтобы Claude понимал, на что уже ответили.
+    const escalations = comments.filter((c) => c.text.startsWith(ESCALATION_MARK));
+    const lastEsc = escalations[escalations.length - 1];
+    const clientAfter = lastEsc ? comments.filter((c) => c.author.role === "client" && c.created > lastEsc.created) : [];
+    const awaitingClient = !!lastEsc && clientAfter.length === 0;
+    const lastClientAnswer = clientAfter.length ? clientAfter[clientAfter.length - 1].text : null;
+    return NextResponse.json({ task, comments, awaitingClient, lastClientAnswer });
   }
 
   // Список задач проекта.

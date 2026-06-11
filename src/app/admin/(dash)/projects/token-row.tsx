@@ -2,20 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { generateProjectToken } from "./actions";
+import { protocolBlock } from "@/lib/dev-protocol";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
 
-const BASE = "https://www.lambertain.site";
-
-function snippet(projectKey: string, token: string): string {
-  return (
-    `## Задачи проекта (Lambertain PM)\n` +
-    `GET ${BASE}/api/dev/tasks  — открытые задачи\n` +
-    `GET ${BASE}/api/dev/tasks?all=1  — все\n` +
-    `GET ${BASE}/api/dev/tasks?id=${projectKey}-42  — одна задача с комментариями\n` +
-    `Заголовок: Authorization: Bearer ${token}`
-  );
-}
+const snippet = (projectKey: string, token: string): string => protocolBlock(token, projectKey);
 
 export function TokenRow({
   projectKey,

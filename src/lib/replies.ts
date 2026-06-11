@@ -44,6 +44,28 @@ export async function draftClientReply(
 }
 
 /**
+ * Оформить сырой вопрос разработчика (или его Claude) в вежливый вопрос КЛИЕНТУ от лица агентства.
+ * Без техжаргона, на «Вы», конкретно — чтобы клиент мог однозначно ответить.
+ */
+export async function draftClientQuestion(task: Task, devQuestion: string, history: Comment[]): Promise<string> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const hist = history.slice(-6).map((c) => `${c.author.fullName} (${c.author.role}): ${c.text}`).join("\n");
+  const system =
+    "Ты — проджект-менеджер агентства Lambertain. Переформулируй технический вопрос (от разработки) в понятный вопрос КЛИЕНТУ " +
+    "от имени агентства. На «Вы», без технического жаргона, конкретно — чтобы клиент мог однозначно ответить (если уместно — с вариантами на выбор простыми словами). " +
+    "Не упоминай разработчика/исполнителя. Не предлагай созвон. Без подписи. Пиши только текст вопроса.";
+  const prompt =
+    `Задача ${task.id}: ${task.summary}\n` +
+    `Описание: ${task.description?.slice(0, 2000) || "—"}\n\n` +
+    (hist ? `Переписка:\n${hist}\n\n` : "") +
+    `Технический вопрос, который надо задать клиенту по-человечески:\n${devQuestion}\n\n` +
+    `Напиши только текст вопроса клиенту.`;
+  const resp = await client.messages.create({ model: MODEL, max_tokens: 600, system, messages: [{ role: "user", content: prompt }] });
+  const block = resp.content.find((b) => b.type === "text");
+  return block && block.type === "text" ? block.text.trim() : devQuestion;
+}
+
+/**
  * Черновик ответа клиенту: ИИ читает задачу, переписку и код и сам предлагает ответ
  * на последний вопрос/комментарий клиента — от имени агентства Lambertain (не от лица разработчика).
  * `instructions` — правки разработчика («убери X», «добавь про сроки»); `priorDraft` — текущая версия
