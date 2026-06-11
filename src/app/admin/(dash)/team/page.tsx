@@ -1,11 +1,12 @@
 import { requireAdmin } from "@/lib/principal";
-import { listAccessRequests, listProjectsWithMeta } from "@/lib/db";
+import { listAccessRequests, listProjectsWithMeta, listOrphanAuthors } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { InviteForm } from "./invite-form";
 import { AccessRequests } from "./requests";
 import { DevProjects } from "./dev-projects";
+import { RelinkHistory } from "./relink-history";
 import { ui } from "../../ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -13,10 +14,11 @@ export const dynamic = "force-dynamic";
 export default async function TeamPage() {
   await requireAdmin();
   const locale = await getLocale();
-  const [requests, projectsMeta, users] = await Promise.all([
+  const [requests, projectsMeta, users, orphans] = await Promise.all([
     listAccessRequests(),
     listProjectsWithMeta(),
     getBackend().listUsers(),
+    listOrphanAuthors(),
   ]);
   const activeProjects = projectsMeta.filter((p) => !p.archived);
   const projOpts = activeProjects.map((p) => ({ key: p.key, name: p.name }));
@@ -43,6 +45,8 @@ export default async function TeamPage() {
       <AccessRequests requests={reqs} projects={projOpts} locale={locale} />
 
       <DevProjects devs={devs} projects={projOpts} locale={locale} />
+
+      <RelinkHistory orphans={orphans} members={users.map((u) => ({ login: u.login, fullName: u.fullName }))} locale={locale} />
 
       <div style={{ marginTop: 28 }}>
         <div style={ui.monoLabel}>{t(locale, "team.inviteKicker")}</div>

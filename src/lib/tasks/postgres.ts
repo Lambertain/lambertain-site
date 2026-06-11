@@ -149,9 +149,11 @@ export const postgresBackend: TasksBackend = {
       author_login: string | null;
       author_name: string | null;
       author_role: Role | null;
+      orig_author_login: string | null;
+      orig_author_role: Role | null;
       visibility: string;
     }>(
-      `SELECT c.id, c.body, c.created_at, c.visibility,
+      `SELECT c.id, c.body, c.created_at, c.visibility, c.orig_author_login, c.orig_author_role,
               m.login AS author_login, m.full_name AS author_name, m.role AS author_role
        FROM comments c
        JOIN tasks t ON t.id = c.task_id
@@ -159,16 +161,18 @@ export const postgresBackend: TasksBackend = {
        WHERE t.readable_id = $1 ORDER BY c.created_at`,
       [id],
     );
-    return rows.map((c) => ({
-      id: String(c.id),
-      text: c.body,
-      created: ms(c.created_at) ?? 0,
-      author: {
-        login: c.author_login || "lambertain",
-        fullName: c.author_name || "Lambertain",
-        role: c.author_role ?? "unknown",
-      },
-    }));
+    return rows.map((c) => {
+      // Член есть — берём его; иначе исходный автор YouTrack (если сохранён); иначе Lambertain.
+      const login = c.author_login || c.orig_author_login || "lambertain";
+      const role = c.author_role ?? c.orig_author_role ?? "unknown";
+      const fullName = c.author_name || c.orig_author_login || "Lambertain";
+      return {
+        id: String(c.id),
+        text: c.body,
+        created: ms(c.created_at) ?? 0,
+        author: { login, fullName, role },
+      };
+    });
   },
 
   async updateStatus(id: string, status: string): Promise<void> {

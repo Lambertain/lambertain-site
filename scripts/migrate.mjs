@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS task_reads (
   login TEXT NOT NULL, task_id TEXT NOT NULL, last_read_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (login, task_id));
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_keys TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_ref TEXT;
@@ -71,6 +72,17 @@ CREATE TABLE IF NOT EXISTS attachments (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (task_id, name));
 CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
+-- Сохранение исходного автора/исполнителя (логин+роль) для переноса истории при уходе с YouTrack:
+-- член может быть удалён (ник YouTrack), а коммент/задачу потом привяжем к новому tg-пользователю.
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS orig_author_login TEXT;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS orig_author_role TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS orig_assignee_login TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS orig_reporter_login TEXT;
+-- Штамп исходного автора по существующим строкам (идемпотентно: только где ещё не проставлено).
+UPDATE comments c SET orig_author_login=m.login, orig_author_role=m.role
+  FROM members m WHERE c.author_id=m.id AND c.orig_author_login IS NULL;
+UPDATE tasks t SET orig_assignee_login=m.login FROM members m WHERE t.assignee_id=m.id AND t.orig_assignee_login IS NULL;
+UPDATE tasks t SET orig_reporter_login=m.login FROM members m WHERE t.reporter_id=m.id AND t.orig_reporter_login IS NULL;
 `;
 
 // Стартовые скилы — реальные полные плейбуки (SKILL.md) из открытых источников:
@@ -114,10 +126,9 @@ function stripFrontmatter(text) {
 }
 
 // Авторитетная раскладка ролей (от Никиты). ON CONFLICT DO NOTHING — ручные правки не затираются.
+// Разработчики (curupa8888, oksanabagrova19, mr.bezpaliva) убраны: это никнеймы YouTrack,
+// в дев-портал они заходят по Telegram (member создаётся инвайтом с tg-логином).
 const ROLES = [
-  ["curupa8888", "contributor"],
-  ["oksanabagrova19", "contributor"],
-  ["mr.bezpaliva", "contributor"],
   ["Shulga.7319", "client"],
   ["shuladvocate", "client"],
   ["olexandrasadi", "client"],

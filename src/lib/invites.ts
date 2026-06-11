@@ -4,7 +4,7 @@
  * Server-side only.
  */
 import { randomBytes } from "node:crypto";
-import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember } from "./db";
+import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects } from "./db";
 import type { Role } from "./tasks/types";
 import type { TgUser } from "./telegram-auth";
 
@@ -15,14 +15,14 @@ export function memberLogin(user: TgUser): string {
   return user.username ? user.username.toLowerCase() : `tg${user.id}`;
 }
 
-/** Создать инвайт под роль и проект, вернуть токен и ссылку для Mini App. */
+/** Создать инвайт под роль и набор проектов, вернуть токен и ссылку для Mini App. */
 export async function generateInvite(
   role: Role,
-  projectKey: string | null,
+  projectKeys: string[],
   ttlHours = DEFAULT_TTL_HOURS,
 ): Promise<{ token: string; link: string }> {
   const token = randomBytes(16).toString("hex");
-  await createInvite(token, "", role, ttlHours, projectKey);
+  await createInvite(token, "", role, ttlHours, projectKeys);
   return { token, link: inviteLink(token) };
 }
 
@@ -40,8 +40,11 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
 
   const login = memberLogin(user);
   const fullName = user.firstName || user.username || login;
+  const keys = (inv.project_keys || inv.project_key || "").split(",").map((k) => k.trim()).filter(Boolean);
   await upsertMember(login, fullName, inv.role, user.id);
-  await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: inv.project_key });
+  // Клиент/сотрудник привязан к одному проекту (project_key); разработчик — ответственный на всех выбранных.
+  await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: keys[0] ?? null });
+  if (inv.role === "contributor" && keys.length) await setDevProjects(login, keys);
   await markInviteUsed(token, user.id);
   return true;
 }

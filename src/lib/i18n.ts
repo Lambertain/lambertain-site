@@ -175,6 +175,8 @@ export const DICT: Record<string, Entry> = {
   "team.inviteTitle": { uk: "Запрошення", ru: "Приглашение", en: "Invite" },
   "team.user": { uk: "Користувач", ru: "Пользователь", en: "User" },
   "team.createInvite": { uk: "Створити посилання-запрошення", ru: "Создать ссылку-приглашение", en: "Create invite link" },
+  "invite.projectsHint": { uk: "можна кілька", ru: "можно несколько", en: "multiple allowed" },
+  "invite.newProject": { uk: "Або створити новий проєкт", ru: "Или создать новый проект", en: "Or create a new project" },
   "team.linkLabel": { uk: "Посилання (діє 72 год, одноразове)", ru: "Ссылка (действует 72 ч, одноразовая)", en: "Link (valid 72h, single-use)" },
   "team.linkHint": {
     uk: "Надішли його людині — відкривши в Telegram, вона прив’яже акаунт до цієї ролі.",
@@ -284,6 +286,18 @@ export const DICT: Record<string, Entry> = {
   },
   "team.noProjects": { uk: "немає проєктів", ru: "нет проектов", en: "no projects" },
   "team.saveProjects": { uk: "Зберегти проєкти", ru: "Сохранить проекты", en: "Save projects" },
+
+  // — перенос истории (старый ник YouTrack → новый tg-пользователь) —
+  "relink.kicker": { uk: "Старі ніки YouTrack", ru: "Старые ники YouTrack", en: "Former YouTrack logins" },
+  "relink.title": { uk: "Перенос історії", ru: "Перенос истории", en: "History transfer" },
+  "relink.hint": {
+    uk: "Коментарі та задачі видалених нікнеймів YouTrack. Прив’яжи до нового користувача, який зайшов по Telegram.",
+    ru: "Комментарии и задачи удалённых никнеймов YouTrack. Привяжи к новому пользователю, зашедшему по Telegram.",
+    en: "Comments and tasks of deleted YouTrack nicknames. Bind them to the new user who joined via Telegram.",
+  },
+  "relink.counts": { uk: "коментарів: {c} · задач: {tk}", ru: "комментариев: {c} · задач: {tk}", en: "comments: {c} · tasks: {tk}" },
+  "relink.bind": { uk: "Прив’язати", ru: "Привязать", en: "Bind" },
+  "relink.done": { uk: "Перенесено: {c} коментарів, {tk} задач ✓", ru: "Перенесено: {c} комментариев, {tk} задач ✓", en: "Transferred: {c} comments, {tk} tasks ✓" },
 
   // — поля проекта: экономика —
   "field.cost": { uk: "Вартість", ru: "Стоимость", en: "Cost" },
