@@ -217,7 +217,12 @@ export function TaskTabs({
     return m;
   }, [projTasks]);
 
-  const defaultBucket: Bucket = byBucket.inProgress.length ? "inProgress" : "notStarted";
+  // По умолчанию «В работе»; если пусто — «Не начатые»; если и там пусто — первый непустой таб (напр. «Готово»).
+  const defaultBucket: Bucket = byBucket.inProgress.length
+    ? "inProgress"
+    : byBucket.notStarted.length
+      ? "notStarted"
+      : BUCKET_ORDER.find((b) => byBucket[b].length) ?? "inProgress";
   const [bucket, setBucket] = useState<Bucket | null>(null);
   const activeBucket = bucket ?? defaultBucket;
   const rows = byBucket[activeBucket];
