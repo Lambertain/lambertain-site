@@ -60,14 +60,6 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     isNew: c.created > prevRead,
   }));
   const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal").length : viewComments.length;
-  // Редактор зависимостей и ИИ-ревью — только админ (зависимости ставит ИИ при формировании задачи).
-  let candidates: { id: string; summary: string; status: string | null }[] = [];
-  if (isAdmin) {
-    const siblings = await be.listTasks({ projectKey: task.projectKey, limit: 200 });
-    candidates = siblings
-      .filter((s) => s.id !== task.id)
-      .map((s) => ({ id: s.id, summary: s.summary, status: s.state ?? null }));
-  }
 
   return (
     <div>
@@ -115,9 +107,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      {isAdmin && (
-        <TaskTools id={task.id} candidates={candidates} currentDeps={deps.map((d) => d.id)} canReview canAiReview locale={locale} />
-      )}
+      {isAdmin && <TaskTools id={task.id} locale={locale} />}
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>

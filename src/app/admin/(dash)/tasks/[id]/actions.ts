@@ -2,7 +2,6 @@
 
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { setTaskDeps } from "@/lib/db";
 import { runReview, taskDiff } from "@/lib/review";
 import { draftClientAnswer } from "@/lib/replies";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
@@ -82,21 +81,6 @@ export async function draftClientReply(
     const code = await taskDiff(id).catch(() => null);
     const draft = await draftClientAnswer(task, lastClient?.text || "", comments, code, instructions, priorDraft);
     return { draft };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка" };
-  }
-}
-
-/** Задать блокеры задачи (readable_id других задач). */
-export async function setTaskDependencies(id: string, deps: string[]): Promise<{ ok?: boolean; error?: string }> {
-  const me = await getPrincipal();
-  if (!me) return { error: "Не авторизован" };
-  if (me.role !== "contributor" && me.realRole !== "admin") return { error: "Нет прав" };
-  try {
-    await setTaskDeps(id, deps);
-    revalidatePath(`/admin/tasks/${id}`);
-    revalidatePath("/admin");
-    return { ok: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
