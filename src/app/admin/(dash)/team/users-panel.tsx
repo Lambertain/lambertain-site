@@ -28,6 +28,7 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
   const [pendN, startN] = useTransition();
 
   const display = user.alias || user.fullName;
+  const projName = (k: string) => projects.find((p) => p.key === k)?.name || k;
   const dirtyKeys = keys.slice().sort().join(",") !== user.projectKeys.slice().sort().join(",");
   const dirtyName = alias.trim() !== (user.alias ?? "");
 
@@ -45,15 +46,23 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
 
   return (
     <div style={{ ...ui.card, padding: 0, marginTop: 10, overflow: "hidden" }}>
-      <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: 14, background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", textAlign: "left", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 15, fontWeight: 600 }}>{display}</span>
-        <span style={ui.monoLabel}>@{user.login}</span>
-        <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, `role.${user.role}`)}</span>
-        {user.projectKeys.length > 0 && <span style={ui.monoLabel}>{user.projectKeys.join(", ")}</span>}
-        <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-          {user.joinedAt && <span style={{ ...ui.monoLabel, textTransform: "none" }}>{new Date(user.joinedAt).toLocaleDateString(DATE_LOC[locale], { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}><polyline points="6 9 12 15 18 9" /></svg>
+      <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, padding: 14, background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", width: "100%" }}>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>{display}</span>
+          <span style={ui.monoLabel}>@{user.login}</span>
+          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, `role.${user.role}`)}</span>
+          <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+            {user.joinedAt && <span style={{ ...ui.monoLabel, textTransform: "none" }}>{new Date(user.joinedAt).toLocaleDateString(DATE_LOC[locale], { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}><polyline points="6 9 12 15 18 9" /></svg>
+          </span>
         </span>
+        {user.projectKeys.length > 0 && (
+          <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {user.projectKeys.map((k) => (
+              <span key={k} style={{ ...ui.monoLabel, textTransform: "none", padding: "2px 8px", border: "1px solid var(--border-2)", background: "var(--surface-2)", borderRadius: 3 }}>{projName(k)}</span>
+            ))}
+          </span>
+        )}
       </button>
 
       {open && (
