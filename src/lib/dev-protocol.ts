@@ -3,6 +3,9 @@
 /** Базовый URL портала (прод). */
 export const PORTAL_BASE = "https://lambertain-site-production.up.railway.app";
 
+/** Публичный (брендовый) домен сайта — для ссылок, которые отправляем клиентам. */
+export const PUBLIC_SITE = "https://www.lambertain.site";
+
 /** Маркер коммента-вопроса клиенту (эскалация) — по нему портал и Claude находят ожидающие вопросы. */
 export const ESCALATION_MARK = "🟡 Вопрос:";
 

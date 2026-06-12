@@ -157,7 +157,7 @@ export async function draftTask(taskId: string): Promise<void> {
         forced = true;
         work.push({ role: "user", content: "Шагов почти не осталось. ПРЯМО СЕЙЧАС вызови write_spec с лучшим текущим пониманием (разумные допущения помечай). Спека обязательна — не задавай вопрос, если без него можно обойтись." });
       }
-      const resp = await client.messages.create({ model: MODEL, max_tokens: 3000, system, tools: TOOLS, messages: work });
+      const resp = await client.messages.create({ model: MODEL, max_tokens: 8000, system, tools: TOOLS, messages: work });
       inTok += resp.usage.input_tokens;
       outTok += resp.usage.output_tokens;
       work.push({ role: "assistant", content: resp.content });
@@ -165,9 +165,15 @@ export async function draftTask(taskId: string): Promise<void> {
 
       const spec = toolUses.find((b) => b.name === "write_spec");
       if (spec) {
-        const inp = spec.input as { title?: string; spec: string; assigneeLogin?: string | null };
+        const inp = spec.input as { title?: string; spec?: string; assigneeLogin?: string | null };
+        const specText = (inp.spec || "").trim();
+        if (!specText) {
+          // Поле spec пустое/обрезано (вероятно по лимиту токенов) — не публикуем «undefined», просим переписать.
+          work.push({ role: "user", content: [{ type: "tool_result", tool_use_id: spec.id, content: "Поле spec пустое или обрезано. Вызови write_spec заново с НЕПУСТЫМ и более компактным полем spec." }] });
+          continue;
+        }
         if (inp.title?.trim()) await setTaskTitle(taskId, inp.title.trim());
-        await be.addComment(taskId, `🛠 <b>Спецификация Lambertain</b>\n\n${inp.spec}`, "internal");
+        await be.addComment(taskId, `🛠 <b>Спецификация Lambertain</b>\n\n${specText}`, "internal");
         const assignee = inp.assigneeLogin || project.meta.defaultAssignee || null;
         if (assignee) {
           await assignTask(taskId, assignee);

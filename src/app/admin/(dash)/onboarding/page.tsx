@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/principal";
 import { getOnboarding } from "@/lib/db";
-import { PORTAL_BASE } from "@/lib/dev-protocol";
+import { PUBLIC_SITE } from "@/lib/dev-protocol";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
@@ -18,7 +18,7 @@ export default async function OnboardingAdminPage() {
       <div style={ui.monoLabel}>{t(locale, "onb.kicker")}</div>
       <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "onb.title")}</h1>
       <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12, maxWidth: 620 }}>{t(locale, "onb.hint")}</p>
-      <OnboardingEditor initial={steps} publicUrl={`${PORTAL_BASE}/onboarding`} locale={locale} />
+      <OnboardingEditor initial={steps} publicUrl={`${PUBLIC_SITE}/onboarding`} locale={locale} />
     </div>
   );
 }
