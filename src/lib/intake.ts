@@ -33,6 +33,7 @@ const TOOLS: Anthropic.Tool[] = [
   { name: "read_file", description: "Прочитать файл репозитория.", input_schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
   { name: "search_code", description: "Поиск по коду репозитория.", input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   { name: "use_skill", description: "Получить плейбук скила по slug (из списка доступных).", input_schema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
+  { name: "ask_question", description: "ЕДИНСТВЕННЫЙ способ задать пользователю уточняющий вопрос. Ровно один короткий вопрос. Только если без ответа реально нельзя поставить задачу.", input_schema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] } },
   {
     name: "create_skill",
     description: "Создать новый скил-плейбук, если подходящего нет. Затем следуй ему.",
@@ -107,14 +108,16 @@ function systemPrompt(ctx: IntakeCtx, skills: { slug: string; title: string; tri
     "что в коде уже есть и чего не хватает, нюансы из плана). Исполнитель + его Claude декомпозируют сами — не дроби заранее.\n" +
     "7) Несколько задач предлагай ТОЛЬКО при реальной причине: независимые куски, разные исполнители, или явные этапы " +
     "с проверкой между ними. В этом случае проставь dependsOn (индексы предшественников) — зависимости ставишь ТЫ, не разработчик.\n\n" +
-    "ВЫВОД В ЧАТ (строго): НЕ пиши в чат свои рассуждения, анализ, план, варианты реализации или ход мыслей — это внутренняя " +
-    "работа, она идёт в ОПИСАНИЕ задачи (propose_tasks), а НЕ в чат. В чат допустимо ТОЛЬКО одно из двух:\n" +
-    "  • один короткий уточняющий вопрос — ЕСЛИ он реально нужен (без него нельзя поставить задачу);\n" +
-    "  • если из контекста всё ясно — короткое подтверждение вроде «Принял, создаю задачу» и сразу вызвать propose_tasks.\n" +
-    "Никаких «вот мой анализ», «я думаю», технических развилок и списков вариантов в чате.\n\n" +
-    "ДЕЙСТВУЙ, НЕ ОБЕЩАЙ: если нужно изучить код — СРАЗУ вызывай инструмент (read_file/search_code/list_dir) в этом же ходе. " +
-    "НИКОГДА не пиши «сейчас прочитаю/проверю/гляну» и не заканчивай ход обещанием действия — это приводит к зависанию. " +
-    "Если файл большой/обрезается — не читай его целиком вслепую, используй search_code по нужному полю/функции."
+    "ОБЩЕНИЕ С ПОЛЬЗОВАТЕЛЕМ — ТОЛЬКО ЧЕРЕЗ ИНСТРУМЕНТЫ. Любой свободный текст, который ты пишешь, пользователь НЕ ВИДИТ — " +
+    "он отбрасывается системой. У тебя ровно два способа обратиться к пользователю:\n" +
+    "  • ask_question — задать ОДИН короткий уточняющий вопрос. Только если без ответа реально нельзя поставить задачу.\n" +
+    "  • propose_tasks — предложить задачу(и), когда требования ясны.\n" +
+    "Всё остальное — изучение кода (read_file / search_code / list_dir / use_skill) — это ВНУТРЕННЯЯ работа. " +
+    "НЕ отчитывайся о прогрессе, НЕ описывай вслух что ты делаешь, НЕ пиши «сейчас прочитаю/проверю/похоже…», НЕ рассуждай вслух " +
+    "и НЕ выводи анализ/план/варианты — этого никто не прочитает, рассуждения идут в ОПИСАНИЕ задачи (propose_tasks). " +
+    "Просто молча работай инструментами, пока не будешь готов задать вопрос или предложить задачу.\n" +
+    "НЕ ОСТАНАВЛИВАЙСЯ НА ПОЛПУТИ: если поиск не дал результата — попробуй другой запрос или путь, не сдавайся и не «зависай» на " +
+    "промежуточной мысли. Если файл большой/обрезается — ищи через search_code по нужному полю/функции, не читай вслепую целиком."
   );
 }
 
@@ -152,33 +155,46 @@ export async function runIntake(history: Anthropic.MessageParam[], ctx: IntakeCt
       ? await readConventions(ctx.repo)
       : "";
   const system = systemPrompt(ctx, skills, conventions);
-  const messages = [...history];
+  // history — ЧИСТАЯ переписка (реплики пользователя + чистые вопросы ассистента), её клиент показывает и пересылает.
+  // work — рабочая память модели на ЭТОТ ход: вызовы инструментов, их результаты, любая болтовня. Наружу не уходит.
+  const work: Anthropic.MessageParam[] = [...history];
   let inTok = 0, outTok = 0;
 
+  // Возвращаем в чистую историю только финальную чистую реплику ассистента.
+  const withReply = (text: string): Anthropic.MessageParam[] => [...history, { role: "assistant", content: [{ type: "text", text }] }];
+
   try {
-    for (let step = 0; step < 10; step++) {
-      const resp = await client.messages.create({ model: MODEL, max_tokens: 2500, system, tools: TOOLS, messages });
+    for (let step = 0; step < 16; step++) {
+      const resp = await client.messages.create({ model: MODEL, max_tokens: 2500, system, tools: TOOLS, messages: work });
       inTok += resp.usage.input_tokens;
       outTok += resp.usage.output_tokens;
-      messages.push({ role: "assistant", content: resp.content });
+      work.push({ role: "assistant", content: resp.content });
 
       const toolUses = resp.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+
       const propose = toolUses.find((b) => b.name === "propose_tasks");
       if (propose) {
-        return { messages, proposed: (propose.input as { tasks: ProposedTask[] }).tasks || [] };
+        // Подтверждение фиксированное — текст модели не показываем (мог бы содержать рассуждения).
+        return { messages: withReply("Принял, создаю задачи."), proposed: (propose.input as { tasks: ProposedTask[] }).tasks || [] };
       }
+      const ask = toolUses.find((b) => b.name === "ask_question");
+      if (ask) {
+        const question = String((ask.input as { question?: string }).question || "").trim() || "Уточните, пожалуйста, детали.";
+        return { messages: withReply(question), reply: question };
+      }
+      // Модель «замолчала» свободным текстом (без инструмента) — он пользователю не виден. Молча подталкиваем продолжать.
       if (toolUses.length === 0) {
-        const text = resp.content.filter((b) => b.type === "text").map((b) => (b as Anthropic.TextBlock).text).join("\n");
-        return { messages, reply: text };
+        work.push({ role: "user", content: "Свободный текст пользователю не доходит. Продолжай работу инструментами; когда будешь готов — вызови ask_question (один вопрос) или propose_tasks." });
+        continue;
       }
       const results: Anthropic.ToolResultBlockParam[] = [];
       for (const tu of toolUses) {
         const out = await runTool(tu.name, tu.input as Record<string, unknown>, ctx);
         results.push({ type: "tool_result", tool_use_id: tu.id, content: out });
       }
-      messages.push({ role: "user", content: results });
+      work.push({ role: "user", content: results });
     }
-    return { messages, reply: "Превышено число шагов. Уточни запрос." };
+    return { messages: withReply("Мне нужно уточнение, чтобы продолжить. Опишите, пожалуйста, что именно нужно сделать и где это в приложении."), reply: "Нужно уточнение." };
   } finally {
     await logUsage(MODEL, "intake", inTok, outTok);
   }
