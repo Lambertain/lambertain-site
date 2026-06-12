@@ -8,6 +8,7 @@ import { logout } from "../auth-actions";
 import { OpenInBrowser } from "./open-in-browser";
 import { ViewAs } from "./view-as";
 import { DevHelp } from "./dev-help";
+import { LocaleSwitch } from "./locale-switch";
 import { ui } from "../ui-styles";
 
 const NAV: Record<Role, { href: string; key: string }[]> = {
@@ -51,6 +52,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
         {/* «В браузере» + «Выйти» — в правом верхнем углу */}
         <div style={{ position: "absolute", top: 12, right: 12, zIndex: 60, display: "flex", alignItems: "center", gap: 8 }}>
           {principal.role === "contributor" && <DevHelp locale={locale} />}
+          <LocaleSwitch current={locale} />
           <OpenInBrowser label={t(locale, "common.inBrowser")} />
           <form action={logout}>
             <button

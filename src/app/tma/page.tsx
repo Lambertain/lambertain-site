@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Script from "next/script";
 import { useRouter } from "next/navigation";
-import { t, detectClientLocale, type Locale } from "@/lib/i18n";
+import { t, detectClientLocale, persistLocale, type Locale } from "@/lib/i18n";
 import { ui } from "../admin/ui-styles";
 
 type Phase = "loading" | "choose_role" | "requested" | "error";
@@ -20,7 +20,7 @@ export default function TmaPage() {
     if (!wa || !wa.initData) return null;
     wa.ready();
     wa.expand?.();
-    setLocale(detectClientLocale());
+    { const l = detectClientLocale(); setLocale(l); persistLocale(l); }
     return wa.initData as string;
   }
 
@@ -73,7 +73,7 @@ export default function TmaPage() {
   }
 
   useEffect(() => {
-    setLocale(detectClientLocale());
+    { const l = detectClientLocale(); setLocale(l); persistLocale(l); }
     // @ts-expect-error — SDK Telegram
     if (typeof window !== "undefined" && window.Telegram?.WebApp) authenticate();
     // eslint-disable-next-line react-hooks/exhaustive-deps

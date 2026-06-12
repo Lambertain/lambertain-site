@@ -473,8 +473,25 @@ export function localeFromAcceptLanguage(header: string | null | undefined): Loc
 }
 
 /** Определение локали на клиенте: язык Telegram (в Mini App) -> navigator.language. */
+/** Сохранить выбранную/определённую локаль: кука `locale` (для серверного рендера) + localStorage. */
+export function persistLocale(l: Locale): void {
+  if (typeof document !== "undefined") document.cookie = `locale=${l};path=/;max-age=31536000`;
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem("locale", l);
+  } catch {
+    /* localStorage может быть недоступен */
+  }
+}
+
 export function detectClientLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE;
+  // Ручной выбор (переключатель) приоритетнее автоопределения.
+  try {
+    const saved = normalizeLocale(window.localStorage?.getItem("locale"));
+    if (saved) return saved;
+  } catch {
+    /* localStorage может быть недоступен */
+  }
   // @ts-expect-error — SDK Telegram, если открыто в Mini App
   const tgLang = window.Telegram?.WebApp?.initDataUnsafe?.user?.language_code;
   return normalizeLocale(tgLang) || normalizeLocale(navigator.language) || DEFAULT_LOCALE;
