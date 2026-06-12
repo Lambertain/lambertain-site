@@ -55,6 +55,20 @@ export async function addTaskComment(
   }
 }
 
+/** Перезапустить ИИ-проработку задачи (admin) — если зависла/нужно переделать. */
+export async function retryDrafting(id: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  try {
+    await setTaskAiStatus(id, "pending");
+    after(() => draftTask(id));
+    revalidatePath(`/admin/tasks/${id}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
 /** On-demand ИИ-ревью: вердикт пишется комментарием, статус не меняется. */
 export async function requestAiReview(id: string): Promise<{ ok?: boolean; verdict?: "approve" | "rework"; error?: string }> {
   const me = await getPrincipal();

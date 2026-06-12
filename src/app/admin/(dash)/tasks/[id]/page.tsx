@@ -10,6 +10,7 @@ import { CommentBox } from "./comment-box";
 import { ApprovalBar } from "./approval-bar";
 import { ClientReply } from "./client-reply";
 import { CommentsView, type ViewComment } from "./comments-view";
+import { RetryDrafting } from "./retry-drafting";
 import { TaskTools } from "./task-tools";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -88,6 +89,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <div style={{ ...ui.card, marginTop: 16, padding: 14, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: aiStatus === "waiting" ? "#e8b339" : "var(--accent)", display: "inline-block", flexShrink: 0 }} />
           <span style={{ fontSize: 14 }}>{t(locale, aiStatus === "waiting" ? "ai.waiting" : "ai.drafting")}</span>
+          {isAdmin && <RetryDrafting id={task.id} label={t(locale, "ai.retry")} />}
         </div>
       )}
 

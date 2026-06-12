@@ -183,6 +183,7 @@ export const DICT: Record<string, Entry> = {
   "request.editDelete": { uk: "Видалити", ru: "Удалить", en: "Delete" },
   "ai.drafting": { uk: "Lambertain опрацьовує задачу — готує специфікацію.", ru: "Lambertain прорабатывает задачу — готовит спецификацию.", en: "Lambertain is working on the task — preparing the spec." },
   "ai.waiting": { uk: "Lambertain очікує вашої відповіді на уточнення нижче.", ru: "Lambertain ждёт вашего ответа на уточнение ниже.", en: "Lambertain is waiting for your answer to the clarification below." },
+  "ai.retry": { uk: "Перепрацювати", ru: "Перепроработать", en: "Re-draft" },
 
   // — поля —
   "field.project": { uk: "Проєкт", ru: "Проект", en: "Project" },

@@ -5,7 +5,7 @@
  * комментарии. Server-side only.
  */
 import Anthropic from "@anthropic-ai/sdk";
-import { listDir, readFile, searchCode, repoFromGit } from "./github";
+import { listDir, listTree, readFile, searchCode, repoFromGit } from "./github";
 import { listSkills, getSkill, createSkill, logUsage, setTaskAiStatus, assignTask, setTaskTitle, getTaskImages } from "./db";
 import { notifyLogins, notifyProjectClients, notifyAdmin } from "./notify";
 import { getBackend } from "./tasks";
@@ -13,9 +13,10 @@ import { getBackend } from "./tasks";
 const MODEL = process.env.STRUCTURER_MODEL || "claude-opus-4-8";
 
 const TOOLS: Anthropic.Tool[] = [
+  { name: "list_tree", description: "ВСЁ дерево файлов репозитория одним вызовом (рекурсивно). Начни с него для ориентации — приложение может быть во вложенной папке. sub — фильтр по префиксу пути (опц.).", input_schema: { type: "object", properties: { sub: { type: "string" } } } },
   { name: "list_dir", description: "Список файлов/папок в директории репозитория.", input_schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
   { name: "read_file", description: "Прочитать файл репозитория.", input_schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
-  { name: "search_code", description: "Поиск по коду репозитория.", input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+  { name: "search_code", description: "Поиск по коду/путям репозитория (для private ищет по именам файлов — ориентируйся также по list_tree).", input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   { name: "use_skill", description: "Получить плейбук скила по slug (из списка доступных).", input_schema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
   {
     name: "create_skill",
@@ -63,6 +64,7 @@ async function runTool(name: string, input: Record<string, unknown>, repo: strin
     return `Скил ${slug} создан. Следуй его плейбуку:\n${input.playbook}`;
   }
   if (!repo) return "Репозиторий не привязан к проекту.";
+  if (name === "list_tree") return listTree(repo, String(input.sub || ""));
   if (name === "list_dir") return listDir(repo, String(input.path || ""));
   if (name === "read_file") return readFile(repo, String(input.path || ""));
   if (name === "search_code") return searchCode(repo, String(input.query || ""));
@@ -86,17 +88,17 @@ function systemPrompt(opts: {
     (opts.conventions ? opts.conventions + "\n\n" : "") +
     "Доступные скилы (плейбуки):\n" + (opts.skillList || "(нет)") + "\n\n" +
     "ЗАДАЧА: изучи код и подготовь детальную ТЕХНИЧЕСКУЮ СПЕЦИФИКАЦИЮ реализации для разработчика.\n" +
-    "Алгоритм:\n" +
-    "1) Определи тип задачи, подними подходящий скил (use_skill); если нет — создай (create_skill) и следуй ему.\n" +
-    "2) Изучи репозиторий: найди затронутые файлы, оцени что уже есть и чего не хватает. Большие/обрезанные файлы — через search_code по нужному полю/функции.\n" +
-    "3) use_skill('writing-plans') и пройди как по чек-листу: затронутые файлы/модули, поток данных, edge-cases и ошибки, зависимости и порядок, конвенции, критерии готовности, риски.\n" +
-    "4) Учитывай оси качества (use_skill при необходимости): code-audit, security, business-logic, customer-journey, seo, performance, accessibility. Найденные попутно баги/дыры — включи в спеку блоком «Попутно исправить».\n" +
-    "5) write_spec — финальная спека для разработчика (внутренняя, клиент её НЕ видит). Это ОСНОВНОЙ результат твоей работы.\n\n" +
+    "Алгоритм (двигайся ЭФФЕКТИВНО, не трать ходы впустую):\n" +
+    "1) СНАЧАЛА list_tree — увидь всю структуру репо одним вызовом (приложение может быть во вложенной папке, напр. lambertain-agency/). Затем читай только релевантные файлы.\n" +
+    "2) Определи тип задачи, при необходимости подними скил (use_skill); нет подходящего — create_skill.\n" +
+    "3) Найди затронутые файлы и пойми что есть и чего не хватает. ВАЖНО: GitHub code-search по содержимому для private пуст — ориентируйся по list_tree и читай файлы напрямую (read_file), не повторяй пустой search.\n" +
+    "4) Кратко продумай решение (writing-plans по сути): затронутые файлы/модули, поток данных, edge-cases, критерии готовности. Найденные попутно баги — блок «Попутно исправить».\n" +
+    "5) write_spec — финальная техническая спека для разработчика (внутренняя, клиент НЕ видит). Это ОСНОВНОЙ результат. НЕ затягивай: как только понял суть — финализируй.\n\n" +
     "ОБЩЕНИЕ — ТОЛЬКО ЧЕРЕЗ ИНСТРУМЕНТЫ. Любой свободный текст отбрасывается, его никто не прочитает. " +
     "НЕ отчитывайся о прогрессе, не рассуждай вслух, не пиши «сейчас прочитаю/похоже…» — просто молча работай инструментами. " +
-    "Действуй автономно как опытный разработчик: решения принимай сам. ask_client вызывай ТОЛЬКО если без ответа клиента реально нельзя " +
-    "(неоднозначность бизнес-логики, которую не вывести из кода) — один короткий вопрос по делу, без воды. Не сдавайся на полпути: " +
-    "если поиск пуст — пробуй другой запрос. Когда спека готова — write_spec."
+    "Действуй автономно как опытный разработчик: решения принимай сам, мелочи не уточняй. ask_client вызывай ТОЛЬКО если без ответа клиента реально нельзя " +
+    "(неоднозначность бизнес-логики, которую не вывести из кода) — один короткий вопрос по делу. " +
+    "Даже если что-то не до конца ясно по коду — лучше написать спеку с разумными допущениями (пометив их), чем зависнуть. write_spec — обязательный итог."
   );
 }
 
@@ -147,7 +149,14 @@ export async function draftTask(taskId: string): Promise<void> {
     const work: Anthropic.MessageParam[] = [{ role: "user", content: first }];
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    for (let step = 0; step < 18; step++) {
+    const MAX_STEPS = 32;
+    let forced = false;
+    for (let step = 0; step < MAX_STEPS; step++) {
+      // За пару шагов до лимита — заставляем финализировать спекой (а не упираться в бесполезный фолбэк-вопрос).
+      if (step === MAX_STEPS - 3 && !forced) {
+        forced = true;
+        work.push({ role: "user", content: "Шагов почти не осталось. ПРЯМО СЕЙЧАС вызови write_spec с лучшим текущим пониманием (разумные допущения помечай). Спека обязательна — не задавай вопрос, если без него можно обойтись." });
+      }
       const resp = await client.messages.create({ model: MODEL, max_tokens: 3000, system, tools: TOOLS, messages: work });
       inTok += resp.usage.input_tokens;
       outTok += resp.usage.output_tokens;
@@ -192,10 +201,10 @@ export async function draftTask(taskId: string): Promise<void> {
       }
       work.push({ role: "user", content: results });
     }
-    // Не уложился в лимит шагов — спросим у клиента, чтобы не зависнуть молча.
-    await be.addComment(taskId, `🟡 <b>Вопрос:</b> Уточните, пожалуйста, детали запроса — что именно и где нужно изменить.`, "client");
-    await notifyProjectClients(task.projectKey, `🟡 <b>Уточнение по задаче</b> · ${taskId}: ${task.summary}`).catch(() => {});
-    await setTaskAiStatus(taskId, "waiting");
+    // Не уложился в лимит даже после форса — отдаём админу на ручную проработку (не дёргаем клиента зря).
+    await be.addComment(taskId, `🛠 <b>Спецификация Lambertain</b>\n\nНе удалось автоматически подготовить спеку за отведённые шаги (большой/сложный репозиторий). Нужна ручная проработка. Запрос клиента — в описании задачи.`, "internal");
+    await notifyAdmin(`⚠️ ИИ-проработка ${taskId} не уложилась в лимит шагов — нужна ручная спека.`).catch(() => {});
+    await setTaskAiStatus(taskId, "done");
   } catch (e) {
     await notifyAdmin(`⚠️ Ошибка ИИ-проработки ${taskId}: ${e instanceof Error ? e.message : "—"}`).catch(() => {});
     await setTaskAiStatus(taskId, null).catch(() => {});

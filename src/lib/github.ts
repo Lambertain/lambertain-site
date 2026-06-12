@@ -41,12 +41,42 @@ export async function readFile(repo: string, path: string): Promise<string> {
   return text.length > 12000 ? text.slice(0, 12000) + "\n…(обрезано)" : text;
 }
 
-/** Поиск по коду репо. */
+async function defaultBranch(repo: string): Promise<string> {
+  const r = await gh(`/repos/${repo}`);
+  if (!r.ok) return "main";
+  return ((await r.json()) as { default_branch?: string }).default_branch || "main";
+}
+
+/**
+ * Всё дерево файлов репо ОДНИМ вызовом (рекурсивно). Даёт модели мгновенную ориентацию —
+ * особенно когда приложение во вложенной папке. sub — фильтр по префиксу пути (опц.).
+ */
+export async function listTree(repo: string, sub = ""): Promise<string> {
+  const branch = await defaultBranch(repo);
+  const r = await gh(`/repos/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
+  if (!r.ok) return `Ошибка ${r.status} (дерево ${repo})`;
+  const data = (await r.json()) as { tree?: Array<{ path: string; type: string }>; truncated?: boolean; message?: string };
+  if (!data.tree) return data.message || "не удалось получить дерево";
+  let paths = data.tree.filter((t) => t.type === "blob").map((t) => t.path);
+  if (sub) paths = paths.filter((p) => p.toLowerCase().startsWith(sub.toLowerCase()));
+  const cap = 500;
+  const head = paths.slice(0, cap).join("\n");
+  const more = paths.length > cap ? `\n…(+${paths.length - cap} файлов, уточни sub)` : data.truncated ? "\n…(дерево GitHub обрезано)" : "";
+  return paths.length ? head + more : "пусто";
+}
+
+/** Поиск по коду репо. Для приватных репо GitHub code-search часто пуст — тогда ищем по ПУТЯМ файлов. */
 export async function searchCode(repo: string, query: string): Promise<string> {
   const r = await gh(`/search/code?q=${encodeURIComponent(`${query} repo:${repo}`)}&per_page=10`);
-  if (!r.ok) return `Ошибка поиска ${r.status}`;
-  const data = (await r.json()) as { items?: Array<{ path: string }>; message?: string };
-  if (!data.items) return data.message || "нет результатов";
-  if (!data.items.length) return "ничего не найдено";
-  return data.items.map((x) => x.path).join("\n");
+  if (r.ok) {
+    const data = (await r.json()) as { items?: Array<{ path: string }> };
+    if (data.items && data.items.length) return data.items.map((x) => x.path).join("\n");
+  }
+  // Фолбэк: поиск по именам/путям файлов в дереве (содержимое для private не индексируется).
+  const tree = await listTree(repo);
+  if (tree.startsWith("Ошибка")) return tree;
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = tree.split("\n").filter((p) => terms.some((t) => p.toLowerCase().includes(t)));
+  if (!hits.length) return "По содержимому не найдено (для private GitHub не индексирует код). Используй list_tree и читай файлы по структуре.";
+  return "Совпадения по путям файлов:\n" + hits.slice(0, 30).join("\n");
 }
