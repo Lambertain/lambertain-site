@@ -43,6 +43,8 @@ export default function Cursor() {
       ring.current.style.borderColor = "rgba(185,255,75,0.28)";
     };
 
+    // Прячем системный курсор только пока смонтирован кастомный (портфолио).
+    document.body.classList.add("has-custom-cursor");
     document.addEventListener("mousemove", onMove);
     raf.current = requestAnimationFrame(tick);
 
@@ -53,6 +55,7 @@ export default function Cursor() {
     });
 
     return () => {
+      document.body.classList.remove("has-custom-cursor");
       document.removeEventListener("mousemove", onMove);
       cancelAnimationFrame(raf.current);
       targets.forEach(el => {

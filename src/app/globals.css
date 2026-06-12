@@ -31,8 +31,10 @@ body {
   color: var(--text);
   font-family: var(--font-body), system-ui, sans-serif;
   overflow-x: hidden;
-  cursor: none;
 }
+/* Прячем системный курсор ТОЛЬКО там, где смонтирован кастомный <Cursor /> (портфолио).
+   На /onboarding и в портальных модалках админки кастомного нет — курсор остаётся обычным. */
+body.has-custom-cursor { cursor: none; }
 
 ::selection { background: var(--accent); color: #000; }
 
@@ -55,7 +57,7 @@ body::after {
 
 /* ── Cursor ────────────────────────────────────── */
 @media (hover: none) {
-  body { cursor: auto; }
+  body.has-custom-cursor { cursor: auto; }
   #cur-dot, #cur-ring { display: none !important; }
 }
 
