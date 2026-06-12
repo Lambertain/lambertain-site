@@ -6,7 +6,7 @@ import { structureTask } from "@/lib/structurer";
 import { runIntake, type ProposedTask } from "@/lib/intake";
 import { repoFromGit } from "@/lib/github";
 import { notifyLogins, notifyAdmin, notifyProjectClients } from "@/lib/notify";
-import { setTaskDeps, projectHasClient } from "@/lib/db";
+import { setTaskDeps, projectHasClient, attachImagesToTask } from "@/lib/db";
 import type { DraftTask, Role } from "@/lib/tasks/types";
 
 /**
@@ -72,6 +72,7 @@ export async function intakeTurn(
 export async function createProposedTasks(
   projectKey: string,
   tasks: ProposedTask[],
+  images: { mime: string; data: string }[] = [],
 ): Promise<{ created?: { id: string; url: string }[]; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
@@ -95,6 +96,8 @@ export async function createProposedTasks(
         approvalStatus: appr.approvalStatus,
         createdByRole: appr.createdByRole,
       });
+      // Прикрепляем приложенные скрины к задаче (разраб смотрит глазами при проверке).
+      if (images.length) await attachImagesToTask(task.id, images).catch(() => {});
       if (appr.pending && appr.approver) await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
       else await notifyNewTask(task);
       created.push({ id: task.id, url: task.url });

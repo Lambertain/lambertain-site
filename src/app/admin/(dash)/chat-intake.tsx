@@ -189,8 +189,16 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
 
   function createTasks() {
     if (!proposed) return;
+    // Собираем все приложенные клиентом/мной картинки из истории — они уйдут в задачу (разраб смотрит глазами).
+    const images: { mime: string; data: string }[] = [];
+    for (const m of history) {
+      if (!Array.isArray(m.content)) continue;
+      for (const b of m.content as { type: string; source?: { media_type: string; data: string } }[]) {
+        if (b.type === "image" && b.source) images.push({ mime: b.source.media_type, data: b.source.data });
+      }
+    }
     start(async () => {
-      const res = await createProposedTasks(projectKey, proposed);
+      const res = await createProposedTasks(projectKey, proposed, images);
       if (res.error) setError(res.error);
       else {
         setCreated(res.created ?? []);

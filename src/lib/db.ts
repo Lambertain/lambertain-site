@@ -7,9 +7,7 @@ import { Pool } from "pg";
 import type { Role } from "./tasks/types";
 
 declare global {
-  // eslint-disable-next-line no-var
   var _pmPool: Pool | undefined;
-  // eslint-disable-next-line no-var
   var _pmSchemaReady: Promise<void> | undefined;
 }
 
@@ -464,6 +462,30 @@ export async function relinkMember(origLogin: string, newLogin: string): Promise
   const a = await q("UPDATE tasks SET assignee_id = $1 WHERE orig_assignee_login = $2 AND assignee_id IS NULL RETURNING id", [id, origLogin]);
   const r = await q("UPDATE tasks SET reporter_id = $1 WHERE orig_reporter_login = $2 AND reporter_id IS NULL RETURNING id", [id, origLogin]);
   return { comments: c.length, assignee: a.length, reporter: r.length };
+}
+
+/** Прикрепить картинки (base64) к задаче: сохранить в attachments и добавить в описание как ![](/api/files/id). */
+export async function attachImagesToTask(readableId: string, images: { mime: string; data: string }[]): Promise<void> {
+  if (!images.length) return;
+  const rows = await q<{ id: number; description: string | null }>(
+    "SELECT id, description FROM tasks WHERE readable_id = $1",
+    [readableId],
+  );
+  if (!rows[0]) return;
+  let descr = rows[0].description || "";
+  let i = 1;
+  for (const img of images) {
+    const buf = Buffer.from(img.data, "base64");
+    const ext = (img.mime.split("/")[1] || "png").replace("jpeg", "jpg");
+    const ins = await q<{ id: number }>(
+      `INSERT INTO attachments (task_id, name, mime, data) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (task_id, name) DO UPDATE SET data=EXCLUDED.data RETURNING id`,
+      [rows[0].id, `screen-${i}.${ext}`, img.mime, buf],
+    );
+    descr += `\n\n![](/api/files/${ins[0].id})`;
+    i++;
+  }
+  await q("UPDATE tasks SET description = $2 WHERE id = $1", [rows[0].id, descr]);
 }
 
 // ---- Вложения (картинки задач, скачанные из YouTrack) ----
