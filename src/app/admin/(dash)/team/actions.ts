@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, renameMember, setLinkProject, setMemberProjects } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { sendTo } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
@@ -27,17 +27,15 @@ export async function createInviteLink(
   }
 }
 
-/** Быстро создать проект прямо из формы инвайта. Возвращает ключ и название. */
+/** Быстро создать проект прямо из формы инвайта (ключ генерируется из названия). */
 export async function createProjectQuick(
-  key: string,
   name: string,
 ): Promise<{ key?: string; name?: string; error?: string }> {
   try {
     await requireAdmin();
-    const k = key.trim().toUpperCase();
     const n = name.trim();
-    if (!k || !n) return { error: "Укажите ключ и название" };
-    if (!/^[A-Z0-9]+$/.test(k)) return { error: "Ключ — латиница/цифры" };
+    if (!n) return { error: "Укажите название" };
+    const k = await generateProjectKey(n);
     await createProject(k, n);
     revalidatePath("/admin/team");
     revalidatePath("/admin/projects");

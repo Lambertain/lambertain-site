@@ -346,6 +346,23 @@ export async function createProject(key: string, name: string): Promise<void> {
   );
 }
 
+const TRANSLIT: Record<string, string> = {
+  а: "a", б: "b", в: "v", г: "h", ґ: "g", д: "d", е: "e", є: "ye", ё: "e", ж: "zh", з: "z", и: "y", і: "i", ї: "yi",
+  й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts",
+  ч: "ch", ш: "sh", щ: "shch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+};
+
+/** Автогенерация уникального ключа проекта из названия (транслит кириллицы → латиница, до 4 симв.). */
+export async function generateProjectKey(name: string): Promise<string> {
+  const translit = name.toLowerCase().split("").map((c) => TRANSLIT[c] ?? c).join("");
+  const base = (translit.replace(/[^a-z0-9]/g, "").toUpperCase().slice(0, 4) || "PRJ");
+  const existing = new Set((await q<{ key: string }>("SELECT key FROM projects")).map((r) => r.key));
+  if (!existing.has(base)) return base;
+  let n = 2;
+  while (existing.has(base + n)) n++;
+  return base + n;
+}
+
 export async function getProjectFull(key: string): Promise<{ name: string; meta: ProjectMeta } | null> {
   const rows = await q<{ name: string; meta: ProjectMeta | null }>(
     "SELECT name, meta FROM projects WHERE key = $1",

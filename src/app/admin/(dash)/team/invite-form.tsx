@@ -17,8 +17,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [pending, start] = useTransition();
 
-  // новый проект
-  const [newKey, setNewKey] = useState("");
+  // новый проект (ключ генерируется из названия автоматически)
   const [newName, setNewName] = useState("");
   const [adding, startAdd] = useTransition();
   const [addErr, setAddErr] = useState<string | null>(null);
@@ -44,13 +43,14 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   function addProject() {
     setAddErr(null);
     startAdd(async () => {
-      const r = await createProjectQuick(newKey, newName);
+      const r = await createProjectQuick(newName);
       if (r.error) { setAddErr(r.error); return; }
       if (r.key && r.name && !list.some((p) => p.key === r.key)) {
         setList((cur) => [...cur, { key: r.key!, name: r.name! }]);
       }
-      if (r.key) setSelected((cur) => (cur.includes(r.key!) ? cur : [...cur, r.key!]));
-      setNewKey(""); setNewName("");
+      // Новый проект сразу выбираем (для клиента — единственный).
+      if (r.key) setSelected(multi ? (cur) => (cur.includes(r.key!) ? cur : [...cur, r.key!]) : [r.key!]);
+      setNewName("");
     });
   }
 
@@ -109,9 +109,8 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
       <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12 }}>
         <label style={ui.fieldLabel}>{t(locale, "invite.newProject")}</label>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder={t(locale, "projects.key")} style={{ ...ui.input, width: 120, textTransform: "uppercase" }} />
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t(locale, "projects.name")} style={{ ...ui.input, flex: 1, minWidth: 160 }} />
-          <button onClick={addProject} disabled={adding || !newKey.trim() || !newName.trim()} style={{ ...ui.btn, opacity: adding || !newKey.trim() || !newName.trim() ? 0.5 : 1 }}>
+          <button onClick={addProject} disabled={adding || !newName.trim()} style={{ ...ui.btn, opacity: adding || !newName.trim() ? 0.5 : 1 }}>
             {adding ? "…" : t(locale, "projects.add")}
           </button>
         </div>

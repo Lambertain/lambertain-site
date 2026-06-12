@@ -2,7 +2,7 @@
 
 import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/principal";
-import { setProjectToken, createProject, setProjectMeta, setProjectArchived } from "@/lib/db";
+import { setProjectToken, createProject, generateProjectKey, setProjectMeta, setProjectArchived } from "@/lib/db";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -25,10 +25,9 @@ export async function addProject(
   formData: FormData,
 ): Promise<{ error?: string }> {
   await requireAdmin();
-  const key = String(formData.get("key") || "").trim().toUpperCase();
   const name = String(formData.get("name") || "").trim();
-  if (!key || !name) return { error: "Укажите ключ и название" };
-  if (!/^[A-Z0-9]+$/.test(key)) return { error: "Ключ — латиница/цифры" };
+  if (!name) return { error: "Укажите название" };
+  const key = await generateProjectKey(name);
   await createProject(key, name);
   redirect(`/admin/projects/${key}`);
 }

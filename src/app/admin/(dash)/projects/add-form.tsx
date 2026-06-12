@@ -9,11 +9,7 @@ export function AddProjectForm({ locale }: { locale: Locale }) {
   const [state, action, pending] = useActionState(addProject, undefined);
   return (
     <form action={action} style={{ ...ui.card, marginTop: 20, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-      <div style={{ flex: "0 0 130px" }}>
-        <label style={ui.fieldLabel}>{t(locale, "projects.key")}</label>
-        <input name="key" style={ui.input} />
-      </div>
-      <div style={{ flex: 1, minWidth: 160 }}>
+      <div style={{ flex: 1, minWidth: 200 }}>
         <label style={ui.fieldLabel}>{t(locale, "projects.name")}</label>
         <input name="name" style={ui.input} />
       </div>
