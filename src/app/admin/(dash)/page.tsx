@@ -112,9 +112,18 @@ export default async function HomePage() {
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
   const canDelete = me.realRole === "admin" || me.role === "client";
   const canStart = me.realRole === "admin" || me.role === "contributor";
+  // Клиент с незавершённым онбордингом — баннер со ссылкой на инструкцию.
+  const showOnboarding = me.role === "client" && !!visible.find((p) => p.key === me.projectKey)?.meta.showOnboarding;
 
   return (
     <div>
+      {showOnboarding && (
+        <Link href="/onboarding" style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", marginBottom: 18, borderRadius: 10, border: "1px solid var(--accent-line)", background: "rgba(185,255,75,0.06)", textDecoration: "none", color: "var(--text)" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
+          <span style={{ fontSize: 14, flex: 1 }}>{t(locale, "onb.banner")}</span>
+          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "onb.bannerCta")}</span>
+        </Link>
+      )}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, me.role === "contributor" ? "nav.myTasks" : "nav.tasks")}</h1>
         {/* Разработчик только выполняет задачи — постановка не его роль. Клиенту/сотруднику чат нужен для заявок (кнопка справа). */}

@@ -230,6 +230,8 @@ export interface Invite {
   project_key: string | null;
   /** Несколько проектов (для разраба — стать ответственным на каждом). Comma-joined ключи. */
   project_keys: string | null;
+  /** Показать клиенту онбординг-инструкцию при первом входе. */
+  show_onboarding: boolean;
 }
 
 export async function createInvite(
@@ -238,17 +240,18 @@ export async function createInvite(
   role: Role,
   ttlHours: number,
   projectKeys: string[],
+  showOnboarding = false,
 ): Promise<void> {
   await q(
-    `INSERT INTO invites (token, youtrack_login, role, expires_at, project_key, project_keys)
-     VALUES ($1, $2, $3, now() + ($4 || ' hours')::interval, $5, $6)`,
-    [token, youtrackLogin, role, String(ttlHours), projectKeys[0] ?? null, projectKeys.join(",") || null],
+    `INSERT INTO invites (token, youtrack_login, role, expires_at, project_key, project_keys, show_onboarding)
+     VALUES ($1, $2, $3, now() + ($4 || ' hours')::interval, $5, $6, $7)`,
+    [token, youtrackLogin, role, String(ttlHours), projectKeys[0] ?? null, projectKeys.join(",") || null, showOnboarding],
   );
 }
 
 export async function getInvite(token: string): Promise<Invite | null> {
   const rows = await q<Invite>(
-    "SELECT token, youtrack_login, role, expires_at, used_at, project_key, project_keys FROM invites WHERE token = $1",
+    "SELECT token, youtrack_login, role, expires_at, used_at, project_key, project_keys, show_onboarding FROM invites WHERE token = $1",
     [token],
   );
   return rows[0] ?? null;
@@ -353,6 +356,33 @@ export async function getProjectFull(key: string): Promise<{ name: string; meta:
 
 export async function setProjectMeta(key: string, name: string, meta: ProjectMeta): Promise<void> {
   await q("UPDATE projects SET name = $2, meta = $3 WHERE key = $1", [key, name, JSON.stringify(meta)]);
+}
+
+/** Флаг «показать клиенту онбординг» на проекте. */
+export async function setProjectShowOnboarding(key: string, on: boolean): Promise<void> {
+  const p = await getProjectFull(key);
+  if (!p) return;
+  await setProjectMeta(key, p.name, { ...p.meta, showOnboarding: on });
+}
+
+/** Сохранить введённое клиентом значение онбординга в поле проекта (clientGit / railwayToken). */
+export async function saveOnboardingValue(key: string, collect: OnboardingCollect, value: string): Promise<void> {
+  const p = await getProjectFull(key);
+  if (!p) return;
+  const meta = { ...p.meta };
+  const v = value.trim();
+  if (collect === "clientGit") meta.clientGit = v;
+  else if (collect === "railwayToken") meta.clientDeploy = { ...(meta.clientDeploy || {}), railwayToken: v };
+  await setProjectMeta(key, p.name, meta);
+}
+
+/** Текущие значения собираемых онбордингом полей проекта (для префилла). */
+export async function getOnboardingValues(key: string): Promise<Record<OnboardingCollect, string>> {
+  const p = await getProjectFull(key);
+  return {
+    clientGit: p?.meta.clientGit || "",
+    railwayToken: p?.meta.clientDeploy?.railwayToken || "",
+  };
 }
 
 export async function setProjectArchived(key: string, archived: boolean): Promise<void> {
@@ -535,9 +565,13 @@ export async function getTaskImages(readableId: string): Promise<{ mime: string;
 }
 
 // ---- Онбординг-инструкция клиента (шаги + публичные картинки) ----
+/** Какое поле проекта собирает шаг (клиент вводит, сохраняется в meta). */
+export type OnboardingCollect = "clientGit" | "railwayToken";
 export interface OnboardingStep {
   title: string;
   body: string; // markdown; картинки — ![](/api/onboarding-media/<id>)
+  /** Поле для сбора данных от клиента на этом шаге (опц.). */
+  collect?: OnboardingCollect;
 }
 const DEFAULT_ONBOARDING: { steps: OnboardingStep[] } = { steps: [] };
 

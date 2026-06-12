@@ -1,17 +1,23 @@
 import type { Metadata } from "next";
-import { getOnboarding } from "@/lib/db";
+import { redirect } from "next/navigation";
+import { getPrincipal } from "@/lib/principal";
+import { getOnboarding, getOnboardingValues } from "@/lib/db";
 import { OnboardingAccordion } from "./accordion";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Lambertain — інструкція з підключення",
-  description: "Покрокова інструкція: GitHub, хостинг Railway і токен для запуску вашого проєкту.",
   robots: { index: false, follow: false },
 };
 
 export default async function OnboardingPage() {
+  const me = await getPrincipal();
+  if (!me) redirect("/admin/login");
+
   const { steps } = await getOnboarding();
+  const isClient = me.role === "client" && !!me.projectKey;
+  const values = isClient ? await getOnboardingValues(me.projectKey!) : undefined;
 
   return (
     <main style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", padding: "clamp(24px,6vw,56px) 18px" }}>
@@ -23,13 +29,13 @@ export default async function OnboardingPage() {
           Інструкція з підключення
         </h1>
         <p style={{ fontSize: 15, color: "var(--muted)", marginTop: 10, lineHeight: 1.6, maxWidth: 560 }}>
-          Кілька простих кроків, щоб запустити ваш проєкт. Виконуйте їх по черзі — наступний крок
-          відкриється після попереднього. Якщо щось незрозуміло, напишіть мені.
+          Кілька простих кроків, щоб запустити ваш проєкт. Виконуйте їх по черзі — на деяких кроках
+          потрібно вставити дані (посилання, токен), вони збережуться автоматично. Якщо щось незрозуміло, напишіть мені.
         </p>
 
         <div style={{ marginTop: 28 }}>
           {steps.length > 0 ? (
-            <OnboardingAccordion steps={steps} />
+            <OnboardingAccordion steps={steps} editable={isClient} values={values} />
           ) : (
             <p style={{ color: "var(--muted)", fontSize: 14 }}>Інструкція готується.</p>
           )}

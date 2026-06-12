@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS member_projects (
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_keys TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS show_onboarding BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS alias TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
@@ -111,7 +112,8 @@ const ONBOARDING = {
     },
     {
       title: "Додайте мене як колаборатора",
-      body: "Щоб я міг працювати над проєктом, надайте мені доступ до репозиторія.\n\n1. У вашому репозиторії відкрийте вкладку **Settings** (угорі праворуч).\n2. У меню зліва оберіть **Collaborators** (GitHub може попросити пароль).\n3. Натисніть **Add people**, введіть нікнейм **Lambertain** і підтвердіть.\n\nЯ отримаю запрошення та прийму його — після цього доступ налаштовано.",
+      body: "Щоб я міг працювати над проєктом, надайте мені доступ до репозиторія.\n\n1. У вашому репозиторії відкрийте вкладку **Settings** (угорі праворуч).\n2. У меню зліва оберіть **Collaborators** (GitHub може попросити пароль).\n3. Натисніть **Add people**, введіть нікнейм **Lambertain** і підтвердіть.\n\nЯ отримаю запрошення та прийму його — після цього доступ налаштовано. Нижче вставте посилання на ваш репозиторій (скопіюйте з адресного рядка).",
+      collect: "clientGit",
     },
     {
       title: "Реєстрація на Railway (хостинг) — бонус у подарунок",
@@ -122,8 +124,9 @@ const ONBOARDING = {
       body: "Базовий тариф, якого достатньо для вашого проєкту.\n\n1. Відкрийте [railway.com/workspace/plans](https://railway.com/workspace/plans)\n2. Оберіть тариф **HOBBY** ($5 / місяць).\n3. Прив'яжіть картку та підтвердіть оплату.",
     },
     {
-      title: "Створіть токен і надішліть мені",
-      body: "Токен — це ключ, який дозволяє мені керувати деплоєм вашого проєкту.\n\n1. Відкрийте [railway.com/account/tokens](https://railway.com/account/tokens)\n2. Натисніть **Create Token**, дайте йому будь-яку назву.\n3. Скопіюйте токен і надішліть його мені в Telegram.\n\n⚠️ Токен показується лише **один раз** — скопіюйте його одразу після створення.",
+      title: "Створіть токен і вставте нижче",
+      body: "Токен — це ключ, який дозволяє мені керувати деплоєм вашого проєкту.\n\n1. Відкрийте [railway.com/account/tokens](https://railway.com/account/tokens)\n2. Натисніть **Create Token**, дайте йому будь-яку назву.\n3. Скопіюйте токен і вставте його нижче (він збережеться автоматично).\n\n⚠️ Токен показується лише **один раз** — скопіюйте його одразу після створення.",
+      collect: "railwayToken",
     },
   ],
 };

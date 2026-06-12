@@ -14,6 +14,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const [pending, start] = useTransition();
 
   // новый проект
@@ -56,7 +57,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   function gen() {
     setError(null); setLink(null); setCopied(false);
     start(async () => {
-      const res = await createInviteLink(role, selected);
+      const res = await createInviteLink(role, selected, showOnboarding);
       if (res.error) setError(res.error);
       else setLink(res.link ?? null);
     });
@@ -117,6 +118,19 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
         {addErr && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 8 }}>{addErr}</p>}
       </div>
       </>
+      )}
+
+      {/* Клиенту — опция показать онбординг-инструкцию при входе */}
+      {role === "client" && (
+        <button
+          onClick={() => setShowOnboarding((v) => !v)}
+          style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 14, padding: 0 }}
+        >
+          <span style={{ width: 15, height: 15, flexShrink: 0, border: `1px solid ${showOnboarding ? "var(--accent)" : "var(--border-2)"}`, background: showOnboarding ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {showOnboarding && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
+          </span>
+          <span>{t(locale, "invite.showOnboarding")}</span>
+        </button>
       )}
 
       <button onClick={gen} disabled={pending || needProject} style={{ ...ui.btnAccent, marginTop: 16, opacity: pending || needProject ? 0.5 : 1 }}>

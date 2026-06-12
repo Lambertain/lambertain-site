@@ -13,13 +13,14 @@ const PERSON_ROLES: Role[] = ["client", "contributor", "employee", "admin"];
 export async function createInviteLink(
   role: Role,
   projectKeys: string[],
+  showOnboarding = false,
 ): Promise<{ link?: string; error?: string }> {
   try {
     await requireAdmin();
     if (!PERSON_ROLES.includes(role)) return { error: "Недопустимая роль" };
     // Проект обязателен только клиенту/сотруднику; админ/разработчик — без проекта.
     if ((role === "client" || role === "employee") && projectKeys.length === 0) return { error: "Выберите проект" };
-    const { link } = await generateInvite(role, projectKeys);
+    const { link } = await generateInvite(role, projectKeys, undefined, role === "client" && showOnboarding);
     return { link };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };

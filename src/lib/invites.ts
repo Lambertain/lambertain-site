@@ -4,7 +4,7 @@
  * Server-side only.
  */
 import { randomBytes } from "node:crypto";
-import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects } from "./db";
+import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding } from "./db";
 import { notifyAdmin } from "./notify";
 import type { Role } from "./tasks/types";
 import type { TgUser } from "./telegram-auth";
@@ -23,9 +23,10 @@ export async function generateInvite(
   role: Role,
   projectKeys: string[],
   ttlHours = DEFAULT_TTL_HOURS,
+  showOnboarding = false,
 ): Promise<{ token: string; link: string }> {
   const token = randomBytes(16).toString("hex");
-  await createInvite(token, "", role, ttlHours, projectKeys);
+  await createInvite(token, "", role, ttlHours, projectKeys, showOnboarding);
   return { token, link: inviteLink(token) };
 }
 
@@ -49,6 +50,8 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: keys[0] ?? null });
   if (inv.role === "contributor" && keys.length) await setDevProjects(login, keys);
   if (inv.role === "employee" && keys.length) await setMemberProjects(login, keys); // сотрудник — несколько проектов
+  // Клиент с флагом онбординга — пометить его проект, чтобы показать инструкцию при входе.
+  if (inv.role === "client" && inv.show_onboarding && keys[0]) await setProjectShowOnboarding(keys[0], true);
   await markInviteUsed(token, user.id);
   await notifyAdmin(
     `✅ <b>${fullName}</b> присоединился по приглашению\n` +

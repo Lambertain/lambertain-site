@@ -8,7 +8,7 @@ export async function saveOnboardingSteps(steps: OnboardingStep[]): Promise<{ ok
   await requireAdmin();
   try {
     const clean = steps
-      .map((s) => ({ title: (s.title || "").trim(), body: (s.body || "").trim() }))
+      .map((s) => ({ title: (s.title || "").trim(), body: (s.body || "").trim(), ...(s.collect ? { collect: s.collect } : {}) }))
       .filter((s) => s.title || s.body);
     await saveOnboarding(clean);
     return { ok: true };

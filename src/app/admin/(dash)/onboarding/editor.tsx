@@ -109,12 +109,24 @@ export function OnboardingEditor({ initial, publicUrl, locale }: { initial: Onbo
             rows={Math.max(5, st.body.split("\n").length + 1)}
             style={{ ...ui.input, width: "100%", marginTop: 8, resize: "vertical", lineHeight: 1.5, fontFamily: "var(--font-mono)", fontSize: 13 }}
           />
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <input ref={(el) => { fileRefs.current[i] = el; }} type="file" accept="image/*" hidden onChange={(e) => { insertImage(i, e.target.files); e.target.value = ""; }} />
             <button onClick={() => fileRefs.current[i]?.click()} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "1px solid var(--border-2)", padding: "6px 12px", cursor: "pointer", borderRadius: 2, display: "inline-flex", alignItems: "center", gap: 8 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
               {t(locale, "onb.insertImage")}
             </button>
+            <label style={{ ...ui.monoLabel, textTransform: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {t(locale, "onb.collect")}:
+              <select
+                value={st.collect ?? ""}
+                onChange={(e) => patch(i, { collect: (e.target.value || undefined) as OnboardingStep["collect"] })}
+                style={{ ...ui.input, width: "auto", padding: "5px 8px" }}
+              >
+                <option value="">{t(locale, "onb.collectNone")}</option>
+                <option value="clientGit">{t(locale, "onb.collectRepo")}</option>
+                <option value="railwayToken">{t(locale, "onb.collectToken")}</option>
+              </select>
+            </label>
           </div>
         </div>
       ))}
