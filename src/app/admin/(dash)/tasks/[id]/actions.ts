@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { runReview, taskDiff } from "@/lib/review";
+import { taskDiff } from "@/lib/review";
 import { draftClientAnswer } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { getTaskAiStatus, setTaskAiStatus } from "@/lib/db";
@@ -65,24 +65,6 @@ export async function retryDrafting(id: string): Promise<{ ok?: boolean; error?:
     after(() => draftTask(id));
     revalidatePath(`/admin/tasks/${id}`);
     return { ok: true };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка" };
-  }
-}
-
-/** On-demand ИИ-ревью: вердикт пишется комментарием, статус не меняется. */
-export async function requestAiReview(id: string): Promise<{ ok?: boolean; verdict?: "approve" | "rework"; error?: string }> {
-  const me = await getPrincipal();
-  if (!me) return { error: "Не авторизован" };
-  // ИИ-ревью кода — инструмент админа (разработчики ревьюят через свой Claude + глазами).
-  if (me.realRole !== "admin") return { error: "Нет прав" };
-  try {
-    const res = await runReview(id);
-    const icon = res.verdict === "approve" ? "✅" : "🔧";
-    // Ревью кода — внутренний коммент (клиент его не видит).
-    await getBackend().addComment(id, `🤖 ИИ-ревью ${icon}\n\n${res.comment}`, "internal");
-    revalidatePath(`/admin/tasks/${id}`);
-    return { ok: true, verdict: res.verdict };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }

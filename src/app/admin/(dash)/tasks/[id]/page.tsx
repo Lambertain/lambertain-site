@@ -11,7 +11,6 @@ import { ApprovalBar } from "./approval-bar";
 import { ClientReply } from "./client-reply";
 import { CommentsView, type ViewComment } from "./comments-view";
 import { RetryDrafting } from "./retry-drafting";
-import { TaskTools } from "./task-tools";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
@@ -121,8 +120,6 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           )}
         </div>
       </div>
-
-      {isAdmin && <TaskTools id={task.id} locale={locale} />}
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>
