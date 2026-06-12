@@ -1,37 +1,25 @@
 "use client";
 
 import { useState, useRef, useTransition, useEffect } from "react";
-import { intakeTurn, createProposedTasks } from "./actions";
-import type { ProposedTask } from "@/lib/intake";
+import { createRequestTask } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
 
 type Proj = { key: string; name: string };
-type Msg = { role: "user" | "assistant"; content: unknown };
 type Att = { kind: "image" | "document" | "file"; media_type: string; data: string; name: string };
-
-function textOf(c: unknown): string {
-  if (typeof c === "string") return c;
-  if (Array.isArray(c)) return c.filter((b) => (b as { type: string }).type === "text").map((b) => (b as { text: string }).text).join("\n");
-  return "";
-}
-function imagesOf(c: unknown): string[] {
-  if (!Array.isArray(c)) return [];
-  return c.filter((b) => (b as { type: string }).type === "image").map((b) => {
-    const s = (b as { source: { media_type: string; data: string } }).source;
-    return `data:${s.media_type};base64,${s.data}`;
-  });
-}
+type Msg = { text: string; atts: Att[] };
+type Created = { id: string; url: string };
+type Block = { type: "text"; text: string } | { type: "image"; mime: string; data: string };
 
 const SPEECH_LANG: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
 
 export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; locale: Locale; fill?: boolean }) {
   const [projectKey, setProjectKey] = useState(projects[0]?.key ?? "");
-  const [history, setHistory] = useState<Msg[]>([]);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [atts, setAtts] = useState<Att[]>([]);
-  const [proposed, setProposed] = useState<ProposedTask[] | null>(null);
-  const [created, setCreated] = useState<{ id: string; url: string }[] | null>(null);
+  const [created, setCreated] = useState<Created | null>(null);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [locked, setLocked] = useState(false);
@@ -43,8 +31,9 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [history, pending, proposed]);
+  }, [msgs, created]);
 
+  // Скрины и файлы уходят в ленту СРАЗУ отдельными сообщениями (не копятся в композере).
   function addFiles(files: FileList | File[] | null) {
     if (!files) return;
     Array.from(files).forEach((f) => {
@@ -53,7 +42,7 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
         const [meta, data] = String(reader.result).split(",");
         const media_type = meta.slice(5, meta.indexOf(";"));
         const kind: Att["kind"] = media_type.startsWith("image/") ? "image" : media_type === "application/pdf" ? "document" : "file";
-        setAtts((p) => [...p, { kind, media_type, data, name: f.name }]);
+        setMsgs((p) => [...p, { text: "", atts: [{ kind, media_type, data, name: f.name }] }]);
       };
       reader.readAsDataURL(f);
     });
@@ -68,8 +57,8 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
   }
 
   const preVoiceRef = useRef("");
-  const committedRef = useRef(""); // финализированный текст за все перезапуски сессии
-  const sessionFinalRef = useRef(""); // финал текущего under-the-hood сеанса
+  const committedRef = useRef("");
+  const sessionFinalRef = useRef("");
   const manualStopRef = useRef(false);
 
   function startVoice() {
@@ -103,7 +92,6 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
       setInput(baseTextRef.current + committedRef.current + fin + interim);
     };
     rec.onend = () => {
-      // Накопить финал текущего сеанса и перезапустить, если не остановили вручную (борьба с авто-стопом на паузе).
       committedRef.current += sessionFinalRef.current;
       sessionFinalRef.current = "";
       if (!manualStopRef.current) {
@@ -112,7 +100,7 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
         setRecording(false);
       }
     };
-    rec.onerror = () => { /* onend всё равно сработает и перезапустит */ };
+    rec.onerror = () => { /* onend перезапустит */ };
     recRef.current = rec;
     rec.start();
   }
@@ -124,15 +112,14 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
   function cancelVoice() {
     stopVoice();
     setLocked(false);
-    setInput(preVoiceRef.current); // вернуть текст до записи — голосовое отменено
+    setInput(preVoiceRef.current);
   }
   function finishVoice() {
     stopVoice();
     setLocked(false);
-    setTimeout(() => send(), 250);
+    setTimeout(() => addMsg(), 250);
   }
 
-  // Зажать «Отправить» = запись; потянуть вверх = замок (руки свободны); отпустить = стоп+отправка; тап = отправка.
   const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heldRef = useRef(false);
   const cancelledRef = useRef(false);
@@ -148,72 +135,79 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
   }
   function sendMove(e: React.PointerEvent) {
     if (!heldRef.current || locked || cancelledRef.current) return;
-    if (startYRef.current - e.clientY > 40) setLocked(true); // вверх — замок
-    else if (startXRef.current - e.clientX > 60) { cancelVoice(); cancelledRef.current = true; heldRef.current = false; } // влево — удалить
+    if (startYRef.current - e.clientY > 40) setLocked(true);
+    else if (startXRef.current - e.clientX > 60) { cancelVoice(); cancelledRef.current = true; heldRef.current = false; }
   }
   function sendUp() {
     if (holdRef.current) clearTimeout(holdRef.current);
     if (cancelledRef.current) { cancelledRef.current = false; return; }
-    if (locked) return; // замок — продолжаем запись, управление кнопками
+    if (locked) return;
     if (heldRef.current) finishVoice();
-    else send();
+    else addMsg();
   }
 
-  function send() {
-    if (!input.trim() && atts.length === 0) return;
-    if (!projectKey) return;
-    setError(null);
-    setProposed(null);
-    const content: unknown[] = [];
-    const fileNames = atts.filter((a) => a.kind === "file").map((a) => a.name);
-    let text = input.trim();
-    if (fileNames.length) text += (text ? "\n" : "") + `[прикреплены файлы: ${fileNames.join(", ")}]`;
-    if (text) content.push({ type: "text", text });
-    for (const a of atts) {
-      if (a.kind === "image") content.push({ type: "image", source: { type: "base64", media_type: a.media_type, data: a.data } });
-      else if (a.kind === "document") content.push({ type: "document", source: { type: "base64", media_type: a.media_type, data: a.data } });
-    }
-    const nh: Msg[] = [...history, { role: "user", content }];
-    setHistory(nh);
+  // Отправка текстового сообщения В ЛЕНТУ (без ответа ИИ) — копит хронологию.
+  function addMsg() {
+    if (!input.trim()) return;
+    setMsgs((p) => [...p, { text: input.trim(), atts: [] }]);
     setInput("");
-    setAtts([]);
-    start(async () => {
-      const res = await intakeTurn(nh as never, projectKey);
-      if (res.error) setError(res.error);
-      else {
-        if (res.messages) setHistory(res.messages as Msg[]);
-        if (res.proposed) setProposed(res.proposed);
-      }
-    });
+    setError(null);
   }
 
-  function createTasks() {
-    if (!proposed) return;
-    // Собираем все приложенные клиентом/мной картинки из истории — они уйдут в задачу (разраб смотрит глазами).
-    const images: { mime: string; data: string }[] = [];
-    for (const m of history) {
-      if (!Array.isArray(m.content)) continue;
-      for (const b of m.content as { type: string; source?: { media_type: string; data: string } }[]) {
-        if (b.type === "image" && b.source) images.push({ mime: b.source.media_type, data: b.source.data });
+  // Собрать всю ленту (+ незапощенный текст композера) в блоки и создать задачу.
+  function createTask() {
+    const all = [...msgs];
+    if (input.trim()) all.push({ text: input.trim(), atts: [] });
+    if (!all.length || !projectKey) return;
+    const blocks: Block[] = [];
+    for (const m of all) {
+      if (m.text) blocks.push({ type: "text", text: m.text });
+      for (const a of m.atts) {
+        if (a.kind === "image") blocks.push({ type: "image", mime: a.media_type, data: a.data });
+        else blocks.push({ type: "text", text: `[файл: ${a.name}]` });
       }
     }
+    setError(null);
     start(async () => {
-      const res = await createProposedTasks(projectKey, proposed, images);
+      const res = await createRequestTask(projectKey, blocks);
       if (res.error) setError(res.error);
-      else {
-        setCreated(res.created ?? []);
-        setProposed(null);
+      else if (res.id && res.url) {
+        setCreated({ id: res.id, url: res.url });
+        setMsgs([]);
+        setInput("");
       }
     });
   }
 
-  const display = history.filter((m) => textOf(m.content) || imagesOf(m.content).length || (Array.isArray(m.content) && m.content.some((b) => (b as { type: string }).type === "document")));
+  function startOver() {
+    setCreated(null);
+    setMsgs([]);
+    setInput("");
+    setError(null);
+  }
 
+  function startEdit(i: number) {
+    setEditIdx(i);
+    setEditText(msgs[i].text);
+  }
+  function saveEdit() {
+    if (editIdx == null) return;
+    const i = editIdx;
+    setMsgs((p) => p.map((m, j) => (j === i ? { ...m, text: editText.trim() } : m)).filter((m) => m.text || m.atts.length));
+    setEditIdx(null);
+    setEditText("");
+  }
+  function removeMsg(i: number) {
+    setMsgs((p) => p.filter((_, j) => j !== i));
+    if (editIdx === i) setEditIdx(null);
+  }
+
+  const hasContent = msgs.length > 0 || !!input.trim();
   const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, flexShrink: 0, background: "transparent", border: "1px solid var(--border-2)", color: "var(--muted)", cursor: "pointer", borderRadius: 2 };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: fill ? "100%" : "calc(100dvh - 200px)", minHeight: 0, flex: fill ? 1 : undefined, marginTop: fill ? 0 : 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
-      {/* проект (селект только если проектов больше одного) */}
+      {/* проект */}
       <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={ui.monoLabel}>{t(locale, "field.project")}:</span>
         {projects.length > 1 ? (
@@ -227,66 +221,74 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
         )}
       </div>
 
-      {/* сообщения */}
+      {/* лента сообщений */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-        {display.length === 0 && !pending && (
-          <p style={{ color: "var(--muted)", fontSize: 14, margin: "auto", textAlign: "center", maxWidth: 360 }}>{t(locale, "chat.empty")}</p>
+        {msgs.length === 0 && !created && (
+          <p style={{ color: "var(--muted)", fontSize: 14, margin: "auto", textAlign: "center", maxWidth: 380 }}>{t(locale, "request.placeholder")}</p>
         )}
-        {display.map((m, i) => (
-          <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
-            <div style={{ ...ui.monoLabel, marginBottom: 4, color: m.role === "user" ? "var(--muted)" : "var(--accent)", textAlign: m.role === "user" ? "right" : "left" }}>
-              {m.role === "user" ? t(locale, "chat.you") : "Lambertain"}
+        {msgs.map((m, i) => (
+          <div key={i} style={{ alignSelf: "flex-end", maxWidth: "88%", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <div style={{ padding: "10px 12px", borderRadius: 10, fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap", background: "var(--surface-2)", border: "1px solid var(--border-2)", width: editIdx === i ? "100%" : undefined }}>
+              {editIdx === i ? (
+                <textarea
+                  value={editText}
+                  autoFocus
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveEdit(); } if (e.key === "Escape") setEditIdx(null); }}
+                  rows={Math.min(8, editText.split("\n").length + 1)}
+                  style={{ ...ui.input, resize: "vertical", width: "100%", minHeight: 60 }}
+                />
+              ) : (
+                m.text
+              )}
+              {m.atts.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: m.text || editIdx === i ? 8 : 0 }}>
+                  {m.atts.map((a, j) =>
+                    a.kind === "image" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={j} src={`data:${a.media_type};base64,${a.data}`} alt="" style={{ maxWidth: 140, borderRadius: 6, border: "1px solid var(--border-2)" }} />
+                    ) : (
+                      <span key={j} style={{ ...ui.monoLabel, textTransform: "none", padding: "4px 8px", border: "1px solid var(--border-2)" }}>{a.name.slice(0, 20)}</span>
+                    ),
+                  )}
+                </div>
+              )}
             </div>
-            <div style={{ padding: "10px 12px", borderRadius: 10, fontSize: 14, lineHeight: 1.5, whiteSpace: "pre-wrap", background: m.role === "user" ? "var(--surface-2)" : "rgba(185,255,75,0.06)", border: "1px solid " + (m.role === "user" ? "var(--border-2)" : "var(--accent-line)") }}>
-              {textOf(m.content)}
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: imagesOf(m.content).length ? 8 : 0 }}>
-                {imagesOf(m.content).map((src, j) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={j} src={src} alt="" style={{ maxWidth: 140, borderRadius: 6, border: "1px solid var(--border-2)" }} />
-                ))}
-              </div>
+            {/* управление сообщением: редактировать текст / удалить */}
+            <div style={{ display: "flex", gap: 10 }}>
+              {editIdx === i ? (
+                <>
+                  <button onClick={saveEdit} style={{ ...ui.monoLabel, color: "var(--accent)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t(locale, "request.editSave")}</button>
+                  <button onClick={() => setEditIdx(null)} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t(locale, "request.editCancel")}</button>
+                </>
+              ) : (
+                <>
+                  {m.text && <button onClick={() => startEdit(i)} title={t(locale, "request.edit")} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t(locale, "request.edit")}</button>}
+                  <button onClick={() => removeMsg(i)} title={t(locale, "request.editDelete")} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>{t(locale, "request.editDelete")}</button>
+                </>
+              )}
             </div>
           </div>
         ))}
-        {pending && <div style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "chat.thinking")}</div>}
 
-        {proposed && (
-          <div style={{ ...ui.card, borderColor: "var(--accent-line)" }}>
-            <div style={ui.monoLabel}>{t(locale, "chat.proposedTitle")} · {proposed.length}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-              {proposed.map((tk, i) => (
-                <div key={i} style={{ borderTop: "1px solid var(--border)", paddingTop: 10 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{tk.summary}</div>
-                  <div style={{ whiteSpace: "pre-wrap", fontSize: 13, color: "var(--muted)", marginTop: 6, lineHeight: 1.5 }}>{tk.description}</div>
-                </div>
-              ))}
-            </div>
-            <button onClick={createTasks} disabled={pending} style={{ ...ui.btnAccent, marginTop: 12, opacity: pending ? 0.5 : 1 }}>{t(locale, "chat.createAll")}</button>
-          </div>
-        )}
         {created && (
-          <div style={{ ...ui.card, borderColor: "var(--accent-line)" }}>
-            <span style={{ color: "var(--accent)" }}>{t(locale, "chat.createdOk")} </span>
-            {created.map((c, i) => (<a key={i} href={c.url} style={{ color: "var(--accent)", marginRight: 10 }}>{c.id}</a>))}
+          <div style={{ ...ui.card, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)" }}>
+            <div style={{ fontSize: 14, lineHeight: 1.6 }}>{t(locale, "request.sent")}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
+              <a href={created.url} style={{ ...ui.monoLabel, color: "var(--accent)", textDecoration: "none" }}>{created.id} →</a>
+              <button onClick={startOver} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "1px solid var(--border-2)", padding: "5px 10px", cursor: "pointer", borderRadius: 2 }}>{t(locale, "request.another")}</button>
+            </div>
           </div>
         )}
         {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none" }}>{error}</p>}
       </div>
 
-      {/* превью вложений */}
-      {atts.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "8px 12px", borderTop: "1px solid var(--border)" }}>
-          {atts.map((a, i) => (
-            <div key={i} style={{ position: "relative" }}>
-              {a.kind === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`data:${a.media_type};base64,${a.data}`} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, border: "1px solid var(--border-2)" }} />
-              ) : (
-                <span style={{ ...ui.monoLabel, textTransform: "none", padding: "6px 8px", border: "1px solid var(--border-2)", display: "inline-block" }}>{a.name.slice(0, 18)}</span>
-              )}
-              <button onClick={() => setAtts((p) => p.filter((_, j) => j !== i))} style={{ position: "absolute", top: -6, right: -6, width: 16, height: 16, borderRadius: "50%", background: "var(--border-2)", color: "var(--text)", border: "none", cursor: "pointer", fontSize: 11, lineHeight: "16px", padding: 0 }}>×</button>
-            </div>
-          ))}
+      {/* кнопка «Создать задачу» — появляется, как только есть что отправить */}
+      {!created && hasContent && (
+        <div style={{ padding: "8px 12px", borderTop: "1px solid var(--border)" }}>
+          <button onClick={createTask} disabled={pending} style={{ ...ui.btnAccent, width: "100%", opacity: pending ? 0.5 : 1 }}>
+            {t(locale, "request.submit")}
+          </button>
         </div>
       )}
 
@@ -314,18 +316,17 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
             value={input}
             onChange={(e) => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px"; }}
             onPaste={onPaste}
-            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } }}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); addMsg(); } }}
             rows={1}
-            placeholder={recording ? `${t(locale, "chat.recording")} · ${t(locale, "chat.lockHint")}` : t(locale, "chat.placeholder")}
+            placeholder={recording ? `${t(locale, "chat.recording")} · ${t(locale, "chat.lockHint")}` : t(locale, "request.placeholder")}
             style={{ ...ui.input, resize: "none", height: 40, maxHeight: 140, overflowY: "auto", flex: 1 }}
           />
           <button
             onPointerDown={(e) => { e.preventDefault(); sendDown(e); }}
             onPointerMove={sendMove}
             onPointerUp={(e) => { e.preventDefault(); sendUp(); }}
-            disabled={pending}
             title={t(locale, "chat.send")}
-            style={{ ...iconBtn, width: 40, height: 40, background: recording ? "#ff5b5b" : "var(--accent)", borderColor: recording ? "#ff5b5b" : "var(--accent)", color: "#000", opacity: pending ? 0.5 : 1, touchAction: "none" }}
+            style={{ ...iconBtn, width: 40, height: 40, background: recording ? "#ff5b5b" : "var(--accent)", borderColor: recording ? "#ff5b5b" : "var(--accent)", color: "#000", touchAction: "none" }}
           >
             {recording ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7" /></svg>

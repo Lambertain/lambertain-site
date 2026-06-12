@@ -1,12 +1,12 @@
 "use server";
 
+import { after } from "next/server";
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
-import { runIntake, type ProposedTask } from "@/lib/intake";
-import { repoFromGit } from "@/lib/github";
+import { draftTask } from "@/lib/drafter";
 import { notifyLogins, notifyAdmin, notifyProjectClients } from "@/lib/notify";
-import { setTaskDeps, projectHasClient, attachImagesToTask } from "@/lib/db";
+import { projectHasClient, appendRequestBlocks, setTaskAiStatus, type ReqBlock } from "@/lib/db";
 import type { DraftTask, Role } from "@/lib/tasks/types";
 
 /**
@@ -24,8 +24,6 @@ async function notifyPendingApproval(approver: "client" | "admin", projectKey: s
   if (approver === "client") await notifyProjectClients(projectKey, text);
   else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${taskId}: ${summary}\nОт сотрудника, проект без клиента.`);
 }
-import type Anthropic from "@anthropic-ai/sdk";
-
 /** Уведомить ответственного разработчика о новой задаче (best-effort). */
 async function notifyNewTask(task: { id: string; summary: string; assignee?: { login: string } | null }): Promise<void> {
   try {
@@ -39,76 +37,41 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Один ход диалогового интейка по проекту. */
-export async function intakeTurn(
-  history: Anthropic.MessageParam[],
+/**
+ * Создать задачу СРАЗУ из сырого запроса (текст + скрины), затем запустить фоновую
+ * ИИ-проработку: она подготовит техническую спеку для разработчика во внутреннем
+ * комментарии или задаст клиенту уточняющий вопрос. Юзер может закрыть портал —
+ * результат придёт уведомлением в бот.
+ */
+export async function createRequestTask(
   projectKey: string,
-): Promise<{ messages?: Anthropic.MessageParam[]; reply?: string; proposed?: ProposedTask[]; error?: string }> {
+  blocks: ReqBlock[],
+): Promise<{ id?: string; url?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
+  if (!blocks.length) return { error: "Пустой запрос" };
   try {
     const be = getBackend();
-    const [projects, users] = await Promise.all([be.listProjects(), be.listUsers()]);
-    const project = projects.find((p) => p.key === projectKey);
-    if (!project) return { error: "Проект не выбран" };
-    const repo = repoFromGit(project.meta.devGit);
-    // Клиент не должен видеть исполнителей: не передаём команду в контекст ИИ (иначе он может их назвать).
-    const ctxUsers = me.role === "client" ? [] : users.filter((u) => !u.banned);
-    const res = await runIntake(history, {
-      projectKey,
-      projectName: project.name,
-      repo,
-      conventions: project.meta.conventions,
-      users: ctxUsers.map((u) => ({ login: u.login, fullName: u.fullName, role: u.role })),
-      today: today(),
-    });
-    return { messages: res.messages, reply: res.reply, proposed: res.proposed };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка интейка" };
-  }
-}
-
-/** Создать предложенные интейком задачи. */
-export async function createProposedTasks(
-  projectKey: string,
-  tasks: ProposedTask[],
-  images: { mime: string; data: string }[] = [],
-): Promise<{ created?: { id: string; url: string }[]; error?: string }> {
-  const me = await getPrincipal();
-  if (!me) return { error: "Не авторизован" };
-  try {
-    const be = getBackend();
-    const projects = await be.listProjects();
-    const project = projects.find((p) => p.key === projectKey);
-    const defaultAssignee = project?.meta.defaultAssignee || null;
     const appr = await approvalFor(me.role, projectKey);
-    const created = [];
-    const createdIds: string[] = []; // readable_id по индексу proposed-задачи
-    for (const tk of tasks) {
-      const task = await be.createTask({
-        projectKey,
-        summary: tk.summary,
-        description: tk.description,
-        // Если исполнитель не задан — ставим ответственного по проекту.
-        assigneeLogin: tk.assigneeLogin ?? defaultAssignee,
-        reporterLogin: me.youtrackLogin ?? null, // создатель (сотрудник/клиент виден)
-        priority: tk.priority ?? null,
-        approvalStatus: appr.approvalStatus,
-        createdByRole: appr.createdByRole,
-      });
-      // Прикрепляем приложенные скрины к задаче (разраб смотрит глазами при проверке).
-      if (images.length) await attachImagesToTask(task.id, images).catch(() => {});
-      if (appr.pending && appr.approver) await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
-      else await notifyNewTask(task);
-      created.push({ id: task.id, url: task.url });
-      createdIds.push(task.id);
-    }
-    // Зависимости между задачами — их проставил ИИ (dependsOn = индексы предшественников в этом списке).
-    for (let i = 0; i < tasks.length; i++) {
-      const deps = (tasks[i].dependsOn || []).filter((j) => j >= 0 && j < createdIds.length && j !== i).map((j) => createdIds[j]);
-      if (deps.length) await setTaskDeps(createdIds[i], deps).catch(() => {});
-    }
-    return { created };
+    // Заголовок — обрезка первой строки текста; ИИ-проработка уточнит его (write_spec.title).
+    const allText = blocks.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+    const firstLine = (allText.split("\n").find((l) => l.trim()) || "Запрос с экрана").trim();
+    const summary = firstLine.length > 70 ? firstLine.slice(0, 67) + "…" : firstLine;
+    const task = await be.createTask({
+      projectKey,
+      summary,
+      description: "", // тело соберём из блоков с сохранением хронологии (текст→скрин→текст→скрин)
+      assigneeLogin: null, // исполнителя назначит ИИ-проработка, когда подготовит спеку
+      reporterLogin: me.youtrackLogin ?? null,
+      approvalStatus: appr.approvalStatus,
+      createdByRole: appr.createdByRole,
+    });
+    await appendRequestBlocks(task.id, blocks);
+    await setTaskAiStatus(task.id, "pending");
+    if (appr.pending && appr.approver) await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
+    // Фоновая проработка: Railway web — long-running, переживает ответ. Страховка — поллер по ai_status='pending'.
+    after(() => draftTask(task.id));
+    return { id: task.id, url: task.url };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка создания" };
   }

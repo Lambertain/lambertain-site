@@ -158,6 +158,16 @@ export const DICT: Record<string, Entry> = {
   "chat.recording": { uk: "Запис…", ru: "Запись…", en: "Recording…" },
   "chat.lockHint": { uk: "вгору — замок, вліво — видалити", ru: "вверх — замок, влево — удалить", en: "up — lock, left — delete" },
   "chat.empty": { uk: "Опишіть задачу. Затисніть кнопку відправки для голосового вводу. Скрін — через Ctrl+V або скріпку.", ru: "Опишите задачу. Зажмите кнопку отправки для голосового ввода. Скрин — через Ctrl+V или скрепку.", en: "Describe the task. Hold the send button for voice input. Paste a screenshot with Ctrl+V or the clip." },
+  "request.placeholder": { uk: "Опишіть, що потрібно зробити. Додайте скріни — Ctrl+V або скріпка.", ru: "Опишите, что нужно сделать. Добавьте скрины — Ctrl+V или скрепка.", en: "Describe what needs to be done. Attach screenshots — Ctrl+V or the clip." },
+  "request.submit": { uk: "Створити задачу", ru: "Создать задачу", en: "Create task" },
+  "request.sent": { uk: "Прийняв, розберуся з кодом. Можете закрити це вікно — ви отримаєте сповіщення в боті, коли задачу буде поставлено, або якщо знадобиться уточнення.", ru: "Принял, разберусь с кодом. Можете закрыть это окно — вы получите уведомление в бот, когда задача будет поставлена, или если понадобится уточнение.", en: "Got it, I'll dig into the code. You can close this window — you'll get a bot notification when the task is ready, or if I need a clarification." },
+  "request.another": { uk: "Створити ще одну", ru: "Создать ещё одну", en: "Create another" },
+  "request.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
+  "request.editSave": { uk: "Зберегти", ru: "Сохранить", en: "Save" },
+  "request.editCancel": { uk: "Скасувати", ru: "Отмена", en: "Cancel" },
+  "request.editDelete": { uk: "Видалити", ru: "Удалить", en: "Delete" },
+  "ai.drafting": { uk: "Lambertain опрацьовує задачу — готує специфікацію.", ru: "Lambertain прорабатывает задачу — готовит спецификацию.", en: "Lambertain is working on the task — preparing the spec." },
+  "ai.waiting": { uk: "Lambertain очікує вашої відповіді на уточнення нижче.", ru: "Lambertain ждёт вашего ответа на уточнение ниже.", en: "Lambertain is waiting for your answer to the clarification below." },
 
   // — поля —
   "field.project": { uk: "Проєкт", ru: "Проект", en: "Project" },

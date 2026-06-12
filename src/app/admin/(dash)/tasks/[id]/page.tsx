@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal } from "@/lib/principal";
-import { getTaskDeps, getReads } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskAiStatus } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -32,10 +32,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const isAdmin = me.realRole === "admin";
   const backHref = isAdmin ? "/admin/tasks" : "/admin";
 
-  let task, comments, deps, reads;
+  let task, comments, deps, reads, aiStatus;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    [task, comments, deps, reads] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey)]);
+    [task, comments, deps, reads, aiStatus] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), getTaskAiStatus(id)]);
   } catch (e) {
     return (
       <div>
@@ -83,6 +83,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         )}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
+
+      {(aiStatus === "pending" || aiStatus === "waiting") && (
+        <div style={{ ...ui.card, marginTop: 16, padding: 14, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: aiStatus === "waiting" ? "#e8b339" : "var(--accent)", display: "inline-block", flexShrink: 0 }} />
+          <span style={{ fontSize: 14 }}>{t(locale, aiStatus === "waiting" ? "ai.waiting" : "ai.drafting")}</span>
+        </div>
+      )}
 
       {task.approvalStatus === "pending" && (
         <ApprovalBar id={task.id} canApprove={isAdmin || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />

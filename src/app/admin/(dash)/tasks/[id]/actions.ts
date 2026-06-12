@@ -1,9 +1,12 @@
 "use server";
 
+import { after } from "next/server";
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { runReview, taskDiff } from "@/lib/review";
 import { draftClientAnswer } from "@/lib/replies";
+import { draftTask } from "@/lib/drafter";
+import { getTaskAiStatus, setTaskAiStatus } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 
@@ -20,6 +23,14 @@ export async function addTaskComment(
   try {
     await getBackend().addComment(id, text, visibility);
     revalidatePath(`/admin/tasks/${id}`);
+    // Клиент ответил на уточняющий вопрос ИИ-проработки → возобновить проработку в фоне.
+    if (me.role === "client") {
+      const ai = await getTaskAiStatus(id).catch(() => null);
+      if (ai === "waiting") {
+        await setTaskAiStatus(id, "pending").catch(() => {});
+        after(() => draftTask(id));
+      }
+    }
     // Уведомления (best-effort): адресно по ролям + картинки задачи.
     try {
       const task = await getBackend().getTask(id);

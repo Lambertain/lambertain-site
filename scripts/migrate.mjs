@@ -64,6 +64,8 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS alias TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_ref TEXT;
+-- Состояние ИИ-проработки задачи: pending (готовит спеку) | waiting (ждёт ответа клиента) | done | NULL (без проработки).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ai_status TEXT;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

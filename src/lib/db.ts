@@ -464,28 +464,74 @@ export async function relinkMember(origLogin: string, newLogin: string): Promise
   return { comments: c.length, assignee: a.length, reporter: r.length };
 }
 
-/** Прикрепить картинки (base64) к задаче: сохранить в attachments и добавить в описание как ![](/api/files/id). */
-export async function attachImagesToTask(readableId: string, images: { mime: string; data: string }[]): Promise<void> {
-  if (!images.length) return;
+/** Блок запроса: текст или картинка (base64). Порядок блоков = хронология ввода клиента. */
+export type ReqBlock = { type: "text"; text: string } | { type: "image"; mime: string; data: string };
+
+/**
+ * Дописать блоки запроса в описание задачи С СОХРАНЕНИЕМ ПОРЯДКА: текст идёт как Markdown,
+ * картинки сохраняются в attachments и вставляются ![](/api/files/id) на своих местах
+ * (чтобы было видно, какой скрин к какому тексту относится).
+ */
+export async function appendRequestBlocks(readableId: string, blocks: ReqBlock[]): Promise<void> {
+  if (!blocks.length) return;
   const rows = await q<{ id: number; description: string | null }>(
     "SELECT id, description FROM tasks WHERE readable_id = $1",
     [readableId],
   );
   if (!rows[0]) return;
-  let descr = rows[0].description || "";
+  const parts: string[] = rows[0].description?.trim() ? [rows[0].description.trim()] : [];
   let i = 1;
-  for (const img of images) {
-    const buf = Buffer.from(img.data, "base64");
-    const ext = (img.mime.split("/")[1] || "png").replace("jpeg", "jpg");
-    const ins = await q<{ id: number }>(
-      `INSERT INTO attachments (task_id, name, mime, data) VALUES ($1,$2,$3,$4)
-       ON CONFLICT (task_id, name) DO UPDATE SET data=EXCLUDED.data RETURNING id`,
-      [rows[0].id, `screen-${i}.${ext}`, img.mime, buf],
-    );
-    descr += `\n\n![](/api/files/${ins[0].id})`;
-    i++;
+  for (const b of blocks) {
+    if (b.type === "text") {
+      if (b.text.trim()) parts.push(b.text.trim());
+    } else {
+      const buf = Buffer.from(b.data, "base64");
+      const ext = (b.mime.split("/")[1] || "png").replace("jpeg", "jpg");
+      const ins = await q<{ id: number }>(
+        `INSERT INTO attachments (task_id, name, mime, data) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (task_id, name) DO UPDATE SET data=EXCLUDED.data RETURNING id`,
+        [rows[0].id, `screen-${i}.${ext}`, b.mime, buf],
+      );
+      parts.push(`![](/api/files/${ins[0].id})`);
+      i++;
+    }
   }
-  await q("UPDATE tasks SET description = $2 WHERE id = $1", [rows[0].id, descr]);
+  await q("UPDATE tasks SET description = $2 WHERE id = $1", [rows[0].id, parts.join("\n\n")]);
+}
+
+// ---- ИИ-проработка задач (drafter) ----
+/** Состояние проработки: pending | waiting | done | null. */
+export async function setTaskAiStatus(readableId: string, status: "pending" | "waiting" | "done" | null): Promise<void> {
+  await q("UPDATE tasks SET ai_status = $2 WHERE readable_id = $1", [readableId, status]);
+}
+export async function getTaskAiStatus(readableId: string): Promise<string | null> {
+  const rows = await q<{ ai_status: string | null }>("SELECT ai_status FROM tasks WHERE readable_id = $1", [readableId]);
+  return rows[0]?.ai_status ?? null;
+}
+/** readable_id задач, ожидающих проработки (страховка для поллера/ретрая). */
+export async function getAiPendingTasks(): Promise<string[]> {
+  const rows = await q<{ readable_id: string }>("SELECT readable_id FROM tasks WHERE ai_status = 'pending' ORDER BY updated_at ASC LIMIT 20");
+  return rows.map((r) => r.readable_id);
+}
+/** Назначить исполнителя по логину + перевести в «В работе». */
+export async function assignTask(readableId: string, login: string): Promise<void> {
+  await q(
+    `UPDATE tasks SET assignee_id = (SELECT id FROM members WHERE login = $2), status = 'In Progress', updated_at = now()
+     WHERE readable_id = $1`,
+    [readableId, login],
+  );
+}
+/** Обновить заголовок задачи. */
+export async function setTaskTitle(readableId: string, title: string): Promise<void> {
+  await q("UPDATE tasks SET title = $2, updated_at = now() WHERE readable_id = $1", [readableId, title]);
+}
+/** Картинки задачи как base64 (для подачи ИИ-проработчику). */
+export async function getTaskImages(readableId: string): Promise<{ mime: string; data: string }[]> {
+  const rows = await q<{ mime: string | null; data: Buffer }>(
+    `SELECT a.mime, a.data FROM attachments a JOIN tasks t ON t.id = a.task_id WHERE t.readable_id = $1 ORDER BY a.id`,
+    [readableId],
+  );
+  return rows.map((r) => ({ mime: r.mime || "image/png", data: r.data.toString("base64") }));
 }
 
 // ---- Вложения (картинки задач, скачанные из YouTrack) ----
