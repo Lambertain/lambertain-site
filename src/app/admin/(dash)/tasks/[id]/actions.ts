@@ -35,10 +35,11 @@ export async function addTaskComment(
     try {
       const task = await getBackend().getTask(id);
       const imgs = attachmentIdsIn(text, task.description);
+      const projName = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey)?.name || task.projectKey;
       if (me.role === "client") {
         // Клиент написал → ответственному разработчику + админу.
         await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${id}: ${task.summary}\n${text.slice(0, 400)}`, imgs);
-        await notifyAdmin(`💬 Вопрос клиента · ${id}: ${task.summary}`);
+        await notifyAdmin(`💬 <b>Вопрос клиента</b>\nПроект «${projName}»\n${id}: ${task.summary}`);
       } else if (visibility === "client") {
         // Команда ответила клиенту → клиенту/сотруднику проекта.
         await notifyProjectClients(task.projectKey, `💬 <b>${id}</b>: ${task.summary}\n${text.slice(0, 400)}`, imgs);
