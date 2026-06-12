@@ -4,7 +4,10 @@ import { getPrincipal } from "@/lib/principal";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
+import { getReads, getProjectReads, getDepsFor } from "@/lib/db";
+import { statusBucket } from "@/lib/statuses";
 import { TaskList } from "../task-card";
+import { TaskTabs, type BoardTask } from "../task-tabs";
 import { nowMs } from "@/lib/now";
 import { ui } from "../../ui-styles";
 
@@ -16,8 +19,72 @@ export default async function TasksPage() {
   const me = await getPrincipal();
   if (!me) redirect("/admin/login");
   const locale = await getLocale();
-
   const be = getBackend();
+  const readKey = me.youtrackLogin || me.fullName || "admin";
+
+  // —— Админ: задачи попроектно (табы проект → статус), как у разработчика ——
+  if (me.role === "admin") {
+    let projectsList, tasks, reads, projectSeen;
+    try {
+      [projectsList, tasks, reads, projectSeen] = await Promise.all([
+        be.listProjects(),
+        be.listTasks({ order: "updated_desc", limit: 300 }),
+        getReads(readKey),
+        getProjectReads(readKey),
+      ]);
+    } catch (e) {
+      return (
+        <div>
+          <h1 style={ui.h1}>{t(locale, "tasks.allTitle")}</h1>
+          <p style={{ color: "#ff5b5b", fontSize: 14 }}>{t(locale, "error.load")}{e instanceof Error ? e.message : "—"}</p>
+        </div>
+      );
+    }
+    const projects = projectsList.map((p) => ({ key: p.key, name: p.name }));
+    const depMap = await getDepsFor(tasks.map((tk) => tk.id));
+    const board: BoardTask[] = tasks.map((tk) => {
+      const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
+      const lastRead = reads.get(tk.id) ?? 0;
+      const unread = (tk.lastCommentAt ?? 0) > lastRead || (tk.created ?? 0) > lastRead;
+      return {
+        id: tk.id,
+        projectKey: tk.projectKey,
+        summary: tk.summary,
+        status: tk.state || "Open",
+        description: tk.description,
+        created: tk.created,
+        updated: tk.updated,
+        commentCount: tk.commentCount,
+        assignee: tk.assignee?.fullName ?? null,
+        unread,
+        blocked: blockers.length > 0,
+        blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
+      };
+    });
+    const projectsWithNew = projects.map((p) => {
+      const seen = projectSeen.get(p.key) ?? 0;
+      const hasNew = tasks.some((tk) => tk.projectKey === p.key && Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen);
+      return { key: p.key, name: p.name, hasNew };
+    });
+
+    return (
+      <div>
+        <div style={ui.monoLabel}>{t(locale, "tasks.allKicker")}</div>
+        <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "tasks.allTitle")}</h1>
+        <TaskTabs
+          tasks={board}
+          projects={projectsWithNew}
+          locale={locale}
+          canEditStatus={true}
+          canDelete={true}
+          canStart={true}
+          empty={t(locale, "tasks.empty")}
+        />
+      </div>
+    );
+  }
+
+  // —— Контрибьютор/клиент: плоский список своих задач ——
   let filter: TaskFilter = { unresolvedOnly: true, order: "updated_desc" };
   let title = t(locale, "tasks.allTitle");
   let kicker = t(locale, "tasks.allKicker");
