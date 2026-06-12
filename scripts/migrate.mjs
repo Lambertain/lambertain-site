@@ -90,7 +90,43 @@ UPDATE comments c SET orig_author_login=m.login, orig_author_role=m.role
   FROM members m WHERE c.author_id=m.id AND c.orig_author_login IS NULL;
 UPDATE tasks t SET orig_assignee_login=m.login FROM members m WHERE t.assignee_id=m.id AND t.orig_assignee_login IS NULL;
 UPDATE tasks t SET orig_reporter_login=m.login FROM members m WHERE t.reporter_id=m.id AND t.orig_reporter_login IS NULL;
+-- Настройки портала (JSON по ключу) и медиа онбординг-инструкции (публичные картинки шагов).
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY, value JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS onboarding_media (
+  id SERIAL PRIMARY KEY, mime TEXT, data BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 `;
+
+// Подробная пошаговая инструкция онбординга клиента (украинский). Сидится один раз —
+// дальнейшие правки админа (текст + скрины) не затираются (ON CONFLICT DO NOTHING).
+const ONBOARDING = {
+  steps: [
+    {
+      title: "Реєстрація на GitHub",
+      body: "GitHub — це сервіс, де зберігається код вашого проєкту.\n\n1. Відкрийте **github.com** і натисніть **Sign up** (праворуч угорі).\n2. Введіть свою електронну пошту → придумайте надійний пароль → оберіть нікнейм (ім'я користувача).\n3. Підтвердіть пошту: GitHub надішле лист із кодом — введіть його.\n\nГотово — обліковий запис створено. Залишайтесь у ньому залогінені.",
+    },
+    {
+      title: "Створіть приватний репозиторій",
+      body: "Репозиторій — це «папка» вашого проєкту всередині GitHub.\n\n1. Натисніть **+** у правому верхньому куті → **New repository**.\n2. У полі **Repository name** вкажіть будь-яку назву (наприклад `my-project`).\n3. Нижче оберіть **Private** — приватний, щоб код бачили лише ви та я.\n4. Натисніть зелену кнопку **Create repository**.",
+    },
+    {
+      title: "Додайте мене як колаборатора",
+      body: "Щоб я міг працювати над проєктом, надайте мені доступ до репозиторія.\n\n1. У вашому репозиторії відкрийте вкладку **Settings** (угорі праворуч).\n2. У меню зліва оберіть **Collaborators** (GitHub може попросити пароль).\n3. Натисніть **Add people**, введіть нікнейм **Lambertain** і підтвердіть.\n\nЯ отримаю запрошення та прийму його — після цього доступ налаштовано.",
+    },
+    {
+      title: "Реєстрація на Railway (хостинг) — бонус у подарунок",
+      body: "Railway — це хостинг, на якому працюватиме ваш сайт. За моїм посиланням ви отримаєте **другий місяць хостингу безкоштовно**.\n\n1. Перейдіть за посиланням: **https://railway.com?referralCode=JgKp7P**\n2. Натисніть **Login** → **Login with GitHub**.\n3. Дозвольте Railway доступ до вашого GitHub (кнопка **Authorize**).",
+    },
+    {
+      title: "Сплатіть тариф HOBBY ($5)",
+      body: "Базовий тариф, якого достатньо для вашого проєкту.\n\n1. Відкрийте **https://railway.com/workspace/plans**\n2. Оберіть тариф **HOBBY** ($5 / місяць).\n3. Прив'яжіть картку та підтвердіть оплату.",
+    },
+    {
+      title: "Створіть токен і надішліть мені",
+      body: "Токен — це ключ, який дозволяє мені керувати деплоєм вашого проєкту.\n\n1. Відкрийте **https://railway.com/account/tokens**\n2. Натисніть **Create Token**, дайте йому будь-яку назву.\n3. Скопіюйте токен і надішліть його мені в Telegram.\n\n⚠️ Токен показується лише **один раз** — скопіюйте його одразу після створення.",
+    },
+  ],
+};
 
 // Стартовые скилы — реальные полные плейбуки (SKILL.md) из открытых источников:
 //   anthropics/skills, obra/superpowers, vercel-labs/agent-skills, supabase/agent-skills.
@@ -184,6 +220,10 @@ async function main() {
       [slug, title, triggers, playbook],
     );
   }
+  await pool.query(
+    "INSERT INTO settings (key, value) VALUES ('onboarding', $1) ON CONFLICT (key) DO NOTHING",
+    [JSON.stringify(ONBOARDING)],
+  );
   const c = await pool.query("SELECT count(*)::int AS n FROM role_overrides");
   const s = await pool.query("SELECT count(*)::int AS n FROM skills");
   console.log(`Миграция ок. role_overrides: ${c.rows[0].n}, skills: ${s.rows[0].n}.`);

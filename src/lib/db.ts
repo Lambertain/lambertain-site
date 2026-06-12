@@ -534,6 +534,39 @@ export async function getTaskImages(readableId: string): Promise<{ mime: string;
   return rows.map((r) => ({ mime: r.mime || "image/png", data: r.data.toString("base64") }));
 }
 
+// ---- Онбординг-инструкция клиента (шаги + публичные картинки) ----
+export interface OnboardingStep {
+  title: string;
+  body: string; // markdown; картинки — ![](/api/onboarding-media/<id>)
+}
+const DEFAULT_ONBOARDING: { steps: OnboardingStep[] } = { steps: [] };
+
+export async function getOnboarding(): Promise<{ steps: OnboardingStep[] }> {
+  const rows = await q<{ value: { steps?: OnboardingStep[] } }>("SELECT value FROM settings WHERE key = 'onboarding'");
+  const v = rows[0]?.value;
+  if (!v || !Array.isArray(v.steps)) return DEFAULT_ONBOARDING;
+  return { steps: v.steps };
+}
+
+export async function saveOnboarding(steps: OnboardingStep[]): Promise<void> {
+  await q(
+    `INSERT INTO settings (key, value, updated_at) VALUES ('onboarding', $1, now())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [JSON.stringify({ steps })],
+  );
+}
+
+/** Сохранить картинку шага (base64) → id (для /api/onboarding-media/<id>). */
+export async function saveOnboardingMedia(mime: string, base64: string): Promise<number> {
+  const buf = Buffer.from(base64, "base64");
+  const rows = await q<{ id: number }>("INSERT INTO onboarding_media (mime, data) VALUES ($1,$2) RETURNING id", [mime, buf]);
+  return rows[0].id;
+}
+export async function getOnboardingMedia(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
+  const rows = await q<{ mime: string | null; data: Buffer }>("SELECT mime, data FROM onboarding_media WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}
+
 // ---- Вложения (картинки задач, скачанные из YouTrack) ----
 export async function getAttachment(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
   const rows = await q<{ mime: string | null; data: Buffer }>(
