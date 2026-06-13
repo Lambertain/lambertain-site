@@ -94,13 +94,27 @@ Event-driven из server actions (`notify.ts`): tg_id резолвится из 
 
 ## Claude Code разработчика ↔ портал (протокол + эскалация)
 
-Чтобы джун не пересылал вопросы скринами, Claude Code разработчика работает с порталом по токену проекта
-автономно (инструкция — в `CLAUDE.md` дев-репо, читается при старте сессии; раскладка — `scripts/distribute-protocol.mjs`).
-- `GET /api/dev/tasks` — задачи; `?id=` — спека + тред комментов + `awaitingClient` / `lastClientAnswer`.
-- `POST /api/dev/escalate` `{taskId, question, kind?}` — Claude эскалирует вопрос: `client` (ИИ оформляет вопрос
-  клиенту от лица агентства → клиент-видимый коммент с маркером + уведомление клиенту); `admin` (внутренний + Никите).
-- Claude технические развилки решает сам по спеке/конвенциям; ответ клиента подтягивает, перечитывая задачу
-  (`awaitingClient`/тред) — без ручного relay. `dev-protocol.ts` — генератор протокол-блока + маркер эскалации.
+Claude Code разработчика работает с порталом по токену проекта автономно (протокол — в `CLAUDE.md` дев-репо
+между маркерами `LAMBERTAIN-PROTOCOL`; единый источник текста — `dev-protocol.ts` `protocolBlock`).
+- `GET /api/dev/tasks` `?id=` — требование + `tags` + тред + `awaitingClient`/`lastClientAnswer`; `GET /api/dev/skills?tags=` — плейбуки.
+- `POST /api/dev/status` `{taskId, status:"in_progress"|"review", summary?}` — Claude сам ставит статусы; при `review` `summary` → клиенту.
+- `POST /api/dev/escalate` `{taskId, question, kind?}` — вопрос клиенту (→ Blocked) или Никите (`kind:"admin"`).
+
+**Раскладка протокола (`protocol-deploy.ts`, единый источник):**
+- **авто** при привязке нашего dev-репо к проекту (`saveMeta` с `devGit` → `after(layProtocol)`) — новые проекты/репо
+  подхватываются сами;
+- **кнопка «Обновить протокол в дев-репо»** на `/admin/projects` (`redistributeProtocol` → `layProtocolAll`) — когда
+  поменялся текст протокола;
+- только в НАШИ репо (`Lambertain/*`), не в клиентские; сам портал (`lambertain-site`) пропускается.
+- Защита от утечки: при доставке dev→client (`deliver.ts`) **вырезается** `LAMBERTAIN-PROTOCOL`-блок из CLAUDE.md и
+  выкидываются внутренние файлы (`.lambertain/`, `esc.json`, `.env*`) — токен и протокол клиенту НЕ попадают.
+
+## Глобальный фидбек-проект (Lamb.dev)
+
+Проект `DEV` «Lamb.dev» (`meta.feedback`, привязан к нашему репо) **виден всем** ролям автоматически (и новым
+юзерам — через `scope.ts`). Каждый пишет туда пожелания по порталу и **видит только свои** задачи
+(`feedback.ts` `mergeFeedback`: убирает чужие фидбек-задачи, подмешивает свои; админ — все). Фидбек идёт **без
+апрува и ИИ-триажа** (напрямую админу + уведомление). В табе проекта — intro-баннер (i18n), что это и что видно только своё.
 
 ## Клиентская приватность (агентство = Lambertain)
 

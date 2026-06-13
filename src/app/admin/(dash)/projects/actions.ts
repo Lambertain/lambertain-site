@@ -1,8 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/principal";
 import { setProjectToken, createProject, generateProjectKey, setProjectMeta, setProjectArchived } from "@/lib/db";
+import { layProtocol, layProtocolAll } from "@/lib/protocol-deploy";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -51,8 +53,21 @@ export async function saveMeta(
   try {
     await requireAdmin();
     await setProjectMeta(key, name, meta);
+    // Привязали/обновили наш dev-репо → автоматически разложить туда протокол (новые репо подхватываются сами).
+    if (meta.devGit) after(() => layProtocol(key));
     revalidatePath(`/admin/projects/${key}`);
     return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Обновить протокол во всех наших дев-репо (после изменения текста протокола). Admin. */
+export async function redistributeProtocol(): Promise<{ updated?: number; results?: { key: string; status: string; detail?: string }[]; error?: string }> {
+  try {
+    await requireAdmin();
+    const results = await layProtocolAll();
+    return { updated: results.filter((r) => r.status === "updated").length, results: results.map((r) => ({ key: r.key, status: r.status, detail: r.detail })) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }

@@ -32,6 +32,24 @@ async function ghJson<T = unknown>(path: string, init?: RequestInit): Promise<T>
 
 interface TreeEntry { path: string; mode: string; type: string; sha?: string }
 
+// ---- Защита от утечки в клиентский репо (токен/протокол Lambertain не должны туда попасть) ----
+const PROTOCOL_BLOCK_RE = /\n?<!-- LAMBERTAIN-PROTOCOL:START -->[\s\S]*?<!-- LAMBERTAIN-PROTOCOL:END -->\n?/g;
+
+/** Файл вообще не отдаём клиенту (внутреннее портала/секреты). */
+function clientSkip(path: string): boolean {
+  const p = path.toLowerCase();
+  return (
+    p === "esc.json" ||
+    /(^|\/)\.lambertain(\/|$)/.test(p) ||
+    /(^|\/)claude\.local\.md$/.test(p) ||
+    /(^|\/)\.env(\.|$)/.test(p)
+  );
+}
+/** Файл санируем (вырезаем протокол-блок Lambertain), прежде чем отдать клиенту. */
+function clientSanitize(path: string): boolean {
+  return /(^|\/)claude\.md$/i.test(path) || /(^|\/)agents\.md$/i.test(path);
+}
+
 /** Файл относится к схеме/миграциям БД? (эвристика по пути) */
 function isSchemaFile(path: string): boolean {
   const p = path.toLowerCase();
@@ -140,16 +158,29 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
   for (let i = 0; i < blobs.length; i += batch) {
     const slice = blobs.slice(i, i + batch);
     const made = await Promise.all(
-      slice.map(async (e) => {
+      slice.map(async (e): Promise<TreeEntry | null> => {
+        // Внутренние файлы Lambertain (токен/протокол/секреты) не отдаём клиенту.
+        if (clientSkip(e.path)) return null;
+        if (clientSanitize(e.path)) {
+          const blob = await ghJson<{ content: string; encoding: string }>(`/repos/${devRepo}/git/blobs/${e.sha}`);
+          let text = Buffer.from(blob.content, (blob.encoding as BufferEncoding) || "base64").toString("utf-8");
+          text = text.replace(PROTOCOL_BLOCK_RE, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+          if (!text.trim()) return null; // после очистки пусто — файл не кладём
+          const created = await ghJson<{ sha: string }>(`/repos/${clientRepo}/git/blobs`, {
+            method: "POST",
+            body: JSON.stringify({ content: Buffer.from(text + "\n", "utf-8").toString("base64"), encoding: "base64" }),
+          });
+          return { path: e.path, mode: e.mode, type: "blob", sha: created.sha };
+        }
         const blob = await ghJson<{ content: string; encoding: string }>(`/repos/${devRepo}/git/blobs/${e.sha}`);
         const created = await ghJson<{ sha: string }>(`/repos/${clientRepo}/git/blobs`, {
           method: "POST",
           body: JSON.stringify({ content: blob.content, encoding: blob.encoding }),
         });
-        return { path: e.path, mode: e.mode, type: "blob", sha: created.sha } as TreeEntry;
+        return { path: e.path, mode: e.mode, type: "blob", sha: created.sha };
       }),
     );
-    entries.push(...made);
+    entries.push(...made.filter((x): x is TreeEntry => x !== null));
   }
 
   // 3. Дерево + коммит в client. Родитель — текущий HEAD ветки-приёмника (или дефолтной, если ветки нет).

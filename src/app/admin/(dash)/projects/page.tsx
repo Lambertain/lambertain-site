@@ -5,6 +5,7 @@ import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
 import { AddProjectForm } from "./add-form";
 import { ArchiveButton } from "./archive-button";
+import { ProtocolButton } from "./protocol-button";
 import { ui } from "../../ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,8 @@ export default async function ProjectsPage() {
       <div style={ui.monoLabel}>{t(locale, "projects.kicker")}</div>
       <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "projects.title")}</h1>
       <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12, maxWidth: 560 }}>{t(locale, "projects.hint")}</p>
+
+      <div style={{ marginTop: 14 }}><ProtocolButton /></div>
 
       <AddProjectForm locale={locale} />
 
