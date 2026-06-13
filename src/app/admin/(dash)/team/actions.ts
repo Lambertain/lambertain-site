@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { sendTo } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
@@ -83,6 +83,20 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
     } else {
       await setDevProjects(login, keys);
     }
+    revalidatePath("/admin/team");
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Удалить пользователя из портала (отвязка от бота/проектов, удаление member). */
+export async function deleteUser(login: string): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    if (!login) return { error: "no login" };
+    await deleteMember(login);
     revalidatePath("/admin/team");
     revalidatePath("/admin");
     return { ok: true };

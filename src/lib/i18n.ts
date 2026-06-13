@@ -422,6 +422,9 @@ export const DICT: Record<string, Entry> = {
   "users.title": { uk: "Користувачі", ru: "Пользователи", en: "Users" },
   "users.empty": { uk: "Поки ніхто не приєднався.", ru: "Пока никто не присоединился.", en: "Nobody has joined yet." },
   "users.alias": { uk: "Імʼя (бачите тільки ви)", ru: "Имя (видите только вы)", en: "Name (only you see it)" },
+  "users.delete": { uk: "Видалити користувача", ru: "Удалить пользователя", en: "Delete user" },
+  "users.deleteConfirm": { uk: "Видалити безповоротно? Доступ і привʼязки зникнуть (історія задач збережеться).", ru: "Удалить безвозвратно? Доступ и привязки исчезнут (история задач сохранится).", en: "Delete permanently? Access and links will be removed (task history is kept)." },
+  "users.deleteYes": { uk: "Так, видалити", ru: "Да, удалить", en: "Yes, delete" },
 
   // — перенос истории (старый ник YouTrack → новый tg-пользователь) —
   "relink.kicker": { uk: "Старі ніки YouTrack", ru: "Старые ники YouTrack", en: "Former YouTrack logins" },

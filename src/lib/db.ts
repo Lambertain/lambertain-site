@@ -188,6 +188,23 @@ export async function projectHasClient(projectKey: string): Promise<boolean> {
   return (rows[0]?.n ?? 0) > 0;
 }
 
+/**
+ * Удалить пользователя из портала: отвязка от бота, проектов и ролей, удаление member.
+ * Ссылки в задачах/комментах обнуляются (авторство сохраняется через orig_author_login/orig_*).
+ */
+export async function deleteMember(login: string): Promise<void> {
+  const m = await q<{ id: number; tg_id: number | null }>("SELECT id FROM members WHERE login = $1", [login]);
+  if (!m[0]) return;
+  const id = m[0].id;
+  await q("UPDATE tasks SET assignee_id = NULL WHERE assignee_id = $1", [id]);
+  await q("UPDATE tasks SET reporter_id = NULL WHERE reporter_id = $1", [id]);
+  await q("UPDATE comments SET author_id = NULL WHERE author_id = $1", [id]);
+  await q("DELETE FROM member_projects WHERE login = $1", [login]);
+  await q("DELETE FROM tg_links WHERE youtrack_login = $1", [login]);
+  await q("DELETE FROM role_overrides WHERE login = $1", [login]);
+  await q("DELETE FROM members WHERE id = $1", [id]);
+}
+
 /** Сменить статус утверждения задачи (approved/pending/rejected). */
 export async function setTaskApproval(taskId: string, status: "approved" | "pending" | "rejected"): Promise<void> {
   await q("UPDATE tasks SET approval_status = $2 WHERE readable_id = $1", [taskId, status]);

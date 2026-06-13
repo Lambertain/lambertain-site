@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveUserProjects, renameUser } from "./actions";
+import { saveUserProjects, renameUser, deleteUser } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
 
@@ -24,8 +24,15 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
   const [alias, setAlias] = useState(user.alias ?? "");
   const [savedP, setSavedP] = useState(false);
   const [savedN, setSavedN] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [deleted, setDeleted] = useState(false);
   const [pendP, startP] = useTransition();
   const [pendN, startN] = useTransition();
+  const [pendD, startD] = useTransition();
+
+  function removeUser() {
+    startD(async () => { const r = await deleteUser(user.login); if (!r.error) setDeleted(true); });
+  }
 
   const display = user.alias || user.fullName;
   const projName = (k: string) => projects.find((p) => p.key === k)?.name || k;
@@ -43,6 +50,8 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
   function saveName() {
     startN(async () => { const r = await renameUser(user.login, alias); if (!r.error) setSavedN(true); });
   }
+
+  if (deleted) return null;
 
   return (
     <div style={{ ...ui.card, padding: 0, marginTop: 10, overflow: "hidden" }}>
@@ -114,6 +123,19 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
               {savedP && !dirtyKeys && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "projects.saved")}</span>}
             </div>
           )}
+
+          {/* удаление пользователя (с подтверждением) */}
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {confirmDel ? (
+              <>
+                <span style={{ ...ui.monoLabel, textTransform: "none", color: "#ff5b5b" }}>{t(locale, "users.deleteConfirm")}</span>
+                <button onClick={removeUser} disabled={pendD} style={{ ...ui.monoLabel, color: "#fff", background: "#ff5b5b", border: "none", padding: "6px 12px", cursor: "pointer", borderRadius: 2, opacity: pendD ? 0.5 : 1 }}>{pendD ? "…" : t(locale, "users.deleteYes")}</button>
+                <button onClick={() => setConfirmDel(false)} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "1px solid var(--border-2)", padding: "6px 12px", cursor: "pointer", borderRadius: 2 }}>{t(locale, "common.cancel")}</button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmDel(true)} style={{ ...ui.monoLabel, color: "#ff5b5b", background: "transparent", border: "1px solid #ff5b5b", padding: "6px 12px", cursor: "pointer", borderRadius: 2 }}>{t(locale, "users.delete")}</button>
+            )}
+          </div>
         </div>
       )}
     </div>
