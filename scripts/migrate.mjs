@@ -65,8 +65,11 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS alias TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_ref TEXT;
--- Состояние ИИ-проработки задачи: pending (готовит спеку) | waiting (ждёт ответа клиента) | done | NULL (без проработки).
+-- Состояние ИИ-проработки задачи: pending (триаж) | waiting (ждёт ответа клиента) | done | NULL.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ai_status TEXT;
+-- Теги триажа: { type, complexity: small|feature, skills: [slug,...] } — портал не читает репо,
+-- Claude разработчика по тегам подключает скилы и применяет spec-kit адаптивно.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tags JSONB;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

@@ -572,6 +572,20 @@ export async function getTaskAiStatus(readableId: string): Promise<string | null
   const rows = await q<{ ai_status: string | null }>("SELECT ai_status FROM tasks WHERE readable_id = $1", [readableId]);
   return rows[0]?.ai_status ?? null;
 }
+/** Теги триажа задачи: тип, сложность, скилы для подключения на стороне разработчика. */
+export interface TaskTags {
+  type?: string;
+  complexity?: "small" | "feature";
+  skills?: string[];
+}
+export async function setTaskTags(readableId: string, tags: TaskTags): Promise<void> {
+  await q("UPDATE tasks SET tags = $2 WHERE readable_id = $1", [readableId, JSON.stringify(tags)]);
+}
+export async function getTaskTags(readableId: string): Promise<TaskTags | null> {
+  const rows = await q<{ tags: TaskTags | null }>("SELECT tags FROM tasks WHERE readable_id = $1", [readableId]);
+  return rows[0]?.tags ?? null;
+}
+
 /** readable_id задач, ожидающих проработки (страховка для поллера/ретрая). */
 export async function getAiPendingTasks(): Promise<string[]> {
   const rows = await q<{ readable_id: string }>("SELECT readable_id FROM tasks WHERE ai_status = 'pending' ORDER BY updated_at ASC LIMIT 20");
@@ -752,6 +766,12 @@ export async function getSkill(slug: string): Promise<Skill | null> {
     [slug],
   );
   return rows[0] ?? null;
+}
+
+/** Скилы по набору slug'ов (для /api/dev/skills — Claude разработчика грузит плейбуки по тегам). */
+export async function getSkillsBySlugs(slugs: string[]): Promise<Skill[]> {
+  if (!slugs.length) return [];
+  return q<Skill>("SELECT slug, title, triggers, playbook, auto_generated FROM skills WHERE slug = ANY($1::text[])", [slugs]);
 }
 
 export async function createSkill(
