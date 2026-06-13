@@ -13,6 +13,9 @@ export default function LoginPage() {
   const [locale, setLocale] = useState<Locale>("uk");
 
   useEffect(() => {
+    // Локаль читаем из браузера ТОЛЬКО после монтирования: lazy-init в useState дал бы hydration mismatch
+    // (сервер не знает navigator/localStorage и отрендерил бы дефолт).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocale(detectClientLocale());
   }, []);
 

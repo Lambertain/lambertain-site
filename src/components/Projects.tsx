@@ -13,7 +13,8 @@ export default function Projects() {
   const toggle = (num: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(num) ? next.delete(num) : next.add(num);
+      if (next.has(num)) next.delete(num);
+      else next.add(num);
       return next;
     });
   };
