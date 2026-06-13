@@ -6,7 +6,7 @@ import { getBackend } from "@/lib/tasks";
 import { taskDiff } from "@/lib/review";
 import { draftClientAnswer } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { getTaskAiStatus, setTaskAiStatus, updateTaskFields } from "@/lib/db";
+import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
@@ -15,14 +15,21 @@ export async function addTaskComment(
   id: string,
   text: string,
   visibleToClient?: boolean,
+  attachments?: { localId: string; mime: string; data: string; name: string; image: boolean }[],
 ): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
-  if (!text.trim()) return { error: "Пустой комментарий" };
+  if (!text.trim() && !attachments?.length) return { error: "Пустой комментарий" };
   // Клиент всегда пишет клиенту видимый коммент. Команда выбирает: по умолчанию внутренний.
   const visibility: "client" | "internal" = me.role === "client" ? "client" : visibleToClient ? "client" : "internal";
   try {
-    await getBackend().addComment(id, text, visibility);
+    // Сохраняем вложения и подставляем реальные ссылки вместо маркеров att:<localId>.
+    let body = text;
+    for (const a of attachments ?? []) {
+      const aid = await saveAttachment(id, a.mime, a.data, a.name);
+      if (aid) body = body.replaceAll(`att:${a.localId}`, `/api/files/${aid}`);
+    }
+    await getBackend().addComment(id, body, visibility);
     revalidatePath(`/admin/tasks/${id}`);
     // Клиент ответил: возобновить ИИ-триаж (если ждал) и разблокировать задачу (если была Blocked из-за эскалации).
     if (me.role === "client") {
@@ -39,18 +46,18 @@ export async function addTaskComment(
     // Уведомления (best-effort): адресно по ролям + картинки задачи.
     try {
       const task = await getBackend().getTask(id);
-      const imgs = attachmentIdsIn(text, task.description);
+      const imgs = attachmentIdsIn(body, task.description);
       const projName = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey)?.name || task.projectKey;
       if (me.role === "client") {
         // Клиент написал → ответственному разработчику + админу.
-        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${id}: ${task.summary}\n${text.slice(0, 400)}`, imgs);
+        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs);
         await notifyAdmin(`💬 <b>Вопрос клиента</b>\nПроект «${projName}»\n${id}: ${task.summary}`);
       } else if (visibility === "client") {
         // Команда ответила клиенту → клиенту/сотруднику проекта.
-        await notifyProjectClients(task.projectKey, `💬 <b>${id}</b>: ${task.summary}\n${text.slice(0, 400)}`, imgs);
+        await notifyProjectClients(task.projectKey, `💬 <b>${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs);
       } else if (task.assignee?.login && task.assignee.login !== me.youtrackLogin) {
         // Внутренний коммент → ответственному разработчику.
-        await notifyLogins([task.assignee.login], `📝 <b>${id}</b> (внутр.): ${text.slice(0, 300)}`, imgs);
+        await notifyLogins([task.assignee.login], `📝 <b>${id}</b> (внутр.): ${body.slice(0, 300)}`, imgs);
       }
     } catch {
       // уведомления не должны валить коммент

@@ -62,11 +62,14 @@ export default async function TasksPage() {
         blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
       };
     });
-    const projectsWithNew = projects.map((p) => {
-      const seen = projectSeen.get(p.key) ?? 0;
-      const hasNew = tasks.some((tk) => tk.projectKey === p.key && Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen);
-      return { key: p.key, name: p.name, hasNew };
-    });
+    const fbSet = new Set(projectsList.filter((p) => p.meta.feedback).map((p) => p.key));
+    const projectsWithNew = projects
+      .map((p) => {
+        const seen = projectSeen.get(p.key) ?? 0;
+        const hasNew = tasks.some((tk) => tk.projectKey === p.key && Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen);
+        return { key: p.key, name: p.name, hasNew };
+      })
+      .sort((a, b) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0));
 
     return (
       <div>

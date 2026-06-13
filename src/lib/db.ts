@@ -4,6 +4,7 @@
  * Server-side only.
  */
 import { Pool } from "pg";
+import { randomBytes } from "node:crypto";
 import type { Role } from "./tasks/types";
 
 declare global {
@@ -665,6 +666,19 @@ export async function saveOnboardingMedia(mime: string, base64: string): Promise
 export async function getOnboardingMedia(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
   const rows = await q<{ mime: string | null; data: Buffer }>("SELECT mime, data FROM onboarding_media WHERE id = $1", [id]);
   return rows[0] ?? null;
+}
+
+/** Сохранить один файл-вложение к задаче (любой mime) → id для /api/files/<id>. Имя уникализируем. */
+export async function saveAttachment(readableId: string, mime: string, base64: string, name: string): Promise<number | null> {
+  const rows = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [readableId]);
+  if (!rows[0]) return null;
+  const buf = Buffer.from(base64, "base64");
+  const uniq = `${(name || "file").slice(0, 40)}-${randomBytes(4).toString("hex")}`;
+  const ins = await q<{ id: number }>(
+    "INSERT INTO attachments (task_id, name, mime, data) VALUES ($1,$2,$3,$4) RETURNING id",
+    [rows[0].id, uniq, mime, buf],
+  );
+  return ins[0].id;
 }
 
 // ---- Вложения (картинки задач, скачанные из YouTrack) ----

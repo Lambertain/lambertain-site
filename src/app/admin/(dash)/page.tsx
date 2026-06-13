@@ -104,13 +104,17 @@ export default async function HomePage() {
   });
 
   // Метка New на проекте: активность задач позже последнего открытия проекта.
-  const projectsWithNew = projects.map((p) => {
-    const seen = projectSeen.get(p.key) ?? 0;
-    const hasNew = filtered.some(
-      (tk) => tk.projectKey === p.key && Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen,
-    );
-    return { key: p.key, name: p.name, hasNew };
-  });
+  // Фидбек-проект (Lamb.dev) — всегда последним табом; первым — основной проект пользователя.
+  const fbSet = new Set(all.filter((p) => p.meta.feedback).map((p) => p.key));
+  const projectsWithNew = projects
+    .map((p) => {
+      const seen = projectSeen.get(p.key) ?? 0;
+      const hasNew = filtered.some(
+        (tk) => tk.projectKey === p.key && Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen,
+      );
+      return { key: p.key, name: p.name, hasNew };
+    })
+    .sort((a, b) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0));
 
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
   const canDelete = me.realRole === "admin" || me.role === "client";
