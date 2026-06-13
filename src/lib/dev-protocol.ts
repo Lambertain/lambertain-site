@@ -9,10 +9,25 @@ export const PUBLIC_SITE = "https://www.lambertain.site";
 /** Маркер коммента-вопроса клиенту (эскалация) — по нему портал и Claude находят ожидающие вопросы. */
 export const ESCALATION_MARK = "🟡 Вопрос:";
 
-/** Markdown-блок с протоколом для CLAUDE.md дев-репо (между маркерами — для идемпотентной раскладки). */
+/**
+ * КОРОТКИЙ бутстрап для CLAUDE.md дев-репо. Полный протокол НЕ хранится в репо — он отдаётся живьём
+ * через /api/dev/protocol, поэтому правки протокола применяются у всех мгновенно (без git pull).
+ */
 export function protocolBlock(token: string, projectKey: string, base = PORTAL_BASE): string {
   return `<!-- LAMBERTAIN-PROTOCOL:START -->
 ## Протокол задач Lambertain (для Claude Code)
+
+Проект ведётся в PM-портале Lambertain. **В НАЧАЛЕ КАЖДОЙ СЕССИИ получи актуальный протокол и следуй ему** —
+он всегда свежий и приоритетнее любого текста ниже:
+\`curl -s -H "Authorization: Bearer ${token}" "${base}/api/dev/protocol"\`
+
+Project: \`${projectKey}\` · Token: \`${token}\` (в публичный код не коммитить).
+<!-- LAMBERTAIN-PROTOCOL:END -->`;
+}
+
+/** ПОЛНЫЙ текст протокола (отдаётся через /api/dev/protocol; единый живой источник). */
+export function protocolBody(token: string, projectKey: string, base = PORTAL_BASE): string {
+  return `## Протокол задач Lambertain (для Claude Code)
 
 Проект ведётся в PM-портале Lambertain. Портал делает только лёгкий триаж (требование + теги) — спеку и
 реализацию делаешь ТЫ здесь, с полным доступом к репозиторию. Работай по протоколу, не дожидаясь настройки.
@@ -39,7 +54,5 @@ export function protocolBlock(token: string, projectKey: string, base = PORTAL_B
    - отправь: \`curl -s -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json; charset=utf-8" --data-binary @esc.json "${base}/api/dev/escalate"\`
 6. **Перед продолжением перечитывай задачу** (\`?id=\`): \`awaitingClient: true\` — ещё ждём ответа; \`lastClientAnswer\` — ответ клиента. Продолжай по нему.
 
-Токен проекта — ниже; в публичный код не коммитить.
-Project: \`${projectKey}\` · Token: \`${token}\`
-<!-- LAMBERTAIN-PROTOCOL:END -->`;
+Токен проекта: \`${token}\` (Project \`${projectKey}\`) — в публичный код не коммитить.`;
 }
