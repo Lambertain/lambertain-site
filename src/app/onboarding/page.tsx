@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getPrincipal } from "@/lib/principal";
 import { getOnboarding, getOnboardingValues } from "@/lib/db";
@@ -22,6 +23,9 @@ export default async function OnboardingPage() {
   return (
     <main style={{ minHeight: "100dvh", background: "var(--bg)", color: "var(--text)", padding: "clamp(24px,6vw,56px) 18px" }}>
       <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        <Link href="/admin" style={{ fontFamily: "var(--font-mono)", fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", textDecoration: "none", display: "inline-block", marginBottom: 18 }}>
+          ← На портал
+        </Link>
         <div style={{ fontFamily: "var(--font-display)", fontSize: 26, letterSpacing: "0.08em" }}>
           LAMB<span style={{ color: "var(--accent)" }}>.</span>
         </div>
