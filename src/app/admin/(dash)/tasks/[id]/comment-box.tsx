@@ -45,6 +45,11 @@ export function CommentBox({ id, locale, canChooseVisibility }: { id: string; lo
     const files = Array.from(e.clipboardData.files);
     if (files.length) { e.preventDefault(); addFiles(files); }
   }
+  function onDrop(e: React.DragEvent) {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) { e.preventDefault(); addFiles(files); }
+  }
+  function onDragOver(e: React.DragEvent) { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }
 
   function removeAtt(localId: string) {
     setAtts((p) => p.filter((a) => a.localId !== localId));
@@ -64,7 +69,7 @@ export function CommentBox({ id, locale, canChooseVisibility }: { id: string; lo
   return (
     <div style={{ marginTop: 16 }}>
       <label style={ui.fieldLabel}>{t(locale, "task.addComment")}</label>
-      <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} rows={3} style={{ ...ui.input, resize: "vertical" }} />
+      <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} rows={3} style={{ ...ui.input, resize: "vertical" }} />
 
       {atts.length > 0 && (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>

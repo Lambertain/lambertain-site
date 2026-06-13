@@ -529,13 +529,16 @@ export async function relinkMember(origLogin: string, newLogin: string): Promise
   return { comments: c.length, assignee: a.length, reporter: r.length };
 }
 
-/** Блок запроса: текст или картинка (base64). Порядок блоков = хронология ввода клиента. */
-export type ReqBlock = { type: "text"; text: string } | { type: "image"; mime: string; data: string };
+/** Блок запроса: текст, картинка или файл (base64). Порядок блоков = хронология ввода. */
+export type ReqBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; mime: string; data: string }
+  | { type: "file"; mime: string; data: string; name: string };
 
 /**
- * Дописать блоки запроса в описание задачи С СОХРАНЕНИЕМ ПОРЯДКА: текст идёт как Markdown,
- * картинки сохраняются в attachments и вставляются ![](/api/files/id) на своих местах
- * (чтобы было видно, какой скрин к какому тексту относится).
+ * Дописать блоки запроса в описание задачи С СОХРАНЕНИЕМ ПОРЯДКА: текст — Markdown,
+ * картинки/файлы сохраняются в attachments и вставляются на своих местах
+ * (![](/api/files/id) для картинок, [имя](/api/files/id) для файлов).
  */
 export async function appendRequestBlocks(readableId: string, blocks: ReqBlock[]): Promise<void> {
   if (!blocks.length) return;
@@ -544,24 +547,34 @@ export async function appendRequestBlocks(readableId: string, blocks: ReqBlock[]
     [readableId],
   );
   if (!rows[0]) return;
+  const taskId = rows[0].id;
   const parts: string[] = rows[0].description?.trim() ? [rows[0].description.trim()] : [];
   let i = 1;
   for (const b of blocks) {
     if (b.type === "text") {
       if (b.text.trim()) parts.push(b.text.trim());
-    } else {
-      const buf = Buffer.from(b.data, "base64");
+      continue;
+    }
+    const buf = Buffer.from(b.data, "base64");
+    if (b.type === "image") {
       const ext = (b.mime.split("/")[1] || "png").replace("jpeg", "jpg");
       const ins = await q<{ id: number }>(
         `INSERT INTO attachments (task_id, name, mime, data) VALUES ($1,$2,$3,$4)
          ON CONFLICT (task_id, name) DO UPDATE SET data=EXCLUDED.data RETURNING id`,
-        [rows[0].id, `screen-${i}.${ext}`, b.mime, buf],
+        [taskId, `screen-${i}.${ext}`, b.mime, buf],
       );
       parts.push(`![](/api/files/${ins[0].id})`);
       i++;
+    } else {
+      const uniq = `${(b.name || "file").slice(0, 40)}-${randomBytes(4).toString("hex")}`;
+      const ins = await q<{ id: number }>(
+        "INSERT INTO attachments (task_id, name, mime, data) VALUES ($1,$2,$3,$4) RETURNING id",
+        [taskId, uniq, b.mime, buf],
+      );
+      parts.push(`[${b.name || "файл"}](/api/files/${ins[0].id})`);
     }
   }
-  await q("UPDATE tasks SET description = $2 WHERE id = $1", [rows[0].id, parts.join("\n\n")]);
+  await q("UPDATE tasks SET description = $2 WHERE id = $1", [taskId, parts.join("\n\n")]);
 }
 
 // ---- ИИ-проработка задач (drafter) ----
