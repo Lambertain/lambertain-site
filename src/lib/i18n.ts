@@ -395,6 +395,14 @@ export const DICT: Record<string, Entry> = {
   "proj.noAccounts": { uk: "Акаунтів ще немає.", ru: "Аккаунтов пока нет.", en: "No accounts yet." },
   "proj.myProjects": { uk: "Мої проєкти", ru: "Мои проекты", en: "My projects" },
   "welcome.joined": { uk: "👋 Вітаємо! Ви приєдналися до порталу Lambertain як {role}. Відкрийте застосунок — задачі, проєкти та доступи там.", ru: "👋 Добро пожаловать! Вы присоединились к порталу Lambertain как {role}. Откройте приложение — задачи, проекты и доступы там.", en: "👋 Welcome! You've joined the Lambertain portal as {role}. Open the app — tasks, projects and access are there." },
+  "kickoff.title": { uk: "Старт проєкту: спека → задачі", ru: "Старт проекта: спека → задачи", en: "Project kickoff: spec → tasks" },
+  "kickoff.hint": { uk: "Вставте повну спеку/роадмеп — розіб'ю на послідовність зв'язаних задач (із залежностями і тегами) для розробника.", ru: "Вставьте полную спеку/роадмап — разобью на последовательность связанных задач (с зависимостями и тегами) для разработчика.", en: "Paste the full spec/roadmap — I'll split it into a sequence of linked tasks (with dependencies and tags) for the developer." },
+  "kickoff.specPh": { uk: "Повна спека проєкту з роадмепом і чеклістом…", ru: "Полная спека проекта с роадмапом и чеклистом…", en: "Full project spec with roadmap and checklist…" },
+  "kickoff.decompose": { uk: "Розбити на задачі", ru: "Разбить на задачи", en: "Split into tasks" },
+  "kickoff.proposed": { uk: "Запропоновані задачі", ru: "Предложенные задачи", en: "Proposed tasks" },
+  "kickoff.deps": { uk: "після", ru: "после", en: "after" },
+  "kickoff.create": { uk: "Створити {n} задач", ru: "Создать {n} задач", en: "Create {n} tasks" },
+  "kickoff.created": { uk: "Створено задач: {n}. Розробник отримав сповіщення.", ru: "Создано задач: {n}. Разработчик получил уведомление.", en: "Created {n} tasks. The developer was notified." },
   "gender.warn": { uk: "Жіночий рід: {words}. Клієнт спілкується нібито напряму з агентством — пишіть у чоловічому роді.", ru: "Женский род: {words}. Клиент общается как будто напрямую с агентством — пишите в мужском роде.", en: "Feminine gender: {words}. The client thinks they talk to the agency directly — write in masculine." },
 
   // — ревью кода (ИИ, on-demand) —

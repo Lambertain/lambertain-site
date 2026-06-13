@@ -1,7 +1,10 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps } from "@/lib/db";
+import { getBackend } from "@/lib/tasks";
+import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
+import { notifyLogins } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 
 type Cred = { role?: string; env?: string; login?: string; pass?: string };
@@ -24,5 +27,56 @@ export async function saveCredentials(projectKey: string, credentials: Cred[]): 
     return { ok: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Старт проекта: разбить спеку на задачи (превью, без создания). Admin. */
+export async function proposeTasksFromSpec(projectKey: string, spec: string): Promise<{ tasks?: KickoffTask[]; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  if (!spec.trim()) return { error: "Пустая спека" };
+  try {
+    const p = await getProjectFull(projectKey);
+    if (!p) return { error: "Проект не найден" };
+    const tasks = await decomposeSpec(spec, p.name);
+    return { tasks };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка декомпозиции" };
+  }
+}
+
+/** Создать предложенные kickoff-задачи с зависимостями и тегами (assign — ответственный по проекту). Admin. */
+export async function createKickoffTasks(projectKey: string, tasks: KickoffTask[]): Promise<{ created?: number; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  if (!tasks.length) return { error: "Нет задач" };
+  try {
+    const be = getBackend();
+    const project = (await be.listProjects()).find((p) => p.key === projectKey);
+    const assignee = project?.meta.defaultAssignee || null;
+    const ids: string[] = [];
+    for (const tk of tasks) {
+      const task = await be.createTask({
+        projectKey,
+        summary: tk.summary,
+        description: tk.description || "",
+        assigneeLogin: assignee,
+        reporterLogin: me.youtrackLogin ?? null,
+        approvalStatus: "approved",
+      });
+      await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (tk.skills || []).filter(Boolean) });
+      await setTaskAiStatus(task.id, "done"); // уже размечено — отдельный триаж не нужен
+      ids.push(task.id);
+    }
+    // Зависимости (правильный порядок выполнения).
+    for (let i = 0; i < tasks.length; i++) {
+      const deps = (tasks[i].dependsOn || []).filter((j) => j >= 0 && j < ids.length && j !== i).map((j) => ids[j]);
+      if (deps.length) await setTaskDeps(ids[i], deps).catch(() => {});
+    }
+    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${project?.name || projectKey}: ${ids.length} задач(и). Делай по порядку — блокеры расставлены.`).catch(() => {});
+    revalidatePath("/admin");
+    return { created: ids.length };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка создания" };
   }
 }
