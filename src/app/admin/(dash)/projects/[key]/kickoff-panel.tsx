@@ -25,7 +25,7 @@ export function KickoffPanel({ projectKey, locale }: { projectKey: string; local
     if (!tasks) return;
     setError(null);
     start(async () => {
-      const r = await createKickoffTasks(projectKey, tasks);
+      const r = await createKickoffTasks(projectKey, tasks, spec);
       if (r.error) setError(r.error);
       else { setCreatedN(r.created ?? 0); setTasks(null); setSpec(""); }
     });

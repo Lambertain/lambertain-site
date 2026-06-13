@@ -39,8 +39,10 @@ export interface ProjectMeta {
   credentials?: Array<{ role?: string; env?: string; login?: string; pass?: string }>;
   design?: string;
   deploy?: { prodBranch?: string; devBranch?: string };
-  /** Конвенции/правила проекта для интейка (для проектов с клиентским репо, где CLAUDE.md в .gitignore). */
+  /** Конвенции/правила проекта (легаси; основной источник — CLAUDE.md дев-репо). */
   conventions?: string;
+  /** Полная спека/роадмэп проекта — общий контекст для Claude разработчика (отдаётся через dev-API). */
+  spec?: string;
   /** Логин ответственного разработчика (один на проект): автоназначение + видимость + группировка дашборда. */
   defaultAssignee?: string;
   /** Показать клиенту онбординг-инструкцию при входе (ставится из инвайта, снимается по завершении). */

@@ -65,6 +65,7 @@ export function MetaForm({
   const [prodBranch, setProdBranch] = useState(m.deploy?.prodBranch ?? "");
   const [devBranch, setDevBranch] = useState(m.deploy?.devBranch ?? "");
   const [design, setDesign] = useState(m.design ?? "");
+  const [spec, setSpec] = useState(m.spec ?? "");
   const [creds, setCreds] = useState(credsToText(m));
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +81,7 @@ export function MetaForm({
       apps: { prod: { url: prodUrl || undefined, host: "" }, dev: { url: devUrl || undefined, host: "" } },
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
       design: design || undefined,
+      spec: spec || undefined,
       conventions: m.conventions || undefined, // поле убрано из формы; сохранённое значение не теряем
       defaultAssignee: defaultAssignee || undefined,
       cost: cost.trim() !== "" && Number.isFinite(Number(cost)) ? Number(cost) : undefined,
@@ -188,6 +190,12 @@ export function MetaForm({
           <Field label={t(locale, "projects.cdService")} value={cdService} onChange={setCdService} />
           <Field label={t(locale, "projects.cdPg")} value={cdPg} onChange={setCdPg} />
         </div>
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <label style={ui.fieldLabel}>{t(locale, "projects.spec")}</label>
+        <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.specHint")}</div>
+        <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={10} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
       </div>
 
       <div style={{ marginTop: 18 }}>

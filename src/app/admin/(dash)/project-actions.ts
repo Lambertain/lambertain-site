@@ -46,7 +46,7 @@ export async function proposeTasksFromSpec(projectKey: string, spec: string): Pr
 }
 
 /** Создать предложенные kickoff-задачи с зависимостями и тегами (assign — ответственный по проекту). Admin. */
-export async function createKickoffTasks(projectKey: string, tasks: KickoffTask[]): Promise<{ created?: number; error?: string }> {
+export async function createKickoffTasks(projectKey: string, tasks: KickoffTask[], spec?: string): Promise<{ created?: number; error?: string }> {
   const me = await getPrincipal();
   if (!me || me.realRole !== "admin") return { error: "Нет прав" };
   if (!tasks.length) return { error: "Нет задач" };
@@ -54,6 +54,11 @@ export async function createKickoffTasks(projectKey: string, tasks: KickoffTask[
     const be = getBackend();
     const project = (await be.listProjects()).find((p) => p.key === projectKey);
     const assignee = project?.meta.defaultAssignee || null;
+    // Сохраняем полную спеку на проекте — Claude разработчика читает её как общий контекст (через dev-API).
+    if (spec?.trim()) {
+      const full = await getProjectFull(projectKey);
+      if (full) await setProjectMeta(projectKey, full.name, { ...full.meta, spec: spec.trim() });
+    }
     const ids: string[] = [];
     for (const tk of tasks) {
       const task = await be.createTask({

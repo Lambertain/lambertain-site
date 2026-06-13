@@ -6,7 +6,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken, getTaskTags } from "@/lib/db";
+import { getProjectKeyByToken, getTaskTags, getProjectFull } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { ESCALATION_MARK } from "@/lib/dev-protocol";
 
@@ -30,15 +30,16 @@ export async function GET(req: Request) {
     if (!id.startsWith(projectKey + "-")) {
       return NextResponse.json({ error: "task not in project" }, { status: 403 });
     }
-    const [task, comments, tags] = await Promise.all([be.getTask(id), be.getComments(id), getTaskTags(id)]);
+    const [task, comments, tags, proj] = await Promise.all([be.getTask(id), be.getComments(id), getTaskTags(id), getProjectFull(projectKey)]);
     // Эскалации (вопросы клиенту) и ответы клиента — чтобы Claude понимал, на что уже ответили.
     const escalations = comments.filter((c) => c.text.startsWith(ESCALATION_MARK));
     const lastEsc = escalations[escalations.length - 1];
     const clientAfter = lastEsc ? comments.filter((c) => c.author.role === "client" && c.created > lastEsc.created) : [];
     const awaitingClient = !!lastEsc && clientAfter.length === 0;
     const lastClientAnswer = clientAfter.length ? clientAfter[clientAfter.length - 1].text : null;
+    // projectSpec — ПОЛНАЯ спека проекта (общий контекст; читай ДО эскалаций — там почти всё).
     // tags: { type, complexity (small|feature), skills:[slug] } — по skills тяни плейбуки из /api/dev/skills.
-    return NextResponse.json({ task, tags, comments, awaitingClient, lastClientAnswer });
+    return NextResponse.json({ task, tags, projectSpec: proj?.meta.spec || null, comments, awaitingClient, lastClientAnswer });
   }
 
   // Список задач проекта.

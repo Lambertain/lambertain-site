@@ -312,6 +312,8 @@ export const DICT: Record<string, Entry> = {
   "projects.devBranch": { uk: "Гілка dev", ru: "Ветка dev", en: "Dev branch" },
   "projects.design": { uk: "Дизайн (Figma)", ru: "Дизайн (Figma)", en: "Design (Figma)" },
   "projects.creds": { uk: "Доступи (рядок: роль|env|логін|пароль)", ru: "Доступы (строка: роль|env|логин|пароль)", en: "Credentials (line: role|env|login|pass)" },
+  "projects.spec": { uk: "Спека проєкту", ru: "Спека проекта", en: "Project spec" },
+  "projects.specHint": { uk: "Повна спека/роадмеп — загальний контекст. Claude розробника читає її через dev-API перед роботою (менше зайвих питань).", ru: "Полная спека/роадмап — общий контекст. Claude разработчика читает её через dev-API перед работой (меньше лишних вопросов).", en: "Full spec/roadmap — shared context. The developer's Claude reads it via dev-API before working (fewer questions)." },
   "projects.defaultAssignee": { uk: "Відповідальний (розробник)", ru: "Ответственный (разработчик)", en: "Responsible (developer)" },
   "projects.clientDeploy": { uk: "Деплой клієнта (Railway)", ru: "Деплой клиента (Railway)", en: "Client deploy (Railway)" },
   "projects.clientDeployHint": { uk: "Токен і ID клієнтського Railway — для доставки dev→client: апрув деплою, моніторинг, URL БД для міграції.", ru: "Токен и ID клиентского Railway — для доставки dev→client: апрув деплоя, мониторинг, URL БД для миграции.", en: "Client Railway token and IDs — for dev→client delivery: approve deploy, monitor, DB URL for migration." },

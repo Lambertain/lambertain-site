@@ -10,7 +10,7 @@ import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { draftClientQuestion } from "@/lib/replies";
 import { notifyProjectClients, notifyAdmin, notifyLogins } from "@/lib/notify";
-import { ESCALATION_MARK } from "@/lib/dev-protocol";
+import { ESCALATION_MARK, PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -36,6 +36,8 @@ export async function POST(req: Request) {
   if (!taskId.startsWith(projectKey + "-")) return NextResponse.json({ error: "task not in project" }, { status: 403 });
 
   const be = getBackend();
+  // Кнопка «Открыть задачу» → страница задачи в браузере (где коммент с эскалацией).
+  const openBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
   try {
     const [task, comments] = await Promise.all([be.getTask(taskId), be.getComments(taskId)]);
 
@@ -45,8 +47,8 @@ export async function POST(req: Request) {
       const body = `🔧 Вопрос разработчика (нужно решение):\n\n${question}`;
       await be.addComment(taskId, body, "internal");
       const msg = `🔧 <b>Вопрос разработчика</b> · ${taskId}: ${task.summary}\n${question.slice(0, 400)}`;
-      if (task.reporter?.login) await notifyLogins([task.reporter.login], msg);
-      else await notifyAdmin(msg);
+      if (task.reporter?.login) await notifyLogins([task.reporter.login], msg, [], openBtn);
+      else await notifyAdmin(msg, openBtn);
       return NextResponse.json({ ok: true, escalatedTo: task.reporter?.login || "admin" });
     }
 
@@ -54,7 +56,7 @@ export async function POST(req: Request) {
     const polished = await draftClientQuestion(task, question, comments);
     await be.addComment(taskId, `${ESCALATION_MARK}\n\n${polished}`, "client");
     await be.updateStatus(taskId, "Blocked").catch(() => {});
-    await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${taskId}: ${task.summary}\n${polished.slice(0, 500)}`);
+    await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${taskId}: ${task.summary}\n${polished.slice(0, 500)}`, [], openBtn);
     return NextResponse.json({ ok: true, escalatedTo: "client", posted: polished });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
