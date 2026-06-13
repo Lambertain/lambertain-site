@@ -6,7 +6,8 @@ import { getPrincipal } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
 import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor } from "@/lib/db";
-import { statusBucket } from "@/lib/statuses";
+import { statusBucket, type Bucket } from "@/lib/statuses";
+import { ProjectInfoCard } from "./project-info-card";
 import { nowMs } from "@/lib/now";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -120,8 +121,49 @@ export default async function HomePage() {
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
   const canDelete = me.realRole === "admin" || me.role === "client";
   const canStart = me.realRole === "admin" || me.role === "contributor";
-  // Клиент с незавершённым онбордингом — баннер со ссылкой на инструкцию.
+  const feedbackKey = all.find((p) => p.meta.feedback)?.key;
+  const now = nowMs();
+
+  // Счётчики задач по корзинам + новые для проекта (из доски).
+  const projCounts = (k: string) => {
+    const c: Record<string, number> = { inProgress: 0, review: 0, rework: 0, done: 0, notStarted: 0, blocked: 0 };
+    let nw = 0;
+    for (const b of board) {
+      if (b.projectKey !== k) continue;
+      c[b.blocked ? "blocked" : statusBucket(b.status)]++;
+      if (b.unread) nw++;
+    }
+    return { counts: c as Record<Bucket, number>, newCount: nw };
+  };
+
+  // —— Разработчик: дашборд своих проектов (инфо, прогресс, счётчики, доступы) ——
+  if (me.role === "contributor") {
+    const myProjects = visible.filter((p) => !p.meta.feedback);
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "proj.myProjects")}</h1>
+          <span style={{ marginLeft: "auto" }}>
+            <ChatModal projects={projects} locale={locale} isContributor feedbackKey={feedbackKey} />
+          </span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 18 }}>
+          {myProjects.length === 0 ? (
+            <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "dash.empty")}</p>
+          ) : (
+            myProjects.map((p) => {
+              const { counts, newCount } = projCounts(p.key);
+              return <ProjectInfoCard key={p.key} project={p} canEdit showDevLink counts={counts} newCount={newCount} now={now} locale={locale} />;
+            })
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // —— Клиент: онбординг-баннер + инфо своего проекта (доступы для тестирования) + задачи ——
   const showOnboarding = me.role === "client" && !!visible.find((p) => p.key === me.projectKey)?.meta.showOnboarding;
+  const clientProject = me.role === "client" ? visible.find((p) => !p.meta.feedback) : null;
 
   return (
     <div>
@@ -132,11 +174,15 @@ export default async function HomePage() {
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "onb.bannerCta")}</span>
         </Link>
       )}
+      {clientProject && (
+        <div style={{ marginBottom: 18 }}>
+          <ProjectInfoCard project={clientProject} now={now} locale={locale} />
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, me.role === "contributor" ? "nav.myTasks" : "nav.tasks")}</h1>
-        {/* Кнопка создания: клиент/сотрудник — заявки; разработчик — фидбек по Lamb.dev + запрос админу/вопрос клиенту. */}
+        <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "nav.tasks")}</h1>
         <span style={{ marginLeft: "auto" }}>
-          <ChatModal projects={projects} locale={locale} isContributor={me.role === "contributor"} feedbackKey={all.find((p) => p.meta.feedback)?.key} />
+          <ChatModal projects={projects} locale={locale} feedbackKey={feedbackKey} />
         </span>
       </div>
       <TaskTabs
@@ -147,7 +193,7 @@ export default async function HomePage() {
         canDelete={canDelete}
         canStart={canStart}
         empty={t(locale, "tasks.empty")}
-        feedbackKey={all.find((p) => p.meta.feedback)?.key}
+        feedbackKey={feedbackKey}
       />
     </div>
   );
