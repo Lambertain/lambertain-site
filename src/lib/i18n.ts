@@ -333,8 +333,6 @@ export const DICT: Record<string, Entry> = {
   "deliver.done": { uk: "Доставлено {n} файлів у гілку {branch}", ru: "Доставлено {n} файлов в ветку {branch}", en: "Delivered {n} files to branch {branch}" },
   "deliver.commit": { uk: "Коміт", ru: "Коммит", en: "Commit" },
   "deliver.deploy": { uk: "Деплой клієнта", ru: "Деплой клиента", en: "Client deploy" },
-  "projects.conventions": { uk: "Конвенції / правила (необов'язково)", ru: "Конвенции / правила (необязательно)", en: "Conventions / rules (optional)" },
-  "projects.conventionsHint": { uk: "Можна лишити порожнім. Конвенції проєкту Claude розробника читає з CLAUDE.md дев-репо — це основне джерело.", ru: "Можно оставить пустым. Конвенции проекта Claude разработчика читает из CLAUDE.md дев-репо — это основной источник.", en: "Can be left empty. The developer's Claude reads conventions from the dev-repo CLAUDE.md — that's the main source." },
 
   // — страница задачи —
   "task.back": { uk: "← до задач", ru: "← к задачам", en: "← to tasks" },
