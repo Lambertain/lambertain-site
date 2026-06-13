@@ -221,7 +221,7 @@ export function TaskTabs({
   );
 
   const byBucket = useMemo(() => {
-    const m: Record<Bucket, BoardTask[]> = { inProgress: [], review: [], done: [], notStarted: [], blocked: [] };
+    const m: Record<Bucket, BoardTask[]> = { inProgress: [], review: [], rework: [], done: [], notStarted: [], blocked: [] };
     for (const tk of projTasks) m[tk.blocked ? "blocked" : statusBucket(tk.status)].push(tk);
     return m;
   }, [projTasks]);

@@ -8,6 +8,7 @@ import { draftClientAnswer } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
+import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
 
 export async function addTaskComment(
@@ -23,13 +24,17 @@ export async function addTaskComment(
   try {
     await getBackend().addComment(id, text, visibility);
     revalidatePath(`/admin/tasks/${id}`);
-    // Клиент ответил на уточняющий вопрос ИИ-проработки → возобновить проработку в фоне.
+    // Клиент ответил: возобновить ИИ-триаж (если ждал) и разблокировать задачу (если была Blocked из-за эскалации).
     if (me.role === "client") {
       const ai = await getTaskAiStatus(id).catch(() => null);
       if (ai === "waiting") {
         await setTaskAiStatus(id, "pending").catch(() => {});
         after(() => draftTask(id));
       }
+      try {
+        const t = await getBackend().getTask(id);
+        if (statusBucket(t.state) === "blocked") await getBackend().updateStatus(id, "In Progress");
+      } catch { /* best-effort */ }
     }
     // Уведомления (best-effort): адресно по ролям + картинки задачи.
     try {
@@ -50,6 +55,34 @@ export async function addTaskComment(
     } catch {
       // уведомления не должны валить коммент
     }
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/**
+ * Постановщик проверил задачу в «Ревью»: принять (→ Готово) или вернуть на доработку (→ Доработка).
+ * Право: автор задачи (reporter) или админ.
+ */
+export async function reviewTask(id: string, accept: boolean, note?: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Не авторизован" };
+  const be = getBackend();
+  try {
+    const task = await be.getTask(id);
+    const isReporter = !!me.youtrackLogin && task.reporter?.login === me.youtrackLogin;
+    if (me.realRole !== "admin" && !isReporter) return { error: "Нет прав" };
+    if (accept) {
+      await be.updateStatus(id, "Done");
+      if (task.assignee?.login) await notifyLogins([task.assignee.login], `✅ <b>Принято</b> · ${id}: ${task.summary}`).catch(() => {});
+    } else {
+      await be.updateStatus(id, "Rework");
+      if (note?.trim()) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${note.trim()}`, "internal");
+      if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${id}: ${task.summary}${note?.trim() ? `\n${note.trim().slice(0, 300)}` : ""}`).catch(() => {});
+    }
+    revalidatePath(`/admin/tasks/${id}`);
+    revalidatePath("/admin");
     return { ok: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };

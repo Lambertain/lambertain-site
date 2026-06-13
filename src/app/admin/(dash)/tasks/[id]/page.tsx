@@ -8,6 +8,7 @@ import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
 import { ApprovalBar } from "./approval-bar";
+import { ReviewActions } from "./review-actions";
 import { ClientReply } from "./client-reply";
 import { CommentsView, type ViewComment } from "./comments-view";
 import { RetryDrafting } from "./retry-drafting";
@@ -106,6 +107,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       {task.approvalStatus === "pending" && (
         <ApprovalBar id={task.id} canApprove={isAdmin || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />
+      )}
+
+      {/* Постановщик (или админ) проверяет результат в «Ревью» → принять/на доработку. */}
+      {statusBucket(task.state) === "review" && (isAdmin || (!!me.youtrackLogin && task.reporter?.login === me.youtrackLogin)) && (
+        <ReviewActions id={task.id} locale={locale} />
       )}
 
       {isAdmin && (

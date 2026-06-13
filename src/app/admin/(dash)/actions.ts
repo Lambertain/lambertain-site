@@ -45,18 +45,16 @@ function today(): string {
  */
 export async function createRequestTask(
   projectKey: string,
+  title: string,
   blocks: ReqBlock[],
 ): Promise<{ id?: string; url?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
-  if (!blocks.length) return { error: "Пустой запрос" };
+  if (!title.trim()) return { error: "Пустой заголовок" };
   try {
     const be = getBackend();
     const appr = await approvalFor(me.role, projectKey);
-    // Заголовок — обрезка первой строки текста; ИИ-проработка уточнит его (write_spec.title).
-    const allText = blocks.filter((b) => b.type === "text").map((b) => b.text).join("\n");
-    const firstLine = (allText.split("\n").find((l) => l.trim()) || "Запрос с экрана").trim();
-    const summary = firstLine.length > 70 ? firstLine.slice(0, 67) + "…" : firstLine;
+    const summary = title.trim().slice(0, 120);
     const task = await be.createTask({
       projectKey,
       summary,

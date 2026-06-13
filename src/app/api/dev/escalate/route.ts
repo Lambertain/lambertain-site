@@ -46,9 +46,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, escalatedTo: "admin" });
     }
 
-    // client: оформляем вопрос от лица агентства, постим клиенту, уведомляем.
+    // client: оформляем вопрос от лица агентства, постим клиенту, уведомляем. Задача блокируется до ответа.
     const polished = await draftClientQuestion(task, question, comments);
     await be.addComment(taskId, `${ESCALATION_MARK}\n\n${polished}`, "client");
+    await be.updateStatus(taskId, "Blocked").catch(() => {});
     await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${taskId}: ${task.summary}\n${polished.slice(0, 500)}`);
     return NextResponse.json({ ok: true, escalatedTo: "client", posted: polished });
   } catch (e) {

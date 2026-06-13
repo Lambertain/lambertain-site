@@ -1,0 +1,51 @@
+/**
+ * Смена статуса задачи Claude разработчика по токену проекта.
+ * POST /api/dev/status  { taskId, status: "in_progress" | "review", summary?: string }
+ *  - in_progress: взял задачу в работу
+ *  - review: закончил, отдал постановщику на проверку. summary — что сделано ПРОСТЫМИ
+ *    словами на языке задачи (без терминов) → публикуется клиенту комментарием от Lambertain.
+ * (Done/Rework ставит постановщик в портале; Blocked — портал при эскалации.)
+ * Авторизация: Authorization: Bearer <project_token>
+ */
+import { NextResponse } from "next/server";
+import { getProjectKeyByToken } from "@/lib/db";
+import { getBackend } from "@/lib/tasks";
+import { notifyProjectClients, attachmentIdsIn } from "@/lib/notify";
+
+function bearer(req: Request): string | null {
+  const h = req.headers.get("authorization") || "";
+  return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+}
+
+const MAP: Record<string, string> = { in_progress: "In Progress", review: "Review" };
+
+export async function POST(req: Request) {
+  const token = bearer(req);
+  if (!token) return NextResponse.json({ error: "no token" }, { status: 401 });
+  const projectKey = await getProjectKeyByToken(token);
+  if (!projectKey) return NextResponse.json({ error: "invalid token" }, { status: 403 });
+
+  let body: { taskId?: string; status?: string; summary?: string };
+  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  const taskId = String(body.taskId || "").trim();
+  const status = MAP[String(body.status || "")];
+  const summary = String(body.summary || "").trim();
+  if (!taskId || !status) return NextResponse.json({ error: "taskId and status (in_progress|review) required" }, { status: 400 });
+  if (!taskId.startsWith(projectKey + "-")) return NextResponse.json({ error: "task not in project" }, { status: 403 });
+
+  const be = getBackend();
+  try {
+    await be.updateStatus(taskId, status);
+    // На ревью: краткий итог простыми словами → клиенту (видимый коммент от Lambertain) + уведомление.
+    if (status === "Review" && summary) {
+      await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client");
+      try {
+        const task = await be.getTask(taskId);
+        await notifyProjectClients(projectKey, `✅ <b>Готово до перевірки</b> · ${taskId}: ${task.summary}\n${summary.slice(0, 400)}`, attachmentIdsIn(summary));
+      } catch { /* best-effort */ }
+    }
+    return NextResponse.json({ ok: true, status });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
+  }
+}

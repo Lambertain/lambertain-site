@@ -1,12 +1,13 @@
 /** Набор статусов задачи (для клика-смены) и цвета. */
-export const STATUSES = ["Open", "In Progress", "Review", "Done", "Blocked"] as const;
+export const STATUSES = ["Open", "In Progress", "Review", "Rework", "Done", "Blocked"] as const;
 
 /** Корзина статуса — устойчиво к импортированным/произвольным названиям (по ключевым словам). */
-export type Bucket = "notStarted" | "inProgress" | "review" | "done" | "blocked";
+export type Bucket = "notStarted" | "inProgress" | "review" | "rework" | "done" | "blocked";
 
-/** Сопоставление статуса с корзиной. Порядок проверок важен (done раньше review/progress). */
+/** Сопоставление статуса с корзиной. Порядок проверок важен (done/rework раньше review/progress). */
 export function statusBucket(status: string | undefined | null): Bucket {
   const s = (status || "").toLowerCase();
+  if (/(доработ|rework|переработ)/.test(s)) return "rework";
   if (/(done|закры|готов|fixed|complete|verified|выполн)/.test(s)) return "done";
   if (/(block|заблок|stuck|hold)/.test(s)) return "blocked";
   if (/(verify|review|провер|тест|qa|ревью)/.test(s)) return "review";
@@ -19,17 +20,19 @@ export const BUCKET_STATUS: Record<Bucket, (typeof STATUSES)[number]> = {
   notStarted: "Open",
   inProgress: "In Progress",
   review: "Review",
+  rework: "Rework",
   done: "Done",
   blocked: "Blocked",
 };
 
-/** Порядок табов в UI: что у разраба → ревью → готово → не начатые → заблок. */
-export const BUCKET_ORDER: Bucket[] = ["inProgress", "review", "done", "notStarted", "blocked"];
+/** Порядок табов в UI: в работе → ревью → доработка → готово → не начатые → заблок. */
+export const BUCKET_ORDER: Bucket[] = ["inProgress", "review", "rework", "done", "notStarted", "blocked"];
 
 /** i18n-ключ подписи таба корзины. */
 export const BUCKET_LABEL: Record<Bucket, string> = {
   inProgress: "tab.inProgress",
   review: "tab.review",
+  rework: "tab.rework",
   done: "tab.done",
   notStarted: "tab.notStarted",
   blocked: "tab.blocked",
@@ -41,6 +44,7 @@ export function statusColor(status: string | undefined | null): string {
   if (bucket === "done") return "#b9ff4b"; // зелёный
   if (bucket === "inProgress") return "#5b8def"; // синий
   if (bucket === "review") return "#e8b339"; // жёлтый
+  if (bucket === "rework") return "#f0883e"; // оранжевый
   if (bucket === "blocked") return "#ff5b5b"; // красный
   return "#8a8a8a"; // серый (not started)
 }

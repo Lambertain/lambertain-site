@@ -180,7 +180,9 @@ export const DICT: Record<string, Entry> = {
   "chat.recording": { uk: "Запис…", ru: "Запись…", en: "Recording…" },
   "chat.lockHint": { uk: "вгору — замок, вліво — видалити", ru: "вверх — замок, влево — удалить", en: "up — lock, left — delete" },
   "chat.empty": { uk: "Опишіть задачу. Затисніть кнопку відправки для голосового вводу. Скрін — через Ctrl+V або скріпку.", ru: "Опишите задачу. Зажмите кнопку отправки для голосового ввода. Скрин — через Ctrl+V или скрепку.", en: "Describe the task. Hold the send button for voice input. Paste a screenshot with Ctrl+V or the clip." },
-  "request.placeholder": { uk: "Опишіть, що потрібно зробити. Додайте скріни — Ctrl+V або скріпка.", ru: "Опишите, что нужно сделать. Добавьте скрины — Ctrl+V или скрепка.", en: "Describe what needs to be done. Attach screenshots — Ctrl+V or the clip." },
+  "request.placeholder": { uk: "Введіть або вставте опис задачі…", ru: "Введите или вставьте описание задачи…", en: "Type or paste the task description…" },
+  "request.titlePh": { uk: "Введіть заголовок", ru: "Введите заголовок", en: "Enter a title" },
+  "request.titleRequired": { uk: "Вкажіть заголовок", ru: "Укажите заголовок", en: "Enter a title" },
   "request.submit": { uk: "Створити задачу", ru: "Создать задачу", en: "Create task" },
   "request.sent": { uk: "Прийняв, розберуся з кодом. Можете закрити це вікно — ви отримаєте сповіщення в боті, коли задачу буде поставлено, або якщо знадобиться уточнення.", ru: "Принял, разберусь с кодом. Можете закрыть это окно — вы получите уведомление в бот, когда задача будет поставлена, или если понадобится уточнение.", en: "Got it, I'll dig into the code. You can close this window — you'll get a bot notification when the task is ready, or if I need a clarification." },
   "request.another": { uk: "Створити ще одну", ru: "Создать ещё одну", en: "Create another" },
@@ -198,6 +200,10 @@ export const DICT: Record<string, Entry> = {
   "taskedit.assignee": { uk: "Виконавець", ru: "Исполнитель", en: "Assignee" },
   "taskedit.noAssignee": { uk: "— не призначено —", ru: "— не назначен —", en: "— unassigned —" },
   "taskedit.priority": { uk: "Пріоритет", ru: "Приоритет", en: "Priority" },
+  "review.creatorHint": { uk: "Розробник завершив — перевірте результат і прийміть або поверніть на доопрацювання.", ru: "Разработчик завершил — проверьте результат и примите или верните на доработку.", en: "The developer finished — review the result and accept or send back for rework." },
+  "review.accept": { uk: "Прийняти (Готово)", ru: "Принять (Готово)", en: "Accept (Done)" },
+  "review.rework": { uk: "На доопрацювання", ru: "На доработку", en: "Send to rework" },
+  "review.reworkPh": { uk: "Що доопрацювати (необовʼязково)", ru: "Что доработать (необязательно)", en: "What to rework (optional)" },
 
   // — поля —
   "field.project": { uk: "Проєкт", ru: "Проект", en: "Project" },
@@ -363,6 +369,7 @@ export const DICT: Record<string, Entry> = {
   // — табы статусов —
   "tab.inProgress": { uk: "В роботі", ru: "В работе", en: "In progress" },
   "tab.review": { uk: "Ревʼю", ru: "Ревью", en: "Review" },
+  "tab.rework": { uk: "Доопрацювання", ru: "Доработка", en: "Rework" },
   "tab.done": { uk: "Готово", ru: "Готово", en: "Done" },
   "tab.notStarted": { uk: "Не розпочаті", ru: "Не начатые", en: "Not started" },
   "tab.blocked": { uk: "Заблоковані", ru: "Заблок.", en: "Blocked" },
