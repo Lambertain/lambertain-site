@@ -6,7 +6,7 @@ import { getBackend } from "@/lib/tasks";
 import { taskDiff } from "@/lib/review";
 import { draftClientAnswer } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { getTaskAiStatus, setTaskAiStatus } from "@/lib/db";
+import { getTaskAiStatus, setTaskAiStatus, updateTaskFields } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 
@@ -50,6 +50,28 @@ export async function addTaskComment(
     } catch {
       // уведомления не должны валить коммент
     }
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Редактировать задачу (admin): заголовок, текст запроса, исполнитель, приоритет. */
+export async function editTask(
+  id: string,
+  fields: { summary?: string; description?: string; assigneeLogin?: string | null; priority?: string | null },
+): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  try {
+    await updateTaskFields(id, {
+      title: fields.summary,
+      description: fields.description,
+      assigneeLogin: fields.assigneeLogin,
+      priority: fields.priority,
+    });
+    revalidatePath(`/admin/tasks/${id}`);
+    revalidatePath("/admin");
     return { ok: true };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };

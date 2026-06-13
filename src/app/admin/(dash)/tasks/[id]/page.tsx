@@ -11,6 +11,7 @@ import { ApprovalBar } from "./approval-bar";
 import { ClientReply } from "./client-reply";
 import { CommentsView, type ViewComment } from "./comments-view";
 import { RetryDrafting } from "./retry-drafting";
+import { TaskEdit } from "./task-edit";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
@@ -32,10 +33,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const isAdmin = me.realRole === "admin";
   const backHref = isAdmin ? "/admin/tasks" : "/admin";
 
-  let task, comments, deps, reads, aiStatus;
+  let task, comments, deps, reads, aiStatus, users;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    [task, comments, deps, reads, aiStatus] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), getTaskAiStatus(id)]);
+    [task, comments, deps, reads, aiStatus, users] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), getTaskAiStatus(id), isAdmin ? be.listUsers() : Promise.resolve([])]);
   } catch (e) {
     return (
       <div>
@@ -94,6 +95,19 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       {task.approvalStatus === "pending" && (
         <ApprovalBar id={task.id} canApprove={isAdmin || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />
+      )}
+
+      {isAdmin && (
+        <TaskEdit
+          id={task.id}
+          summary={task.summary}
+          description={task.description ?? ""}
+          priority={task.priority ?? ""}
+          assigneeLogin={task.assignee?.login ?? ""}
+          assignees={users.filter((u) => (u.role === "contributor" || u.role === "admin") && !u.banned).map((u) => ({ login: u.login, fullName: u.alias || u.fullName }))}
+          locale={locale}
+          defaultOpen={task.approvalStatus === "pending"}
+        />
       )}
 
       {blockers.length > 0 && (

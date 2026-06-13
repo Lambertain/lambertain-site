@@ -1,8 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { getPrincipal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus } from "@/lib/db";
+import { draftTask } from "@/lib/drafter";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
@@ -70,6 +72,14 @@ export async function setApproval(id: string, status: "approved" | "rejected"): 
   }
   try {
     await setTaskApproval(id, status);
+    // После утверждения — запускаем ИИ-проработку (если ещё не запускалась). Отклонённую не прорабатываем.
+    if (status === "approved") {
+      const ai = await getTaskAiStatus(id).catch(() => null);
+      if (!ai) {
+        await setTaskAiStatus(id, "pending");
+        after(() => draftTask(id));
+      }
+    }
     revalidatePath(`/admin/tasks/${id}`);
     revalidatePath("/admin");
     return { ok: true };

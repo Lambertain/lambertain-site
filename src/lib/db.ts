@@ -589,6 +589,24 @@ export async function assignTask(readableId: string, login: string): Promise<voi
 export async function setTaskTitle(readableId: string, title: string): Promise<void> {
   await q("UPDATE tasks SET title = $2, updated_at = now() WHERE readable_id = $1", [readableId, title]);
 }
+
+/** Редактирование полей задачи (заголовок, описание, исполнитель, приоритет) — для админа. */
+export async function updateTaskFields(
+  readableId: string,
+  f: { title?: string; description?: string; assigneeLogin?: string | null; priority?: string | null },
+): Promise<void> {
+  const sets: string[] = [];
+  const params: unknown[] = [readableId];
+  if (f.title !== undefined) { params.push(f.title); sets.push(`title = $${params.length}`); }
+  if (f.description !== undefined) { params.push(f.description); sets.push(`description = $${params.length}`); }
+  if (f.priority !== undefined) { params.push(f.priority || null); sets.push(`priority = $${params.length}`); }
+  if (f.assigneeLogin !== undefined) {
+    params.push(f.assigneeLogin || null);
+    sets.push(`assignee_id = (SELECT id FROM members WHERE login = $${params.length})`);
+  }
+  if (!sets.length) return;
+  await q(`UPDATE tasks SET ${sets.join(", ")}, updated_at = now() WHERE readable_id = $1`, params);
+}
 /** Картинки задачи как base64 (для подачи ИИ-проработчику). */
 export async function getTaskImages(readableId: string): Promise<{ mime: string; data: string }[]> {
   const rows = await q<{ mime: string | null; data: Buffer }>(

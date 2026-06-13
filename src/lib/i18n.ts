@@ -191,6 +191,13 @@ export const DICT: Record<string, Entry> = {
   "ai.drafting": { uk: "Lambertain опрацьовує задачу — готує специфікацію.", ru: "Lambertain прорабатывает задачу — готовит спецификацию.", en: "Lambertain is working on the task — preparing the spec." },
   "ai.waiting": { uk: "Lambertain очікує вашої відповіді на уточнення нижче.", ru: "Lambertain ждёт вашего ответа на уточнение ниже.", en: "Lambertain is waiting for your answer to the clarification below." },
   "ai.retry": { uk: "Перепрацювати", ru: "Перепроработать", en: "Re-draft" },
+  "taskedit.edit": { uk: "Редагувати задачу", ru: "Редактировать задачу", en: "Edit task" },
+  "taskedit.title": { uk: "Редагування задачі", ru: "Редактирование задачи", en: "Edit task" },
+  "taskedit.summary": { uk: "Заголовок", ru: "Заголовок", en: "Title" },
+  "taskedit.description": { uk: "Опис / запит", ru: "Описание / запрос", en: "Description / request" },
+  "taskedit.assignee": { uk: "Виконавець", ru: "Исполнитель", en: "Assignee" },
+  "taskedit.noAssignee": { uk: "— не призначено —", ru: "— не назначен —", en: "— unassigned —" },
+  "taskedit.priority": { uk: "Пріоритет", ru: "Приоритет", en: "Priority" },
 
   // — поля —
   "field.project": { uk: "Проєкт", ru: "Проект", en: "Project" },

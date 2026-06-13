@@ -67,10 +67,15 @@ export async function createRequestTask(
       createdByRole: appr.createdByRole,
     });
     await appendRequestBlocks(task.id, blocks);
-    await setTaskAiStatus(task.id, "pending");
-    if (appr.pending && appr.approver) await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
-    // Фоновая проработка: Railway web — long-running, переживает ответ. Страховка — поллер по ai_status='pending'.
-    after(() => draftTask(task.id));
+    if (appr.pending && appr.approver) {
+      // Задача ждёт утверждения (сотрудник в проекте без клиента → админ; с клиентом → клиент).
+      // ИИ-проработку НЕ запускаем — стартует только после апрува (можно отредактировать задачу до этого).
+      await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
+    } else {
+      await setTaskAiStatus(task.id, "pending");
+      // Фоновая проработка: Railway web — long-running, переживает ответ.
+      after(() => draftTask(task.id));
+    }
     return { id: task.id, url: task.url };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка создания" };
