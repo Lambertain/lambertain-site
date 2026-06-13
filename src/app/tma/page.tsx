@@ -24,6 +24,20 @@ export default function TmaPage() {
     return wa.initData as string;
   }
 
+  /**
+   * Запросить у пользователя разрешение боту писать ему (requestWriteAccess).
+   * Нужно, т.к. инвайтнутые открывают Mini App мимо Start у бота — без этого бот
+   * не может слать им уведомления. Если уже разрешено — колбэк сработает сразу без попапа.
+   */
+  function ensureWriteAccess(done: () => void) {
+    // @ts-expect-error — Telegram WebApp SDK
+    const wa = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
+    if (wa?.requestWriteAccess) {
+      try { wa.requestWriteAccess(() => done()); return; } catch { /* fallthrough */ }
+    }
+    done();
+  }
+
   async function authenticate() {
     const initData = getInitData();
     if (!initData) {
@@ -38,7 +52,7 @@ export default function TmaPage() {
         body: JSON.stringify({ initData }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.ok) router.replace("/admin");
+      if (res.ok && data.ok) ensureWriteAccess(() => router.replace("/admin"));
       else if (data.needRole) setPhase("choose_role");
       else {
         setPhase("error");
@@ -61,7 +75,7 @@ export default function TmaPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ initData, role }),
       });
-      if (res.ok) setPhase("requested");
+      if (res.ok) ensureWriteAccess(() => setPhase("requested"));
       else {
         setPhase("error");
         setErrKey("tma.requestFailed");
