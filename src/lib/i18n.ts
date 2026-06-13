@@ -376,6 +376,11 @@ export const DICT: Record<string, Entry> = {
   "tab.startHint": { uk: "Клік — взяти в роботу", ru: "Клик — взять в работу", en: "Click — take to work" },
   "tab.allProjects": { uk: "Усі", ru: "Все", en: "All" },
   "feedback.intro": { uk: "Це простір для ваших побажань щодо порталу: напишіть, чого бракує, що покращити, які функції хотіли б бачити.", ru: "Это пространство для ваших пожеланий по порталу: напишите, чего не хватает, что улучшить, какие функции хотели бы видеть.", en: "This is the space for your feedback about the portal: what's missing, what to improve, features you'd like." },
+  "recipient.label": { uk: "Кому", ru: "Кому", en: "To" },
+  "recipient.admin": { uk: "Адміну", ru: "Админу", en: "Admin" },
+  "recipient.client": { uk: "Клієнту", ru: "Клиенту", en: "Client" },
+  "recipient.adminHint": { uk: "Приватно: доступи, питання щодо проєкту (клієнт не бачить).", ru: "Приватно: доступы, вопросы по проекту (клиент не видит).", en: "Private: access, project questions (client doesn't see)." },
+  "recipient.clientHint": { uk: "Питання клієнту — він побачить задачу і відповість.", ru: "Вопрос клиенту — он увидит задачу и ответит.", en: "A question to the client — they'll see the task and reply." },
 
   // — ревью кода (ИИ, on-demand) —
   "review.refLabel": { uk: "Посилання на коміт/PR/гілку (необовʼязково)", ru: "Ссылка на коммит/PR/ветку (необязательно)", en: "Commit/PR/branch link (optional)" },

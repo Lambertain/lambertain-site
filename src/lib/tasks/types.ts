@@ -89,6 +89,8 @@ export interface Task {
   lastCommentAt?: number | null;
   /** approved | pending | rejected (задачи сотрудника в проектах без клиента ждут утверждения админа). */
   approvalStatus?: string;
+  /** Внутренняя задача (разработчик → админ): клиенту не видна. */
+  internal?: boolean;
 }
 
 export interface Comment {
@@ -138,6 +140,7 @@ export interface TasksBackend {
     priority?: string | null;
     approvalStatus?: "approved" | "pending";
     createdByRole?: Role;
+    internal?: boolean;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
   addComment(id: string, text: string, visibility?: "client" | "internal"): Promise<Comment>;

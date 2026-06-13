@@ -47,6 +47,7 @@ export async function createRequestTask(
   projectKey: string,
   title: string,
   blocks: ReqBlock[],
+  recipient?: "admin" | "client",
 ): Promise<{ id?: string; url?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
@@ -55,11 +56,32 @@ export async function createRequestTask(
     const be = getBackend();
     const project = (await be.listProjects()).find((p) => p.key === projectKey);
     const isFeedback = !!project?.meta.feedback;
-    // Фидбек-проект — без апрува и без ИИ-триажа (это пожелания по порталу, напрямую админу).
+    const summary = title.trim().slice(0, 120);
+
+    // Разработчик создаёт задачу вручную в своём проекте: адресат — админ (приватно, доступы и т.п.) или клиент (вопрос).
+    if (me.role === "contributor" && !isFeedback && (recipient === "admin" || recipient === "client")) {
+      const task = await be.createTask({
+        projectKey,
+        summary,
+        description: "",
+        assigneeLogin: me.youtrackLogin ?? null, // разработчик ведёт ответ
+        reporterLogin: me.youtrackLogin ?? null,
+        approvalStatus: "approved",
+        internal: recipient === "admin", // запрос админу — клиенту не виден
+      });
+      await appendRequestBlocks(task.id, blocks);
+      if (recipient === "admin") {
+        await notifyAdmin(`🔧 <b>Запрос разработчика</b> · проект «${project?.name || projectKey}» · ${task.id}: ${task.summary}`).catch(() => {});
+      } else {
+        await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${task.id}: ${task.summary}`).catch(() => {});
+      }
+      return { id: task.id, url: task.url };
+    }
+
+    // Фидбек-проект — без апрува и без ИИ-триажа (пожелания по порталу, напрямую админу).
     const appr = isFeedback
       ? { approvalStatus: "approved" as const, createdByRole: me.role, pending: false, approver: null }
       : await approvalFor(me.role, projectKey);
-    const summary = title.trim().slice(0, 120);
     const task = await be.createTask({
       projectKey,
       summary,

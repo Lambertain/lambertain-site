@@ -49,7 +49,7 @@ export default async function HomePage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>{t(locale, "projects.manage")}</Link>
-            <ChatModal projects={dash.map((p) => ({ key: p.key, name: p.name }))} locale={locale} />
+            <ChatModal projects={dash.map((p) => ({ key: p.key, name: p.name }))} locale={locale} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
           </div>
         </div>
         <DevDashboard projects={dash} devNames={devNames} now={nowMs()} locale={locale} />
@@ -79,8 +79,9 @@ export default async function HomePage() {
   }
 
   const visibleFiltered = tasks.filter((tk) => (me.role === "admin" ? true : visibleKeys.has(tk.projectKey)));
-  // Фидбек-проект: убрать чужие фидбек-задачи, подмешать свои.
-  const filtered = await mergeFeedback(me, all, visibleFiltered);
+  // Фидбек-проект: убрать чужие фидбек-задачи, подмешать свои; клиенту — скрыть внутренние (разработчик→админ).
+  const merged = await mergeFeedback(me, all, visibleFiltered);
+  const filtered = me.role === "client" ? merged.filter((tk) => !tk.internal) : merged;
   const depMap = await getDepsFor(filtered.map((tk) => tk.id));
   const board: BoardTask[] = filtered.map((tk) => {
     const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
@@ -133,12 +134,10 @@ export default async function HomePage() {
       )}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, me.role === "contributor" ? "nav.myTasks" : "nav.tasks")}</h1>
-        {/* Разработчик только выполняет задачи — постановка не его роль. Клиенту/сотруднику чат нужен для заявок (кнопка справа). */}
-        {me.role !== "contributor" && (
-          <span style={{ marginLeft: "auto" }}>
-            <ChatModal projects={projects} locale={locale} />
-          </span>
-        )}
+        {/* Кнопка создания: клиент/сотрудник — заявки; разработчик — фидбек по Lamb.dev + запрос админу/вопрос клиенту. */}
+        <span style={{ marginLeft: "auto" }}>
+          <ChatModal projects={projects} locale={locale} isContributor={me.role === "contributor"} feedbackKey={all.find((p) => p.meta.feedback)?.key} />
+        </span>
       </div>
       <TaskTabs
         tasks={board}

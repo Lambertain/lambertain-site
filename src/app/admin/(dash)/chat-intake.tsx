@@ -36,8 +36,9 @@ function buildBlocks(text: string, atts: Att[]): Block[] {
   return blocks;
 }
 
-export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; locale: Locale; fill?: boolean }) {
+export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; feedbackKey?: string }) {
   const [projectKey, setProjectKey] = useState(projects[0]?.key ?? "");
+  const [recipient, setRecipient] = useState<"admin" | "client">("admin");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [images, setImages] = useState<Att[]>([]);
@@ -148,6 +149,9 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
     else startVoice();
   }
 
+  const isFeedbackSel = !!feedbackKey && projectKey === feedbackKey;
+  const showRecipient = !!isContributor && !isFeedbackSel; // разработчик в обычном проекте — выбирает адресата
+
   function createTask() {
     if (!title.trim()) { setError(t(locale, "request.titleRequired")); return; }
     if (!projectKey) return;
@@ -155,7 +159,7 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
     const blocks = buildBlocks(body, images);
     setError(null);
     start(async () => {
-      const res = await createRequestTask(projectKey, title.trim(), blocks);
+      const res = await createRequestTask(projectKey, title.trim(), blocks, showRecipient ? recipient : undefined);
       if (res.error) setError(res.error);
       else if (res.id && res.url) {
         setCreated({ id: res.id, url: res.url });
@@ -195,6 +199,21 @@ export function ChatIntake({ projects, locale, fill }: { projects: Proj[]; local
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projects[0] ? projects[0].name : "—"}</span>
         )}
       </div>
+
+      {/* адресат (только разработчик в обычном проекте): админ (приватно) или клиент (вопрос) */}
+      {showRecipient && (
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={ui.monoLabel}>{t(locale, "recipient.label")}:</span>
+          {(["admin", "client"] as const).map((r) => (
+            <button key={r} onClick={() => setRecipient(r)} style={{ ...ui.monoLabel, textTransform: "none", padding: "5px 12px", borderRadius: 2, cursor: "pointer", border: "1px solid " + (recipient === r ? "var(--accent)" : "var(--border-2)"), background: recipient === r ? "var(--accent)" : "transparent", color: recipient === r ? "#000" : "var(--muted)" }}>
+              {t(locale, r === "admin" ? "recipient.admin" : "recipient.client")}
+            </button>
+          ))}
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", flexBasis: "100%" }}>
+            {t(locale, recipient === "admin" ? "recipient.adminHint" : "recipient.clientHint")}
+          </span>
+        </div>
+      )}
 
       {/* заголовок */}
       <input

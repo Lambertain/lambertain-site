@@ -49,6 +49,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     );
   }
 
+  // Внутренняя задача (разработчик → админ) клиенту не видна.
+  if (task.internal && me.role === "client") redirect(backHref);
+
   const canReview = isAdmin || me.role === "contributor";
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
   // Новые комменты — появившиеся после последнего открытия задачи.

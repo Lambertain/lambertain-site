@@ -70,6 +70,8 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ai_status TEXT;
 -- Теги триажа: { type, complexity: small|feature, skills: [slug,...] } — портал не читает репо,
 -- Claude разработчика по тегам подключает скилы и применяет spec-kit адаптивно.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tags JSONB;
+-- Внутренняя задача (разработчик → админ, напр. доступы): клиенту НЕ видна.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

@@ -43,7 +43,8 @@ export async function GET(req: Request) {
 
   // Список задач проекта.
   const all = url.searchParams.get("all") === "1";
-  const tasks = await be.listTasks({ projectKey, unresolvedOnly: !all, order: "updated_desc" });
+  // Внутренние задачи (разработчик → админ, напр. доступы) не показываем в рабочей очереди Claude.
+  const tasks = (await be.listTasks({ projectKey, unresolvedOnly: !all, order: "updated_desc" })).filter((t) => !t.internal);
   return NextResponse.json({
     project: projectKey,
     count: tasks.length,
