@@ -18,7 +18,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
   const [proj, tokens, users] = await Promise.all([getProjectFull(key), getProjectTokens(), getBackend().listUsers()]);
   const contributors = users
     .filter((u) => u.role === "contributor" || u.role === "admin")
-    .map((u) => ({ login: u.login, fullName: u.fullName }));
+    .map((u) => ({ login: u.login, fullName: u.alias || u.fullName }));
 
   if (!proj) {
     return (
