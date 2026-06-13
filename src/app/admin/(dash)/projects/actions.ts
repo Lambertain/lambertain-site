@@ -3,8 +3,9 @@
 import { after } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/principal";
-import { setProjectToken, createProject, generateProjectKey, setProjectMeta, setProjectArchived } from "@/lib/db";
+import { setProjectToken, createProject, generateProjectKey, setProjectMeta, setProjectArchived, getProjectFull } from "@/lib/db";
 import { layProtocol, layProtocolAll } from "@/lib/protocol-deploy";
+import { notifyLogins } from "@/lib/notify";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -52,9 +53,15 @@ export async function saveMeta(
 ): Promise<{ ok?: boolean; error?: string }> {
   try {
     await requireAdmin();
+    const prev = await getProjectFull(key);
     await setProjectMeta(key, name, meta);
     // Привязали/обновили наш dev-репо → автоматически разложить туда протокол (новые репо подхватываются сами).
     if (meta.devGit) after(() => layProtocol(key));
+    // Назначили нового ответственного разработчика → уведомить его.
+    if (meta.defaultAssignee && meta.defaultAssignee !== prev?.meta.defaultAssignee) {
+      await notifyLogins([meta.defaultAssignee], `📋 <b>Вас назначили ответственным на проект</b> «${name}».\nОткройте портал — детали, доступы и задачи там.`).catch(() => {});
+    }
+    revalidatePath("/admin");
     revalidatePath(`/admin/projects/${key}`);
     return { ok: true };
   } catch (e) {
