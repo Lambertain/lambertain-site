@@ -183,6 +183,7 @@ export function TaskTabs({
   canDelete,
   canStart,
   empty,
+  feedbackKey,
 }: {
   tasks: BoardTask[];
   projects: Proj[];
@@ -191,6 +192,7 @@ export function TaskTabs({
   canDelete: boolean;
   canStart: boolean;
   empty: string;
+  feedbackKey?: string;
 }) {
   const projectKeys = projects.map((p) => p.key);
   const [activeProject, setActiveProject] = useState<string>(projectKeys[0] ?? "");
@@ -241,6 +243,12 @@ export function TaskTabs({
               {p.name}
             </TabBtn>
           ))}
+        </div>
+      )}
+
+      {feedbackKey && activeProject === feedbackKey && (
+        <div style={{ ...ui.card, padding: 14, marginBottom: 12, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)" }}>
+          <p style={{ fontSize: 14, lineHeight: 1.6 }}>{t(locale, "feedback.intro")}</p>
         </div>
       )}
 

@@ -230,6 +230,13 @@ async function main() {
     "INSERT INTO settings (key, value) VALUES ('onboarding', $1) ON CONFLICT (key) DO NOTHING",
     [JSON.stringify(ONBOARDING)],
   );
+  // Глобальный фидбек-проект Lamb.dev: виден всем, каждый видит только свои задачи (фидбек по порталу).
+  // meta мержим (не затирая ручные правки), но гарантируем флаг feedback + devGit на наш репо.
+  await pool.query(
+    `INSERT INTO projects (key, name, meta) VALUES ('DEV', 'Lamb.dev', $1::jsonb)
+     ON CONFLICT (key) DO UPDATE SET meta = projects.meta || $1::jsonb`,
+    [JSON.stringify({ feedback: true, devGit: "https://github.com/Lambertain/lambertain-site.git" })],
+  );
   const c = await pool.query("SELECT count(*)::int AS n FROM role_overrides");
   const s = await pool.query("SELECT count(*)::int AS n FROM skills");
   console.log(`Миграция ок. role_overrides: ${c.rows[0].n}, skills: ${s.rows[0].n}.`);

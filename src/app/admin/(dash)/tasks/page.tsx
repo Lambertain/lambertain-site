@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { getReads, getProjectReads, getDepsFor } from "@/lib/db";
+import { mergeFeedback } from "@/lib/feedback";
 import { statusBucket } from "@/lib/statuses";
 import { TaskList } from "../task-card";
 import { TaskTabs, type BoardTask } from "../task-tabs";
@@ -79,6 +80,7 @@ export default async function TasksPage() {
           canDelete={true}
           canStart={true}
           empty={t(locale, "tasks.empty")}
+          feedbackKey={projectsList.find((p) => p.meta.feedback)?.key}
         />
       </div>
     );
@@ -101,7 +103,8 @@ export default async function TasksPage() {
 
   let tasks;
   try {
-    tasks = await be.listTasks(filter);
+    const [raw, projects] = await Promise.all([be.listTasks(filter), be.listProjects()]);
+    tasks = await mergeFeedback(me, projects, raw); // фидбек-проект: только свои задачи
   } catch (e) {
     return (
       <div>

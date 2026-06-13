@@ -15,8 +15,10 @@ export function isDevOfProject(login: string | undefined, p: Project): boolean {
 export function visibleProjects(me: Principal, all: Project[]): Project[] {
   // Админ (в т.ч. в режиме превью роли) видит все проекты — иначе нечего выбрать.
   if (me.realRole === "admin") return all;
-  if (me.role === "contributor") return all.filter((p) => isDevOfProject(me.youtrackLogin, p));
+  // Фидбек-проект виден всем (каждый пишет фидбек по порталу).
+  const fb = (p: Project) => !!p.meta.feedback;
+  if (me.role === "contributor") return all.filter((p) => fb(p) || isDevOfProject(me.youtrackLogin, p));
   // Сотрудник — несколько проектов (member_projects); клиент — один.
-  if (me.role === "employee" && me.projectKeys?.length) return all.filter((p) => me.projectKeys!.includes(p.key));
-  return all.filter((p) => p.key === me.projectKey);
+  if (me.role === "employee" && me.projectKeys?.length) return all.filter((p) => fb(p) || me.projectKeys!.includes(p.key));
+  return all.filter((p) => fb(p) || p.key === me.projectKey);
 }

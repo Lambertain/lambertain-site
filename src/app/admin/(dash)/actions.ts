@@ -53,25 +53,30 @@ export async function createRequestTask(
   if (!title.trim()) return { error: "Пустой заголовок" };
   try {
     const be = getBackend();
-    const appr = await approvalFor(me.role, projectKey);
+    const project = (await be.listProjects()).find((p) => p.key === projectKey);
+    const isFeedback = !!project?.meta.feedback;
+    // Фидбек-проект — без апрува и без ИИ-триажа (это пожелания по порталу, напрямую админу).
+    const appr = isFeedback
+      ? { approvalStatus: "approved" as const, createdByRole: me.role, pending: false, approver: null }
+      : await approvalFor(me.role, projectKey);
     const summary = title.trim().slice(0, 120);
     const task = await be.createTask({
       projectKey,
       summary,
       description: "", // тело соберём из блоков с сохранением хронологии (текст→скрин→текст→скрин)
-      assigneeLogin: null, // исполнителя назначит ИИ-проработка, когда подготовит спеку
+      assigneeLogin: null,
       reporterLogin: me.youtrackLogin ?? null,
       approvalStatus: appr.approvalStatus,
       createdByRole: appr.createdByRole,
     });
     await appendRequestBlocks(task.id, blocks);
-    if (appr.pending && appr.approver) {
-      // Задача ждёт утверждения (сотрудник в проекте без клиента → админ; с клиентом → клиент).
-      // ИИ-проработку НЕ запускаем — стартует только после апрува (можно отредактировать задачу до этого).
+    if (isFeedback) {
+      await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${task.id}: ${task.summary}\nОт: ${me.fullName}`).catch(() => {});
+    } else if (appr.pending && appr.approver) {
+      // Задача ждёт утверждения; ИИ-проработку запустим только после апрува (можно отредактировать до этого).
       await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
     } else {
       await setTaskAiStatus(task.id, "pending");
-      // Фоновая проработка: Railway web — long-running, переживает ответ.
       after(() => draftTask(task.id));
     }
     return { id: task.id, url: task.url };

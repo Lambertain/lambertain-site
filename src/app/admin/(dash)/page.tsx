@@ -4,6 +4,7 @@ import { getBackend } from "@/lib/tasks";
 import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
+import { mergeFeedback } from "@/lib/feedback";
 import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { nowMs } from "@/lib/now";
@@ -77,7 +78,9 @@ export default async function HomePage() {
     return <p style={{ color: "#ff5b5b", fontSize: 14 }}>{e instanceof Error ? e.message : "—"}</p>;
   }
 
-  const filtered = tasks.filter((tk) => (me.role === "admin" ? true : visibleKeys.has(tk.projectKey)));
+  const visibleFiltered = tasks.filter((tk) => (me.role === "admin" ? true : visibleKeys.has(tk.projectKey)));
+  // Фидбек-проект: убрать чужие фидбек-задачи, подмешать свои.
+  const filtered = await mergeFeedback(me, all, visibleFiltered);
   const depMap = await getDepsFor(filtered.map((tk) => tk.id));
   const board: BoardTask[] = filtered.map((tk) => {
     const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
@@ -141,6 +144,7 @@ export default async function HomePage() {
         canDelete={canDelete}
         canStart={canStart}
         empty={t(locale, "tasks.empty")}
+        feedbackKey={all.find((p) => p.meta.feedback)?.key}
       />
     </div>
   );
