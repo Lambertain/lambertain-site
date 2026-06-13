@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyProjectClients, attachmentIdsIn } from "@/lib/notify";
+import { notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -35,15 +35,24 @@ export async function POST(req: Request) {
 
   const be = getBackend();
   try {
-    await be.updateStatus(taskId, status);
-    // На ревью: краткий итог простыми словами → клиенту (видимый коммент от Lambertain) + уведомление.
-    if (status === "Review" && summary) {
-      await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client");
-      try {
-        const task = await be.getTask(taskId);
-        await notifyProjectClients(projectKey, `✅ <b>Готово до перевірки</b> · ${taskId}: ${task.summary}\n${summary.slice(0, 400)}`, attachmentIdsIn(summary));
-      } catch { /* best-effort */ }
+    if (status === "Review") {
+      const task = await be.getTask(taskId);
+      // Задачи по спеке супер-админа (autoDone) — на готовности сразу Done, без ручной приёмки.
+      if (task.autoDone) {
+        await be.updateStatus(taskId, "Done");
+        if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client");
+        await notifyAdmin(`✅ <b>Авто-готово</b> · ${taskId}: ${task.summary}`).catch(() => {});
+        return NextResponse.json({ ok: true, status: "Done" });
+      }
+      // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
+      await be.updateStatus(taskId, "Review");
+      if (summary) {
+        await be.addComment(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, "client");
+        await notifyProjectClients(projectKey, `✅ <b>Готово до перевірки</b> · ${taskId}: ${task.summary}\n${summary.slice(0, 400)}\n\nℹ️ Відкрийте задачу — прийміть або поверніть на доопрацювання.`, attachmentIdsIn(summary)).catch(() => {});
+      }
+      return NextResponse.json({ ok: true, status: "Review" });
     }
+    await be.updateStatus(taskId, status);
     return NextResponse.json({ ok: true, status });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });

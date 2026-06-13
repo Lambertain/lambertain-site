@@ -31,11 +31,12 @@ interface TaskRow {
   last_comment_at: string | null;
   approval_status: string | null;
   internal: boolean | null;
+  auto_done: boolean | null;
 }
 
 const TASK_SELECT = `
   SELECT t.readable_id, p.key AS project_key, t.title, t.description, t.status, t.priority,
-         t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal,
+         t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal, t.auto_done,
          a.login AS assignee_login, a.full_name AS assignee_name,
          r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role,
          (SELECT count(*) FROM comments c WHERE c.task_id = t.id) AS comment_count,
@@ -66,6 +67,7 @@ function rowToTask(t: TaskRow): Task {
     lastCommentAt: t.last_comment_at ? ms(t.last_comment_at)! : null,
     approvalStatus: t.approval_status ?? "approved",
     internal: !!t.internal,
+    autoDone: !!t.auto_done,
   };
 }
 
@@ -144,9 +146,9 @@ export const postgresBackend: TasksBackend = {
     let description = input.description || "";
     if (input.dueDate) description += `\n\n**Дедлайн:** ${input.dueDate}`;
     await q(
-      `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, reporter_id, created_at, updated_at, source, approval_status, created_by_role, internal)
-       VALUES ($1,$2,$3,$4,$5,'Open',$6,$7,$8, now(), now(), 'portal', $9, $10, $11)`,
-      [proj[0].id, num, readable, input.summary, description, input.priority || null, assigneeId, reporterId, input.approvalStatus || "approved", input.createdByRole || null, input.internal || false],
+      `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, reporter_id, created_at, updated_at, source, approval_status, created_by_role, internal, auto_done)
+       VALUES ($1,$2,$3,$4,$5,'Open',$6,$7,$8, now(), now(), 'portal', $9, $10, $11, $12)`,
+      [proj[0].id, num, readable, input.summary, description, input.priority || null, assigneeId, reporterId, input.approvalStatus || "approved", input.createdByRole || null, input.internal || false, input.autoDone || false],
     );
     return this.getTask(readable);
   },

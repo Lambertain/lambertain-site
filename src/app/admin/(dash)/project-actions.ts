@@ -63,6 +63,7 @@ export async function createKickoffTasks(projectKey: string, tasks: KickoffTask[
         assigneeLogin: assignee,
         reporterLogin: me.youtrackLogin ?? null,
         approvalStatus: "approved",
+        autoDone: true, // спека супер-админа: на готовности — авто-Готово, без ручной приёмки
       });
       await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (tk.skills || []).filter(Boolean) });
       await setTaskAiStatus(task.id, "done"); // уже размечено — отдельный триаж не нужен

@@ -72,6 +72,8 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS ai_status TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tags JSONB;
 -- Внутренняя задача (разработчик → админ, напр. доступы): клиенту НЕ видна.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT false;
+-- Авто-готово: задачи по спеке от супер-админа на готовности идут сразу в Done (без ручной приёмки).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS auto_done BOOLEAN NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

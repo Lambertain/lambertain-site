@@ -91,6 +91,8 @@ export interface Task {
   approvalStatus?: string;
   /** Внутренняя задача (разработчик → админ): клиенту не видна. */
   internal?: boolean;
+  /** Авто-готово: на ревью-завершении дева задача идёт сразу в Done (без ручной приёмки). */
+  autoDone?: boolean;
 }
 
 export interface Comment {
@@ -141,6 +143,7 @@ export interface TasksBackend {
     approvalStatus?: "approved" | "pending";
     createdByRole?: Role;
     internal?: boolean;
+    autoDone?: boolean;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
   addComment(id: string, text: string, visibility?: "client" | "internal"): Promise<Comment>;
