@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { draftClientQuestion } from "@/lib/replies";
-import { notifyProjectClients, notifyAdmin } from "@/lib/notify";
+import { notifyProjectClients, notifyAdmin, notifyLogins } from "@/lib/notify";
 import { ESCALATION_MARK } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -40,10 +40,14 @@ export async function POST(req: Request) {
     const [task, comments] = await Promise.all([be.getTask(taskId), be.getComments(taskId)]);
 
     if (kind === "admin") {
+      // Вопрос/решение — ПОСТАНОВЩИКУ задачи (кто её создал), а не глобально супер-админу.
+      // Постановщик-член (напр. админ Настя) получает уведомление; иначе — супер-админ (Никита).
       const body = `🔧 Вопрос разработчика (нужно решение):\n\n${question}`;
       await be.addComment(taskId, body, "internal");
-      await notifyAdmin(`🔧 <b>Вопрос разработчика</b> · ${taskId}: ${task.summary}\n${question.slice(0, 400)}`);
-      return NextResponse.json({ ok: true, escalatedTo: "admin" });
+      const msg = `🔧 <b>Вопрос разработчика</b> · ${taskId}: ${task.summary}\n${question.slice(0, 400)}`;
+      if (task.reporter?.login) await notifyLogins([task.reporter.login], msg);
+      else await notifyAdmin(msg);
+      return NextResponse.json({ ok: true, escalatedTo: task.reporter?.login || "admin" });
     }
 
     // client: оформляем вопрос от лица агентства, постим клиенту, уведомляем. Задача блокируется до ответа.

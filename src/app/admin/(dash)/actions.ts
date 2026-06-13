@@ -1,7 +1,8 @@
 "use server";
 
 import { after } from "next/server";
-import { getPrincipal } from "@/lib/principal";
+import { getPrincipal, isSuperAdmin } from "@/lib/principal";
+import type { Principal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
 import { draftTask } from "@/lib/drafter";
@@ -10,19 +11,27 @@ import { projectHasClient, appendRequestBlocks, setTaskAiStatus, type ReqBlock }
 import type { DraftTask, Role } from "@/lib/tasks/types";
 
 /**
- * Задачи сотрудника создаются на утверждение: если в проекте есть клиент — утверждает клиент,
- * если клиента нет — админ. Остальные роли — без утверждения.
+ * Кому уходит задача на утверждение:
+ * - сотрудник: клиент проекта (если есть) либо супер-админ;
+ * - обычный админ (Настя и т.п.): супер-админ (Никита);
+ * - супер-админ / клиент / разработчик: без утверждения.
  */
-async function approvalFor(role: Role, projectKey: string): Promise<{ approvalStatus: "approved" | "pending"; createdByRole: Role; pending: boolean; approver: "client" | "admin" | null }> {
-  if (role !== "employee") return { approvalStatus: "approved", createdByRole: role, pending: false, approver: null };
-  const approver = (await projectHasClient(projectKey)) ? "client" : "admin";
-  return { approvalStatus: "pending", createdByRole: "employee", pending: true, approver };
+async function approvalFor(me: Principal, projectKey: string): Promise<{ approvalStatus: "approved" | "pending"; createdByRole: Role; pending: boolean; approver: "client" | "admin" | null }> {
+  if (me.role === "employee") {
+    const approver = (await projectHasClient(projectKey)) ? "client" : "admin";
+    return { approvalStatus: "pending", createdByRole: "employee", pending: true, approver };
+  }
+  // Обычный админ — на утверждение супер-админу.
+  if (me.realRole === "admin" && !isSuperAdmin(me)) {
+    return { approvalStatus: "pending", createdByRole: "admin", pending: true, approver: "admin" };
+  }
+  return { approvalStatus: "approved", createdByRole: me.role, pending: false, approver: null };
 }
 
 async function notifyPendingApproval(approver: "client" | "admin", projectKey: string, taskId: string, summary: string): Promise<void> {
   const text = `🟠 <b>Новая задача — нужно подтверждение</b> · ${taskId}: ${summary}`;
   if (approver === "client") await notifyProjectClients(projectKey, text);
-  else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${taskId}: ${summary}\nОт сотрудника, проект без клиента.`);
+  else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${taskId}: ${summary}`);
 }
 /** Уведомить ответственного разработчика о новой задаче (best-effort). */
 async function notifyNewTask(task: { id: string; summary: string; assignee?: { login: string } | null }): Promise<void> {
@@ -81,7 +90,7 @@ export async function createRequestTask(
     // Фидбек-проект — без апрува и без ИИ-триажа (пожелания по порталу, напрямую админу).
     const appr = isFeedback
       ? { approvalStatus: "approved" as const, createdByRole: me.role, pending: false, approver: null }
-      : await approvalFor(me.role, projectKey);
+      : await approvalFor(me, projectKey);
     const task = await be.createTask({
       projectKey,
       summary,
@@ -140,7 +149,7 @@ export async function createFromDraft(
   if (!me) return { error: "Не авторизован" };
   try {
     const be = getBackend();
-    const appr = await approvalFor(me.role, draft.projectKey);
+    const appr = await approvalFor(me, draft.projectKey);
     const task = await be.createTask({
       projectKey: draft.projectKey,
       summary: draft.summary,

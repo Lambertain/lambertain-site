@@ -79,3 +79,12 @@ export async function requireAdmin(): Promise<Principal> {
   if (!p || p.realRole !== "admin") throw new Error("Forbidden");
   return p;
 }
+
+/**
+ * Супер-админ (Никита) — владелец портала: вход по паролю или по ADMIN_TELEGRAM_ID,
+ * у него НЕТ member-логина. Обычные админы (приглашённые, напр. Настя) имеют youtrackLogin.
+ * Задачи обычных админов уходят супер-админу на утверждение; супер-админ утверждает.
+ */
+export function isSuperAdmin(p: Principal | null | undefined): boolean {
+  return !!p && p.realRole === "admin" && !p.youtrackLogin;
+}

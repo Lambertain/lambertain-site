@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
-import { getPrincipal } from "@/lib/principal";
+import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
@@ -109,7 +109,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       )}
 
       {task.approvalStatus === "pending" && (
-        <ApprovalBar id={task.id} canApprove={isAdmin || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />
+        <ApprovalBar id={task.id} canApprove={isSuperAdmin(me) || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />
       )}
 
       {/* Постановщик (или админ) проверяет результат в «Ревью» → принять/на доработку. */}

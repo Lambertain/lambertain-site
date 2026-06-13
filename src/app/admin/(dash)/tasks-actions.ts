@@ -1,7 +1,7 @@
 "use server";
 
 import { after } from "next/server";
-import { getPrincipal } from "@/lib/principal";
+import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus } from "@/lib/db";
 import { draftTask } from "@/lib/drafter";
@@ -65,7 +65,8 @@ export async function moveToReview(id: string, ref: string): Promise<{ ok?: bool
 export async function setApproval(id: string, status: "approved" | "rejected"): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
-  if (me.realRole !== "admin") {
+  // Утверждает супер-админ (Никита) или клиент своего проекта. Обычный админ — не утверждает.
+  if (!isSuperAdmin(me)) {
     if (me.role !== "client") return { error: "Нет прав" };
     const task = await getBackend().getTask(id);
     if (task.projectKey !== me.projectKey) return { error: "Нет прав" };
