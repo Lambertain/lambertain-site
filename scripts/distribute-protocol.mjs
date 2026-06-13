@@ -81,6 +81,7 @@ async function main() {
     const devGit = p.meta?.devGit;
     const repo = repoFromGit(devGit);
     if (!repo || !/^Lambertain\//i.test(repo)) continue; // только наши репо
+    if (repo.toLowerCase() === "lambertain/lambertain-site") continue; // сам портал — не раскладываем
 
     // токен (генерируем, если нет)
     let token = tokens.get(p.key);
