@@ -5,7 +5,8 @@
  */
 import { randomBytes } from "node:crypto";
 import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding } from "./db";
-import { notifyAdmin } from "./notify";
+import { notifyAdmin, notifyLogins } from "./notify";
+import { t, normalizeLocale, DEFAULT_LOCALE } from "./i18n";
 import type { Role } from "./tasks/types";
 import type { TgUser } from "./telegram-auth";
 
@@ -58,5 +59,8 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
       `Роль: ${ROLE_RU[inv.role] || inv.role}${keys.length ? ` · проекты: ${keys.join(", ")}` : ""}\n` +
       `Логин: @${login}`,
   );
+  // Приветствие новому участнику — любой роли, на локали его устройства.
+  const loc = normalizeLocale(user.languageCode) || DEFAULT_LOCALE;
+  await notifyLogins([login], t(loc, "welcome.joined", { role: t(loc, `role.${inv.role}`) })).catch(() => {});
   return true;
 }

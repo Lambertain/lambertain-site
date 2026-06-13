@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
 import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { sendTo } from "@/lib/notify";
+import { sendTo, notifyLogins } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
 
@@ -75,13 +75,20 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
   try {
     await requireAdmin();
     if (!login) return { error: "no login" };
-    const user = (await getBackend().listUsers()).find((u) => u.login === login);
+    const be = getBackend();
+    const user = (await be.listUsers()).find((u) => u.login === login);
     if (user?.role === "client") {
       await setLinkProject(login, keys[0] ?? null);
     } else if (user?.role === "employee") {
       await setMemberProjects(login, keys); // сотрудник — несколько проектов
     } else {
       await setDevProjects(login, keys);
+    }
+    // Уведомить разработчика/сотрудника о назначении на проект(ы).
+    if ((user?.role === "contributor" || user?.role === "employee") && keys.length) {
+      const projects = await be.listProjects().catch(() => []);
+      const names = keys.map((k) => projects.find((p) => p.key === k)?.name || k).join(", ");
+      await notifyLogins([login], `📋 <b>Вас назначили на проект(ы):</b> ${names}\nОткройте портал — детали и задачи там.`).catch(() => {});
     }
     revalidatePath("/admin/team");
     revalidatePath("/admin");

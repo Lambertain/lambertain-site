@@ -394,6 +394,7 @@ export const DICT: Record<string, Entry> = {
   "proj.addAccount": { uk: "Додати акаунт", ru: "Добавить аккаунт", en: "Add account" },
   "proj.noAccounts": { uk: "Акаунтів ще немає.", ru: "Аккаунтов пока нет.", en: "No accounts yet." },
   "proj.myProjects": { uk: "Мої проєкти", ru: "Мои проекты", en: "My projects" },
+  "welcome.joined": { uk: "👋 Вітаємо! Ви приєдналися до порталу Lambertain як {role}. Відкрийте застосунок — задачі, проєкти та доступи там.", ru: "👋 Добро пожаловать! Вы присоединились к порталу Lambertain как {role}. Откройте приложение — задачи, проекты и доступы там.", en: "👋 Welcome! You've joined the Lambertain portal as {role}. Open the app — tasks, projects and access are there." },
   "gender.warn": { uk: "Жіночий рід: {words}. Клієнт спілкується нібито напряму з агентством — пишіть у чоловічому роді.", ru: "Женский род: {words}. Клиент общается как будто напрямую с агентством — пишите в мужском роде.", en: "Feminine gender: {words}. The client thinks they talk to the agency directly — write in masculine." },
 
   // — ревью кода (ИИ, on-demand) —

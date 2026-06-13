@@ -9,6 +9,8 @@ export interface TgUser {
   id: number;
   firstName: string;
   username?: string;
+  /** Язык клиента Telegram (для локали приветствия). */
+  languageCode?: string;
 }
 
 export interface InitDataResult {
@@ -50,7 +52,7 @@ export function validateInitData(initData: string): InitDataResult | null {
 
   const userRaw = params.get("user");
   if (!userRaw) return null;
-  let u: { id?: number; first_name?: string; username?: string };
+  let u: { id?: number; first_name?: string; username?: string; language_code?: string };
   try {
     u = JSON.parse(userRaw);
   } catch {
@@ -59,7 +61,7 @@ export function validateInitData(initData: string): InitDataResult | null {
   if (!u.id) return null;
 
   return {
-    user: { id: u.id, firstName: u.first_name || "", username: u.username },
+    user: { id: u.id, firstName: u.first_name || "", username: u.username, languageCode: u.language_code },
     startParam: params.get("start_param") || undefined,
     authDate,
   };
