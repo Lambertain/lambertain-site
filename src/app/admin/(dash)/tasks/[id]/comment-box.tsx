@@ -2,6 +2,7 @@
 
 import { useState, useRef, useTransition } from "react";
 import { addTaskComment } from "./actions";
+import { detectFeminine } from "@/lib/gender-check";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
@@ -66,6 +67,9 @@ export function CommentBox({ id, locale, canChooseVisibility }: { id: string; lo
     });
   }
 
+  // Предупреждение о женском роде — только для команды в клиент-видимом комментарии.
+  const femWords = canChooseVisibility && visibleToClient ? detectFeminine(text) : [];
+
   return (
     <div style={{ marginTop: 16 }}>
       <label style={ui.fieldLabel}>{t(locale, "task.addComment")}</label>
@@ -105,6 +109,11 @@ export function CommentBox({ id, locale, canChooseVisibility }: { id: string; lo
       {canChooseVisibility && (
         <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 6 }}>
           {visibleToClient ? t(locale, "comment.willSeeClient") : t(locale, "comment.internalOnly")}
+        </p>
+      )}
+      {femWords.length > 0 && (
+        <p style={{ fontSize: 13, color: "#e8b339", marginTop: 8, lineHeight: 1.5 }}>
+          ⚠️ {t(locale, "gender.warn", { words: femWords.join(", ") })}
         </p>
       )}
       {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 8 }}>{error}</p>}

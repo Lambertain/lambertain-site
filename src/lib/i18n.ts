@@ -381,6 +381,7 @@ export const DICT: Record<string, Entry> = {
   "recipient.client": { uk: "Клієнту", ru: "Клиенту", en: "Client" },
   "recipient.adminHint": { uk: "Приватно: доступи, питання щодо проєкту (клієнт не бачить).", ru: "Приватно: доступы, вопросы по проекту (клиент не видит).", en: "Private: access, project questions (client doesn't see)." },
   "recipient.clientHint": { uk: "Питання клієнту — він побачить задачу і відповість.", ru: "Вопрос клиенту — он увидит задачу и ответит.", en: "A question to the client — they'll see the task and reply." },
+  "gender.warn": { uk: "Жіночий рід: {words}. Клієнт спілкується нібито напряму з агентством — пишіть у чоловічому роді.", ru: "Женский род: {words}. Клиент общается как будто напрямую с агентством — пишите в мужском роде.", en: "Feminine gender: {words}. The client thinks they talk to the agency directly — write in masculine." },
 
   // — ревью кода (ИИ, on-demand) —
   "review.refLabel": { uk: "Посилання на коміт/PR/гілку (необовʼязково)", ru: "Ссылка на коммит/PR/ветку (необязательно)", en: "Commit/PR/branch link (optional)" },

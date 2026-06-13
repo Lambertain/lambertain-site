@@ -2,6 +2,7 @@
 
 import { useState, useRef, useTransition } from "react";
 import { createRequestTask } from "./actions";
+import { detectFeminine } from "@/lib/gender-check";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
 
@@ -151,6 +152,8 @@ export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey 
 
   const isFeedbackSel = !!feedbackKey && projectKey === feedbackKey;
   const showRecipient = !!isContributor && !isFeedbackSel; // разработчик в обычном проекте — выбирает адресата
+  // Предупреждение о женском роде — когда разработчик пишет задачу-вопрос клиенту.
+  const femWords = showRecipient && recipient === "client" ? detectFeminine(title + " " + body) : [];
 
   function createTask() {
     if (!title.trim()) { setError(t(locale, "request.titleRequired")); return; }
@@ -252,6 +255,9 @@ export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey 
         </div>
       )}
 
+      {femWords.length > 0 && (
+        <p style={{ fontSize: 13, color: "#e8b339", padding: "0 16px", lineHeight: 1.5 }}>⚠️ {t(locale, "gender.warn", { words: femWords.join(", ") })}</p>
+      )}
       {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", padding: "0 16px" }}>{error}</p>}
 
       {/* нижняя панель: скрепка, микрофон, [Создать задачу] */}
