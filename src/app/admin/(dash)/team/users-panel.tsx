@@ -49,7 +49,18 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
       <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, padding: 14, background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
         <span style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", width: "100%" }}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>{display}</span>
-          <span style={ui.monoLabel}>@{user.login}</span>
+          {/^tg\d+$/.test(user.login) ? (
+            <span style={ui.monoLabel}>@{user.login}</span>
+          ) : (
+            <span
+              role="link"
+              title="Відкрити в Telegram"
+              onClick={(e) => { e.stopPropagation(); window.open(`https://t.me/${user.login}`, "_blank", "noopener"); }}
+              style={{ ...ui.monoLabel, color: "var(--accent)", textDecoration: "underline", cursor: "pointer" }}
+            >
+              @{user.login}
+            </span>
+          )}
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, `role.${user.role}`)}</span>
           <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
             {user.joinedAt && <span style={{ ...ui.monoLabel, textTransform: "none" }}>{new Date(user.joinedAt).toLocaleDateString(DATE_LOC[locale], { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>}
