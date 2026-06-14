@@ -9,6 +9,7 @@ import { randomBytes } from "node:crypto";
 import { protocolBlock } from "./dev-protocol";
 import { repoFromGit } from "./github";
 import { getProjectFull, listProjectsWithMeta, getProjectTokens, setProjectToken } from "./db";
+import { notifyLogins } from "./notify";
 
 const API = "https://api.github.com";
 const START = "<!-- LAMBERTAIN-PROTOCOL:START -->";
@@ -63,6 +64,18 @@ export async function layProtocol(projectKey: string): Promise<LayResult> {
     body: JSON.stringify({ message: "chore: протокол задач Lambertain (Claude Code)", content: Buffer.from(next, "utf-8").toString("base64"), sha }),
   });
   if (!put.ok) return { key: projectKey, repo, status: "error", detail: `write ${put.status} ${(await put.text()).slice(0, 150)}` };
+
+  // Корневой фикс «стазлого клона»: в момент привязки/обновления протокола сигналим назначенному разработчику
+  // сделать git pull — иначе клон, сделанный ДО привязки, не имеет CLAUDE.md с токеном и Claude не видит задач.
+  const dev = p?.meta.defaultAssignee;
+  if (dev) {
+    await notifyLogins(
+      [dev],
+      `🔗 <b>Проект «${p?.name || projectKey}» подключён к порталу</b>\n` +
+        `Сделай <code>git pull</code> в репо <code>${repo}</code> — подтянется CLAUDE.md с токеном.\n` +
+        `Затем в новой сессии Claude первым сообщением: «следуй CLAUDE.md, получи протокол и возьми задачу с портала».`,
+    ).catch(() => {});
+  }
   return { key: projectKey, repo, status: "updated" };
 }
 

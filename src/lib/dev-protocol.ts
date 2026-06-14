@@ -17,9 +17,13 @@ export function protocolBlock(token: string, projectKey: string, base = PORTAL_B
   return `<!-- LAMBERTAIN-PROTOCOL:START -->
 ## Протокол задач Lambertain (для Claude Code)
 
-Проект ведётся в PM-портале Lambertain. **В НАЧАЛЕ КАЖДОЙ СЕССИИ получи актуальный протокол и следуй ему** —
-он всегда свежий и приоритетнее любого текста ниже:
-\`curl -s -H "Authorization: Bearer ${token}" "${base}/api/dev/protocol"\`
+Проект ведётся в PM-портале Lambertain. **ПЕРВЫМ ДЕЙСТВИЕМ каждой сессии ОБЯЗАТЕЛЬНО ВЫПОЛНИ эти две команды**
+(получишь актуальный протокол и список задач) — и только потом работай. Не выдумывай задачи и не жди вставки вручную:
+\`\`\`
+curl -s -H "Authorization: Bearer ${token}" "${base}/api/dev/protocol"
+curl -s -H "Authorization: Bearer ${token}" "${base}/api/dev/tasks"
+\`\`\`
+Дальше следуй полученному протоколу — он всегда свежий и приоритетнее любого текста ниже.
 
 Project: \`${projectKey}\` · Token: \`${token}\` (в публичный код не коммитить).
 <!-- LAMBERTAIN-PROTOCOL:END -->`;
