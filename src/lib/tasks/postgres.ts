@@ -199,19 +199,30 @@ export const postgresBackend: TasksBackend = {
     await q("DELETE FROM tasks WHERE id = $1", [rows[0].id]);
   },
 
-  async addComment(id: string, text: string, visibility: "client" | "internal" = "client"): Promise<Comment> {
+  async addComment(id: string, text: string, visibility: "client" | "internal" = "client", authorLogin?: string): Promise<Comment> {
     const task = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [id]);
     if (!task[0]) throw new Error(`Задача ${id} не найдена`);
+    // Автор: член по логину (клиент/разработчик/сотрудник/админ-член). Без логина (бот/супер-админ) — Lambertain.
+    let author: { id: number; login: string; full_name: string | null; role: Role } | null = null;
+    if (authorLogin) {
+      const m = await q<{ id: number; login: string; full_name: string | null; role: Role }>(
+        "SELECT id, login, full_name, role FROM members WHERE login = $1",
+        [authorLogin],
+      );
+      author = m[0] ?? null;
+    }
     const rows = await q<{ id: number; created_at: string }>(
       `INSERT INTO comments (task_id, author_id, body, visibility, approved, created_at)
-       VALUES ($1, NULL, $2, $3, true, now()) RETURNING id, created_at`,
-      [task[0].id, text, visibility],
+       VALUES ($1, $2, $3, $4, true, now()) RETURNING id, created_at`,
+      [task[0].id, author?.id ?? null, text, visibility],
     );
     return {
       id: String(rows[0].id),
       text,
       created: ms(rows[0].created_at) ?? 0,
-      author: { login: "lambertain", fullName: "Lambertain", role: "admin" },
+      author: author
+        ? { login: author.login, fullName: author.full_name || author.login, role: author.role }
+        : { login: "lambertain", fullName: "Lambertain", role: "admin" },
       visibility,
     };
   },

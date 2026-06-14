@@ -6,7 +6,8 @@ import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { getReads, getProjectReads, getDepsFor } from "@/lib/db";
 import { mergeFeedback } from "@/lib/feedback";
-import { statusBucket } from "@/lib/statuses";
+import { visibleProjects } from "@/lib/scope";
+import { statusBucket, BUCKET_ORDER, type Bucket } from "@/lib/statuses";
 import { TaskList } from "../task-card";
 import { TaskTabs, type BoardTask } from "../task-tabs";
 import { nowMs } from "@/lib/now";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 const STALE_DAYS = 5;
 
-export default async function TasksPage() {
+export default async function TasksPage({ searchParams }: { searchParams: Promise<{ project?: string; tab?: string }> }) {
   const me = await getPrincipal();
   if (!me) redirect("/admin/login");
   const locale = await getLocale();
@@ -89,16 +90,75 @@ export default async function TasksPage() {
     );
   }
 
-  // —— Контрибьютор/клиент: плоский список своих задач ——
+  // —— Контрибьютор: задачи попроектно (табы проект→статус), дип-линк из карточки проекта (?project=&tab=) ——
+  if (me.role === "contributor") {
+    const sp = await searchParams;
+    const all = await be.listProjects();
+    const visible = visibleProjects(me, all);
+    const fbSet = new Set(all.filter((p) => p.meta.feedback).map((p) => p.key));
+    const byFbLast = (a: { key: string }, b: { key: string }) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0);
+    const filter: TaskFilter = me.youtrackLogin
+      ? { assigneeLogin: me.youtrackLogin, order: "updated_desc", limit: 300 }
+      : { order: "updated_desc", limit: 300 };
+    let raw, reads, projectSeen;
+    try {
+      [raw, reads, projectSeen] = await Promise.all([be.listTasks(filter), getReads(readKey), getProjectReads(readKey)]);
+    } catch (e) {
+      return (
+        <div>
+          <h1 style={ui.h1}>{t(locale, "tasks.mineTitle")}</h1>
+          <p style={{ color: "#ff5b5b", fontSize: 14 }}>{t(locale, "error.load")}{e instanceof Error ? e.message : "—"}</p>
+        </div>
+      );
+    }
+    const merged = await mergeFeedback(me, all, raw);
+    const depMap = await getDepsFor(merged.map((tk) => tk.id));
+    const board: BoardTask[] = merged.map((tk) => {
+      const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
+      const lastRead = reads.get(tk.id) ?? 0;
+      const unread = (tk.lastCommentAt ?? 0) > lastRead || (tk.created ?? 0) > lastRead;
+      return {
+        id: tk.id, projectKey: tk.projectKey, summary: tk.summary, status: tk.state || "Open",
+        description: tk.description, created: tk.created, updated: tk.updated, commentCount: tk.commentCount,
+        assignee: tk.assignee?.fullName ?? null, unread,
+        blocked: blockers.length > 0, blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
+      };
+    });
+    const projectsWithNew = visible
+      .map((p) => {
+        const seen = projectSeen.get(p.key) ?? 0;
+        const hasNew = merged.some((tk) => tk.projectKey === p.key && Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen);
+        return { key: p.key, name: p.name, hasNew };
+      })
+      .sort(byFbLast);
+    const initialProject = typeof sp.project === "string" ? sp.project : undefined;
+    const initialBucket = (BUCKET_ORDER as readonly string[]).includes(sp.tab ?? "") ? (sp.tab as Bucket) : undefined;
+    return (
+      <div>
+        <div style={ui.monoLabel}>{t(locale, "tasks.mineKicker")}</div>
+        <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "tasks.mineTitle")}</h1>
+        <TaskTabs
+          tasks={board}
+          projects={projectsWithNew}
+          locale={locale}
+          canEditStatus={true}
+          canDelete={false}
+          canStart={true}
+          empty={t(locale, "tasks.empty")}
+          feedbackKey={all.find((p) => p.meta.feedback)?.key}
+          initialProject={initialProject}
+          initialBucket={initialBucket}
+        />
+      </div>
+    );
+  }
+
+  // —— Клиент: плоский список своих задач ——
   let filter: TaskFilter = { unresolvedOnly: true, order: "updated_desc" };
   let title = t(locale, "tasks.allTitle");
   let kicker = t(locale, "tasks.allKicker");
 
-  if (me.role === "contributor" && me.youtrackLogin) {
-    filter = { assigneeLogin: me.youtrackLogin, unresolvedOnly: true, order: "updated_desc" };
-    title = t(locale, "tasks.mineTitle");
-    kicker = t(locale, "tasks.mineKicker");
-  } else if (me.role === "client" && me.youtrackLogin) {
+  if (me.role === "client" && me.youtrackLogin) {
     filter = { reporterLogin: me.youtrackLogin, order: "updated_desc" };
     title = t(locale, "tasks.clientTitle");
     kicker = t(locale, "tasks.clientKicker");

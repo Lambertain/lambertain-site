@@ -78,17 +78,21 @@ export function ProjectInfoCard({
       {/* шапка + узкие блоки (цифры/прогресс) */}
       <div style={{ padding: 16 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{project.key}</span>
-          <strong style={{ fontSize: 16 }}>{project.name}</strong>
+          {/* Клик по проекту → его задачи (таб проекта). */}
+          <a href={`/admin/tasks?project=${project.key}`} style={{ display: "inline-flex", alignItems: "baseline", gap: 8, textDecoration: "none", color: "inherit" }}>
+            <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{project.key}</span>
+            <strong style={{ fontSize: 16 }}>{project.name}</strong>
+          </a>
           {!!newCount && <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 7px", borderRadius: 3, fontWeight: 600 }}>{newCount} NEW</span>}
         </div>
 
         {counts && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+            {/* Клик по плашке статуса → задачи проекта на этом табе. */}
             {BUCKET_ORDER.filter((b) => counts[b] > 0).map((b) => (
-              <span key={b} style={{ ...ui.monoLabel, textTransform: "none", padding: "3px 9px", border: "1px solid var(--border-2)", borderRadius: 3 }}>
+              <a key={b} href={`/admin/tasks?project=${project.key}&tab=${b}`} style={{ ...ui.monoLabel, textTransform: "none", padding: "3px 9px", border: "1px solid var(--border-2)", borderRadius: 3, textDecoration: "none", color: "inherit", cursor: "pointer" }}>
                 {t(locale, BUCKET_LABEL[b])}: <b>{counts[b]}</b>
-              </span>
+              </a>
             ))}
           </div>
         )}

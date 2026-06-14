@@ -148,7 +148,7 @@ export interface TasksBackend {
     autoDone?: boolean;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
-  addComment(id: string, text: string, visibility?: "client" | "internal"): Promise<Comment>;
+  addComment(id: string, text: string, visibility?: "client" | "internal", authorLogin?: string): Promise<Comment>;
   updateStatus(id: string, status: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
 }

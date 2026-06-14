@@ -29,7 +29,8 @@ export async function addTaskComment(
       const aid = await saveAttachment(id, a.mime, a.data, a.name);
       if (aid) body = body.replaceAll(`att:${a.localId}`, `/api/files/${aid}`);
     }
-    await getBackend().addComment(id, body, visibility);
+    // Автор коммента = текущий член (по логину); супер-админ без логина → Lambertain. Клиент видит команду как «Lambertain» (маскируется при выводе).
+    await getBackend().addComment(id, body, visibility, me.youtrackLogin);
     revalidatePath(`/admin/tasks/${id}`);
     // Клиент ответил: возобновить ИИ-триаж (если ждал) и разблокировать задачу (если была Blocked из-за эскалации).
     if (me.role === "client") {

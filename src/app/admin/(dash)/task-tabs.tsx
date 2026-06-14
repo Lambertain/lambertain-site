@@ -184,6 +184,8 @@ export function TaskTabs({
   canStart,
   empty,
   feedbackKey,
+  initialProject,
+  initialBucket,
 }: {
   tasks: BoardTask[];
   projects: Proj[];
@@ -193,9 +195,14 @@ export function TaskTabs({
   canStart: boolean;
   empty: string;
   feedbackKey?: string;
+  /** Начальные проект/корзина из URL (?project=&tab=) — для дип-линка из карточки проекта. */
+  initialProject?: string;
+  initialBucket?: Bucket;
 }) {
   const projectKeys = projects.map((p) => p.key);
-  const [activeProject, setActiveProject] = useState<string>(projectKeys[0] ?? "");
+  const [activeProject, setActiveProject] = useState<string>(
+    initialProject && projectKeys.includes(initialProject) ? initialProject : projectKeys[0] ?? "",
+  );
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [, startSeen] = useTransition();
 
@@ -230,7 +237,7 @@ export function TaskTabs({
 
   // По умолчанию «В работе»; если пусто — «Не начатые». Пустой экран = всё выполнено, ждём новые задачи.
   const defaultBucket: Bucket = byBucket.inProgress.length ? "inProgress" : "notStarted";
-  const [bucket, setBucket] = useState<Bucket | null>(null);
+  const [bucket, setBucket] = useState<Bucket | null>(initialBucket ?? null);
   const activeBucket = bucket ?? defaultBucket;
   const rows = byBucket[activeBucket];
 
