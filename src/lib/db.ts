@@ -942,3 +942,43 @@ export async function getBriefByProject(projectKey: string): Promise<Brief | nul
   const rows = await q<Brief>("SELECT * FROM briefs WHERE project_key = $1 ORDER BY submitted_at DESC NULLS LAST, created_at DESC LIMIT 1", [projectKey]);
   return rows[0] ?? null;
 }
+
+// ——— Гайды-инструкции (библиотека) ———
+export interface Guide { id: number; slug: string; title: string; body: string; ord: number }
+
+export async function listGuides(): Promise<Guide[]> {
+  return q<Guide>("SELECT id, slug, title, body, ord FROM guides ORDER BY ord, title");
+}
+export async function createGuide(slug: string, title: string, body: string, ord: number): Promise<{ id?: number; error?: string }> {
+  try {
+    const rows = await q<{ id: number }>("INSERT INTO guides (slug, title, body, ord) VALUES ($1,$2,$3,$4) RETURNING id", [slug, title, body, ord]);
+    return { id: rows[0].id };
+  } catch {
+    return { error: "slug занят" };
+  }
+}
+export async function updateGuide(id: number, title: string, body: string, ord: number): Promise<void> {
+  await q("UPDATE guides SET title=$2, body=$3, ord=$4 WHERE id=$1", [id, title, body, ord]);
+}
+export async function deleteGuide(id: number): Promise<void> {
+  await q("DELETE FROM guides WHERE id=$1", [id]);
+}
+/** id включённых клиенту гайдов по проекту. */
+export async function getProjectGuideIds(projectKey: string): Promise<number[]> {
+  const rows = await q<{ guide_id: number }>("SELECT guide_id FROM project_guides WHERE project_key=$1", [projectKey]);
+  return rows.map((r) => r.guide_id);
+}
+/** Заменить набор включённых гайдов проекта. */
+export async function setProjectGuides(projectKey: string, guideIds: number[]): Promise<void> {
+  await q("DELETE FROM project_guides WHERE project_key=$1", [projectKey]);
+  for (const gid of guideIds) {
+    await q("INSERT INTO project_guides (project_key, guide_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [projectKey, gid]);
+  }
+}
+/** Включённые клиенту гайды проекта (для кабинета клиента). */
+export async function getEnabledGuides(projectKey: string): Promise<Guide[]> {
+  return q<Guide>(
+    "SELECT g.id, g.slug, g.title, g.body, g.ord FROM guides g JOIN project_guides pg ON pg.guide_id=g.id WHERE pg.project_key=$1 ORDER BY g.ord, g.title",
+    [projectKey],
+  );
+}

@@ -100,6 +100,25 @@ CREATE TABLE IF NOT EXISTS briefs (
   project_key  TEXT,                                  -- привязка к проекту (проставляется позже)
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   submitted_at TIMESTAMPTZ);
+-- Гайды-инструкции (растущая библиотека): регистрация GitHub/хостинг/бот и т.п. Каждый гайд — markdown-страница.
+CREATE TABLE IF NOT EXISTS guides (
+  id         SERIAL PRIMARY KEY,
+  slug       TEXT UNIQUE NOT NULL,
+  title      TEXT NOT NULL,
+  body       TEXT NOT NULL DEFAULT '',               -- markdown
+  ord        INT NOT NULL DEFAULT 100,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+-- Какие гайды включены клиенту по проекту.
+CREATE TABLE IF NOT EXISTS project_guides (
+  project_key TEXT NOT NULL,
+  guide_id    INT  NOT NULL REFERENCES guides(id) ON DELETE CASCADE,
+  PRIMARY KEY (project_key, guide_id));
+-- Стартовые гайды (идемпотентно).
+INSERT INTO guides (slug, title, body, ord) VALUES
+ ('github', 'Реєстрація GitHub', E'Потрібен акаунт GitHub, щоб зберігати код проєкту.\n\n1. Відкрийте https://github.com/signup\n2. Вкажіть e-mail, придумайте пароль і ім''я користувача.\n3. Підтвердіть e-mail (лист від GitHub).\n4. Надішліть мені ваш нік (username) — додам вас до репозиторію.', 10),
+ ('railway', 'Реєстрація хостингу (Railway)', E'Хостинг — де працює сайт онлайн.\n\n1. Відкрийте https://railway.com\n2. Увійдіть через GitHub (кнопка «Login with GitHub»).\n3. Підтвердіть доступ.\n4. Напишіть мені — підключу проєкт і налаштую автодеплой.', 20),
+ ('tg-bot', 'Реєстрація Telegram-бота', E'Якщо проєкту потрібен Telegram-бот.\n\n1. У Telegram відкрийте @BotFather.\n2. Команда /newbot → задайте ім''я та username бота (закінчується на *bot*).\n3. BotFather надішле **токен** — скопіюйте його.\n4. Надішліть токен мені (приватно) — підключу бота.', 30)
+ON CONFLICT (slug) DO NOTHING;
 CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
 -- Сохранение исходного автора/исполнителя (логин+роль) для переноса истории при уходе с YouTrack:
 -- член может быть удалён (ник YouTrack), а коммент/задачу потом привяжем к новому tg-пользователю.

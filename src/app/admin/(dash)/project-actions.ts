@@ -1,7 +1,7 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins } from "@/lib/notify";
@@ -28,6 +28,16 @@ export async function saveCredentials(projectKey: string, credentials: Cred[]): 
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
+}
+
+/** Включить клиенту набор гайдов на проекте. Admin. */
+export async function saveProjectGuides(projectKey: string, guideIds: number[]): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  await setProjectGuides(projectKey, guideIds);
+  revalidatePath(`/admin/projects/${projectKey}`);
+  revalidatePath("/admin");
+  return { ok: true };
 }
 
 /**

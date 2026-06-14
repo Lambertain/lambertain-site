@@ -5,7 +5,8 @@ import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
-import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor } from "@/lib/db";
+import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor, getEnabledGuides } from "@/lib/db";
+import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
 import { ProjectInfoCard } from "./project-info-card";
 import { nowMs } from "@/lib/now";
@@ -177,12 +178,14 @@ export default async function HomePage() {
     );
   }
 
-  // —— Клиент: онбординг-баннер + инфо своего проекта (доступы для тестирования) + задачи ——
+  // —— Клиент: онбординг-баннер + «Подготовка» (гайды) + инфо своего проекта + задачи ——
   const showOnboarding = me.role === "client" && !!visible.find((p) => p.key === me.projectKey)?.meta.showOnboarding;
   const clientProject = me.role === "client" ? visible.find((p) => !p.meta.feedback) : null;
+  const clientGuides = me.role === "client" && me.projectKey ? await getEnabledGuides(me.projectKey) : [];
 
   return (
     <div>
+      <ClientGuides guides={clientGuides.map((g) => ({ id: g.id, title: g.title, body: g.body }))} locale={locale} />
       {showOnboarding && (
         <Link href="/onboarding" style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", marginBottom: 18, borderRadius: 10, border: "1px solid var(--accent-line)", background: "rgba(185,255,75,0.06)", textDecoration: "none", color: "var(--text)" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
