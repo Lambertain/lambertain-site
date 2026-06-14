@@ -12,6 +12,7 @@ const TYPES: { key: string; uk: string; ru: string }[] = [
   { key: "landing", uk: "Лендинг послуги", ru: "Лендинг услуги" },
   { key: "shop", uk: "Інтернет-магазин", ru: "Интернет-магазин" },
   { key: "saas", uk: "SaaS / платформа", ru: "SaaS / платформа" },
+  { key: "automation", uk: "Автоматизація / CRM / інтеграції", ru: "Автоматизация / CRM / интеграции" },
   { key: "portfolio", uk: "Портфоліо", ru: "Портфолио" },
   { key: "other", uk: "Інше", ru: "Другое" },
 ];
@@ -55,6 +56,27 @@ const BRANCH: Record<string, Field[]> = {
     { key: "pricing", uk: "Тарифи / монетизація", ru: "Тарифы / монетизация", kind: "text" },
     { key: "integrations", uk: "Інтеграції (оплата, пошта, API)", ru: "Интеграции (оплата, почта, API)", kind: "text" },
     { key: "auth", uk: "Авторизація (email, Google, Telegram)", ru: "Авторизация (email, Google, Telegram)", kind: "text" },
+  ],
+  automation: [
+    { key: "channels", uk: "Канали зв'язку, які підключити", ru: "Каналы связи для подключения", kind: "multi", opts: [
+      { key: "telegram", uk: "Telegram", ru: "Telegram" }, { key: "viber", uk: "Viber", ru: "Viber" },
+      { key: "whatsapp", uk: "WhatsApp", ru: "WhatsApp" }, { key: "email", uk: "Email", ru: "Email" },
+      { key: "instagram", uk: "Instagram Direct", ru: "Instagram Direct" }, { key: "calls", uk: "Телефонія / дзвінки", ru: "Телефония / звонки" },
+    ] },
+    { key: "ai", uk: "AI-функції", ru: "AI-функции", kind: "multi", opts: [
+      { key: "transcribe", uk: "Транскрибація дзвінків", ru: "Транскрибация звонков" }, { key: "callAnalysis", uk: "Аналіз / підсумок дзвінків", ru: "Анализ / резюме звонков" },
+      { key: "autotag", uk: "Авто-категоризація / теги", ru: "Авто-категоризация / теги" }, { key: "chatbot", uk: "Чат-бот / автовідповіді", ru: "Чат-бот / автоответы" },
+      { key: "chatSummary", uk: "Резюме переписки", ru: "Резюме переписки" },
+    ] },
+    { key: "crm", uk: "Модулі CRM", ru: "Модули CRM", kind: "multi", opts: [
+      { key: "contacts", uk: "Контакти / клієнти", ru: "Контакты / клиенты" }, { key: "pipeline", uk: "Воронка / угоди", ru: "Воронка / сделки" },
+      { key: "tasks", uk: "Задачі / нагадування", ru: "Задачи / напоминания" }, { key: "reports", uk: "Звіти / аналітика", ru: "Отчёты / аналитика" },
+      { key: "integrateCrm", uk: "Інтеграція з наявною CRM", ru: "Интеграция с существующей CRM" },
+    ] },
+    { key: "current", uk: "Що вже використовуєте (CRM, телефонія, інструменти)", ru: "Что уже используете (CRM, телефония, инструменты)", kind: "text" },
+    { key: "volume", uk: "Обсяги (каналів / дзвінків на день / користувачів)", ru: "Объёмы (каналов / звонков в день / пользователей)", kind: "text" },
+    { key: "scenarios", uk: "Ключові сценарії роботи", ru: "Ключевые сценарии работы", kind: "area" },
+    { key: "integrations", uk: "Інші інтеграції (оплата, API, 1С/BAS...)", ru: "Другие интеграции (оплата, API, 1С/BAS...)", kind: "text" },
   ],
   portfolio: [
     { key: "works", uk: "Що показуємо (роботи / проєкти)", ru: "Что показываем (работы / проекты)", kind: "area" },
