@@ -582,6 +582,10 @@ export async function appendRequestBlocks(readableId: string, blocks: ReqBlock[]
 export async function setTaskAiStatus(readableId: string, status: "pending" | "waiting" | "done" | null): Promise<void> {
   await q("UPDATE tasks SET ai_status = $2 WHERE readable_id = $1", [readableId, status]);
 }
+/** Флаг «нужно действие владельца» (деплой/регистрация/токен) — задача ждёт ручного ops-шага супер-админа. null = снять. */
+export async function setOwnerAction(readableId: string, action: string | null): Promise<void> {
+  await q("UPDATE tasks SET owner_action = $2, updated_at = now() WHERE readable_id = $1", [readableId, action]);
+}
 export async function getTaskAiStatus(readableId: string): Promise<string | null> {
   const rows = await q<{ ai_status: string | null }>("SELECT ai_status FROM tasks WHERE readable_id = $1", [readableId]);
   return rows[0]?.ai_status ?? null;

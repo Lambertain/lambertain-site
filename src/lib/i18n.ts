@@ -355,6 +355,8 @@ export const DICT: Record<string, Entry> = {
   "mod.discard": { uk: "Відхилити", ru: "Отклонить", en: "Discard" },
   "mod.save": { uk: "Зберегти", ru: "Сохранить", en: "Save" },
   "mod.ownNote": { uk: "На модерації — можете виправити до публікації:", ru: "На модерации — можно поправить до публикации:", en: "Pending review — you can edit before it's published:" },
+  "owner.needLabel": { uk: "Потрібна дія власника (деплой / реєстрація / токен)", ru: "Нужно действие владельца (деплой / регистрация / токен)", en: "Owner action required (deploy / registration / token)" },
+  "owner.done": { uk: "Виконав", ru: "Выполнил", en: "Done" },
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
 
   // — ответ клиенту через ИИ (по фидбеку разраба, от лица Lambertain) —

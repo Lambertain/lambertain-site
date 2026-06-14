@@ -97,11 +97,14 @@ async function remindSuperAdmin() {
   const pt = (await pool.query(
     `SELECT readable_id FROM tasks WHERE approval_status = 'pending' AND created_at < now() - interval '15 minutes' ORDER BY readable_id`,
   )).rows;
-  if (!pc.length && !pt.length) return;
+  // Задачи «на доработку владельцу» (ops-шаг: деплой/регистрация/токен).
+  const oa = (await pool.query(`SELECT readable_id FROM tasks WHERE owner_action IS NOT NULL ORDER BY readable_id`)).rows;
+  if (!pc.length && !pt.length && !oa.length) return;
   const lines = ["🔔 <b>Ждут твоей реакции</b>"];
+  if (oa.length) lines.push(`🛠 На доработку (твой ops-шаг): <b>${oa.length}</b>`);
   if (pc.length) lines.push(`📝 Комментов на модерации: <b>${pc.length}</b>`);
   if (pt.length) lines.push(`✅ Задач на апрув: <b>${pt.length}</b>`);
-  const ids = [...new Set([...pc.map((r) => r.readable_id), ...pt.map((r) => r.readable_id)])].slice(0, 8);
+  const ids = [...new Set([...oa.map((r) => r.readable_id), ...pc.map((r) => r.readable_id), ...pt.map((r) => r.readable_id)])].slice(0, 8);
   const buttons = ids.map((id) => ({ text: `→ ${id}`, web_app: { url: `${PUBLIC_SITE}/tma?task=${encodeURIComponent(id)}` } }));
   await tgButtons(lines.join("\n"), buttons);
   await setState("last_remind", String(Date.now()));

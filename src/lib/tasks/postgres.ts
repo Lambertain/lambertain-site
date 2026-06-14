@@ -32,11 +32,12 @@ interface TaskRow {
   approval_status: string | null;
   internal: boolean | null;
   auto_done: boolean | null;
+  owner_action: string | null;
 }
 
 const TASK_SELECT = `
   SELECT t.readable_id, p.key AS project_key, t.title, t.description, t.status, t.priority,
-         t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal, t.auto_done,
+         t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal, t.auto_done, t.owner_action,
          a.login AS assignee_login, a.full_name AS assignee_name,
          r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role,
          (SELECT count(*) FROM comments c WHERE c.task_id = t.id AND c.approved) AS comment_count,
@@ -68,6 +69,7 @@ function rowToTask(t: TaskRow): Task {
     approvalStatus: t.approval_status ?? "approved",
     internal: !!t.internal,
     autoDone: !!t.auto_done,
+    ownerAction: t.owner_action ?? null,
   };
 }
 

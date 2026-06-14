@@ -7,7 +7,7 @@ import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment, editOwnPending, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment } from "@/lib/db";
+import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
@@ -100,6 +100,16 @@ export async function discardPendingComment(commentId: string, taskId: string): 
   const r = await discardOwnPending(commentId, me.youtrackLogin || "");
   revalidatePath(`/admin/tasks/${taskId}`);
   return "error" in r ? { error: r.error } : { ok: true };
+}
+
+/** Владелец выполнил ops-шаг (деплой/регистрация/токен) → снять флаг и продвинуть задачу (Done если autoDone, иначе Review). */
+export async function markOwnerActionDone(taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
+  await setOwnerAction(taskId, null);
+  const task = await getBackend().getTask(taskId).catch(() => null);
+  await getBackend().updateStatus(taskId, task?.autoDone ? "Done" : "Review").catch(() => {});
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return { ok: true };
 }
 
 /** Супер-админ удаляет любой коммент (опубликованный или на модерации). */

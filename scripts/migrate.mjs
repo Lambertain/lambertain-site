@@ -74,6 +74,9 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tags JSONB;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT false;
 -- Авто-готово: задачи по спеке от супер-админа на готовности идут сразу в Done (без ручной приёмки).
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS auto_done BOOLEAN NOT NULL DEFAULT false;
+-- Действие владельца: задача требует ручного ops-шага только владельца (деплой/регистрация/токен) — передаётся
+-- супер-админу «на доработку». Клиент видит «в работе» (status не меняется); это внутренний флаг.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS owner_action TEXT;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

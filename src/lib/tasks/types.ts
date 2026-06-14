@@ -95,6 +95,8 @@ export interface Task {
   internal?: boolean;
   /** Авто-готово: на ревью-завершении дева задача идёт сразу в Done (без ручной приёмки). */
   autoDone?: boolean;
+  /** Задача ждёт ручного ops-шага владельца (деплой/регистрация/токен): что нужно сделать. Клиент не видит. */
+  ownerAction?: string | null;
 }
 
 export interface Comment {

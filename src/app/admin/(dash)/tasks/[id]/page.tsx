@@ -10,6 +10,7 @@ import { CommentBox } from "./comment-box";
 import { ApprovalBar } from "./approval-bar";
 import { ReviewActions } from "./review-actions";
 import { CommentsView, type ViewComment } from "./comments-view";
+import { OwnerActionBar } from "./owner-action-bar";
 import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
 import { Markdown } from "../../markdown";
@@ -89,6 +90,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         )}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
+
+      {/* Нужно действие владельца (деплой/регистрация/токен) — команде, не клиенту (клиент видит «в работе») */}
+      {me.role !== "client" && task.ownerAction && (
+        <OwnerActionBar taskId={task.id} action={task.ownerAction} canResolve={isSuperAdmin(me)} locale={locale} />
+      )}
 
       {/* Теги триажа (тип/сложность/скилы) — команде, не клиенту */}
       {me.role !== "client" && tags && (tags.type || tags.complexity || (tags.skills?.length ?? 0) > 0) && (

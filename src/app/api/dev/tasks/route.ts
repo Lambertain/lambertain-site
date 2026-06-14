@@ -57,6 +57,8 @@ export async function GET(req: Request) {
       priority: t.priority,
       updated: t.updated,
       url: t.url,
+      // Передана владельцу на ops-шаг — НЕ бери в работу, пропусти (см. протокол).
+      ownerAction: t.ownerAction ?? null,
     })),
   });
 }

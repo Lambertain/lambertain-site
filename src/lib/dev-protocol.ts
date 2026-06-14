@@ -53,7 +53,13 @@ export function protocolBody(token: string, projectKey: string, base = PORTAL_BA
    ВАЖНО ПРО КОДИРОВКУ: тело с кириллицей передавай ТОЛЬКО через файл в UTF-8 — инлайн \`-d '...'\` ломает кодировку в консоли Windows.
    - запиши тело в файл \`esc.json\` (UTF-8): \`{"taskId":"${projectKey}-<N>","question":"<вопрос>","kind":"client|admin"}\`
    - отправь: \`curl -s -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json; charset=utf-8" --data-binary @esc.json "${base}/api/dev/escalate"\`
-6. **Перед продолжением перечитывай задачу** (\`?id=\`): \`awaitingClient: true\` — ещё ждём ответа; \`lastClientAnswer\` — ответ клиента. Продолжай по нему.
+6. **Нужен ручной ops-шаг ВЛАДЕЛЬЦА — передай задачу владельцу (НЕ клиенту, НЕ в review).** Если задача упирается в действие,
+   которое может сделать только владелец агентства: **деплой на хостинг/Railway, регистрация внешнего сервиса/аккаунта, получение
+   API-токенов/ключей/секретов, DNS, биллинг, публикация в стор** — НЕ помечай review и НЕ эскалируй клиенту. Передай владельцу:
+   - тело в файл \`ho.json\` (UTF-8): \`{"taskId":"${projectKey}-<N>","action":"<что нужно сделать владельцу простыми словами>"}\`
+   - отправь: \`curl -s -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json; charset=utf-8" --data-binary @ho.json "${base}/api/dev/handoff"\`
+   Клиент видит «в работе», задача уходит владельцу. **Бери следующую НЕзаблокированную задачу** (в списке задачи с \`ownerAction != null\` — пропускай, они у владельца).
+7. **Перед продолжением перечитывай задачу** (\`?id=\`): \`awaitingClient: true\` — ещё ждём ответа; \`lastClientAnswer\` — ответ клиента. Продолжай по нему.
 
 Токен проекта: \`${token}\` (Project \`${projectKey}\`) — в публичный код не коммитить.`;
 }
