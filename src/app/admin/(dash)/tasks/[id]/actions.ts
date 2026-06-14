@@ -6,6 +6,7 @@ import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment, editOwnPending, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
+import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
@@ -62,16 +63,17 @@ export async function addTaskComment(
       const task = await getBackend().getTask(id);
       const imgs = attachmentIdsIn(body, task.description);
       const projName = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey)?.name || task.projectKey;
+      const openBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` };
       if (me.role === "client") {
         // Клиент написал → ответственному разработчику + админу.
-        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs);
-        await notifyAdmin(`💬 <b>Вопрос клиента</b>\nПроект «${projName}»\n${id}: ${task.summary}`);
+        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
+        await notifyAdmin(`💬 <b>Вопрос клиента</b>\nПроект «${projName}»\n${id}: ${task.summary}`, openBtn);
       } else if (visibility === "client") {
         // Команда ответила клиенту → клиенту/сотруднику проекта.
-        await notifyProjectClients(task.projectKey, `💬 <b>${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs);
+        await notifyProjectClients(task.projectKey, `💬 <b>${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
       } else if (task.assignee?.login && task.assignee.login !== me.youtrackLogin) {
         // Внутренний коммент → ответственному разработчику.
-        await notifyLogins([task.assignee.login], `📝 <b>${id}</b> (внутр.): ${body.slice(0, 300)}`, imgs);
+        await notifyLogins([task.assignee.login], `📝 <b>${id}</b> (внутр.): ${body.slice(0, 300)}`, imgs, openBtn);
       }
     } catch {
       // уведомления не должны валить коммент

@@ -12,6 +12,7 @@ import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin } from "@/lib/notify";
 import { submitForModeration } from "@/lib/moderation";
+import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
       if (task.autoDone) {
         await be.updateStatus(taskId, "Done");
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client");
-        await notifyAdmin(`✅ <b>Авто-готово</b> · ${taskId}: ${task.summary}`).catch(() => {});
+        await notifyAdmin(`✅ <b>Авто-готово</b> · ${taskId}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
         return NextResponse.json({ ok: true, status: "Done" });
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
