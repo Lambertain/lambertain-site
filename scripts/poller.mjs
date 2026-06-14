@@ -69,6 +69,44 @@ async function tg(text) {
   return sendToDev(TG_CHAT, text);
 }
 
+async function tgButtons(text, buttons) {
+  if (DRY) { console.log(`[DRY] →${TG_CHAT}`, text.replace(/\n/g, " ⏎ ")); return; }
+  const kb = [];
+  for (let i = 0; i < buttons.length; i += 2) kb.push(buttons.slice(i, i + 2));
+  const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: kb } }),
+  });
+  if (!r.ok) console.error("TG error:", await r.text());
+}
+
+const REMIND_MS = 15 * 60 * 1000;
+const PUBLIC_SITE = "https://www.lambertain.site";
+
+/** Каждые 15 мин: напомнить супер-админу про несделанное — комменты на модерации и задачи на апрув (с кнопками-диплинками). */
+async function remindSuperAdmin() {
+  if (!TG_TOKEN || !TG_CHAT) return;
+  const last = Number((await getState("last_remind")) || 0);
+  if (Date.now() - last < REMIND_MS) return; // не чаще раза в 15 мин
+  // Старше 15 мин — чтобы не дублировать свежее исходное уведомление о коммента/задаче.
+  const pc = (await pool.query(
+    `SELECT DISTINCT t.readable_id FROM comments c JOIN tasks t ON t.id = c.task_id
+     WHERE c.approved = false AND c.created_at < now() - interval '15 minutes' ORDER BY t.readable_id`,
+  )).rows;
+  const pt = (await pool.query(
+    `SELECT readable_id FROM tasks WHERE approval_status = 'pending' AND created_at < now() - interval '15 minutes' ORDER BY readable_id`,
+  )).rows;
+  if (!pc.length && !pt.length) return;
+  const lines = ["🔔 <b>Ждут твоей реакции</b>"];
+  if (pc.length) lines.push(`📝 Комментов на модерации: <b>${pc.length}</b>`);
+  if (pt.length) lines.push(`✅ Задач на апрув: <b>${pt.length}</b>`);
+  const ids = [...new Set([...pc.map((r) => r.readable_id), ...pt.map((r) => r.readable_id)])].slice(0, 8);
+  const buttons = ids.map((id) => ({ text: `→ ${id}`, web_app: { url: `${PUBLIC_SITE}/tma?task=${encodeURIComponent(id)}` } }));
+  await tgButtons(lines.join("\n"), buttons);
+  await setState("last_remind", String(Date.now()));
+}
+
 // login -> role ("client" | "contributor" | "admin" | "unknown")
 let rolesCache = null;
 let rolesAt = 0;
@@ -199,6 +237,7 @@ async function cycle() {
   if (flag("NOTIFY_CLIENT_COMMENT")) total += await checkClientComments(rmap).catch((e) => (console.error("comments:", e.message), 0));
   if (flag("NOTIFY_DONE")) total += await checkDone(rmap).catch((e) => (console.error("done:", e.message), 0));
   if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
+  if (flag("REMIND_APPROVALS")) await remindSuperAdmin().catch((e) => console.error("remind:", e.message));
   console.log(new Date().toISOString(), `цикл завершён, событий: ${total}`);
 }
 

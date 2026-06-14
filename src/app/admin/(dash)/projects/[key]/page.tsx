@@ -44,7 +44,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
 
       <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
 
-      <KickoffPanel projectKey={key} locale={locale} />
+      <KickoffPanel projectKey={key} locale={locale} hasSpec={!!proj.meta.spec?.trim()} />
 
       {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} />}
 

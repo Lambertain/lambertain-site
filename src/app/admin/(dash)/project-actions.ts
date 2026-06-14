@@ -30,35 +30,22 @@ export async function saveCredentials(projectKey: string, credentials: Cred[]): 
   }
 }
 
-/** Старт проекта: разбить спеку на задачи (превью, без создания). Admin. */
-export async function proposeTasksFromSpec(projectKey: string, spec: string): Promise<{ tasks?: KickoffTask[]; error?: string }> {
+/**
+ * Старт проекта одной кнопкой: берём СОХРАНЁННУЮ спеку проекта (`meta.spec`), разбиваем на задачи и СРАЗУ создаём
+ * (с зависимостями, тегами, assign на ответственного). Без превью/апрува и без второго поля спеки. Admin.
+ */
+export async function kickoffFromSpec(projectKey: string): Promise<{ created?: number; error?: string }> {
   const me = await getPrincipal();
   if (!me || me.realRole !== "admin") return { error: "Нет прав" };
-  if (!spec.trim()) return { error: "Пустая спека" };
+  const p = await getProjectFull(projectKey);
+  if (!p) return { error: "Проект не найден" };
+  const spec = (p.meta.spec || "").trim();
+  if (!spec) return { error: "Сначала заполните и сохраните «Спека проекта» выше." };
   try {
-    const p = await getProjectFull(projectKey);
-    if (!p) return { error: "Проект не найден" };
-    const tasks = await decomposeSpec(spec, p.name);
-    return { tasks };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка декомпозиции" };
-  }
-}
-
-/** Создать предложенные kickoff-задачи с зависимостями и тегами (assign — ответственный по проекту). Admin. */
-export async function createKickoffTasks(projectKey: string, tasks: KickoffTask[], spec?: string): Promise<{ created?: number; error?: string }> {
-  const me = await getPrincipal();
-  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
-  if (!tasks.length) return { error: "Нет задач" };
-  try {
+    const tasks: KickoffTask[] = await decomposeSpec(spec, p.name);
+    if (!tasks.length) return { error: "Не удалось разбить спеку на задачи" };
     const be = getBackend();
-    const project = (await be.listProjects()).find((p) => p.key === projectKey);
-    const assignee = project?.meta.defaultAssignee || null;
-    // Сохраняем полную спеку на проекте — Claude разработчика читает её как общий контекст (через dev-API).
-    if (spec?.trim()) {
-      const full = await getProjectFull(projectKey);
-      if (full) await setProjectMeta(projectKey, full.name, { ...full.meta, spec: spec.trim() });
-    }
+    const assignee = p.meta.defaultAssignee || null;
     const ids: string[] = [];
     for (const tk of tasks) {
       const task = await be.createTask({
@@ -79,10 +66,11 @@ export async function createKickoffTasks(projectKey: string, tasks: KickoffTask[
       const deps = (tasks[i].dependsOn || []).filter((j) => j >= 0 && j < ids.length && j !== i).map((j) => ids[j]);
       if (deps.length) await setTaskDeps(ids[i], deps).catch(() => {});
     }
-    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${project?.name || projectKey}: ${ids.length} задач(и). Делай по порядку — блокеры расставлены.`).catch(() => {});
+    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай по порядку — блокеры расставлены.`).catch(() => {});
     revalidatePath("/admin");
+    revalidatePath(`/admin/projects/${projectKey}`);
     return { created: ids.length };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка создания" };
+    return { error: e instanceof Error ? e.message : "Ошибка декомпозиции/создания" };
   }
 }
