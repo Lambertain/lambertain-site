@@ -3,8 +3,7 @@
 import { after } from "next/server";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { taskDiff } from "@/lib/review";
-import { draftClientAnswer, draftClientMessage } from "@/lib/replies";
+import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment, editOwnPending, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment } from "@/lib/db";
@@ -197,26 +196,3 @@ export async function retryDrafting(id: string): Promise<{ ok?: boolean; error?:
   }
 }
 
-/**
- * Черновик ответа клиенту: ИИ читает задачу, комменты и код и сам предлагает ответ.
- * instructions — правки разработчика; priorDraft — текущая версия (переработать). Не публикует.
- */
-export async function draftClientReply(
-  id: string,
-  instructions?: string,
-  priorDraft?: string,
-): Promise<{ draft?: string; error?: string }> {
-  const me = await getPrincipal();
-  if (!me) return { error: "Не авторизован" };
-  if (me.role !== "contributor" && me.realRole !== "admin") return { error: "Нет прав" };
-  try {
-    const be = getBackend();
-    const [task, comments] = await Promise.all([be.getTask(id), be.getComments(id)]);
-    const lastClient = [...comments].reverse().find((c) => c.author.role === "client");
-    const code = await taskDiff(id).catch(() => null);
-    const draft = await draftClientAnswer(task, lastClient?.text || "", comments, code, instructions, priorDraft);
-    return { draft };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка" };
-  }
-}

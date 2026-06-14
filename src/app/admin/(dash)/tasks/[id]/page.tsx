@@ -9,7 +9,6 @@ import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
 import { ApprovalBar } from "./approval-bar";
 import { ReviewActions } from "./review-actions";
-import { ClientReply } from "./client-reply";
 import { CommentsView, type ViewComment } from "./comments-view";
 import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
@@ -162,8 +161,6 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           {t(locale, "task.comments")} · {shownCount}
         </div>
         <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} locale={locale} />
-        {/* Прямой ИИ-ответ клиенту (мимо модерации) — только супер-админу. Команда пишет через обычный коммент → модерация. */}
-        {isSuperAdmin(me) && <ClientReply id={task.id} locale={locale} />}
         <CommentBox id={task.id} locale={locale} canChooseVisibility={me.role !== "client"} />
       </div>
     </div>
