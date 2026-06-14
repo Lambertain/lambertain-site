@@ -38,7 +38,8 @@ function buildBlocks(text: string, atts: Att[]): Block[] {
 }
 
 export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; feedbackKey?: string }) {
-  const [projectKey, setProjectKey] = useState(projects[0]?.key ?? "");
+  // Дефолт — первый НЕ-фидбек проект (Lamb.dev не должен быть выбран по умолчанию).
+  const [projectKey, setProjectKey] = useState((projects.find((p) => p.key !== feedbackKey) ?? projects[0])?.key ?? "");
   const [recipient, setRecipient] = useState<"admin" | "client">("admin");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");

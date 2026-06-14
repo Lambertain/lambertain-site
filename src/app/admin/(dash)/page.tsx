@@ -40,6 +40,11 @@ export default async function HomePage() {
         return { key: p.key, name: p.name, meta: p.meta, createdAt: p.createdAt, total: c?.total ?? 0, done: c?.done ?? 0 };
       });
     const devNames: Record<string, string> = Object.fromEntries(users.map((u) => [u.login, u.alias || u.fullName]));
+    // Селект создания задачи: фидбек-проект (Lamb.dev) — последним, не дефолтом.
+    const chatProjects = dash
+      .map((p) => ({ key: p.key, name: p.name, fb: !!p.meta.feedback }))
+      .sort((a, b) => (a.fb ? 1 : 0) - (b.fb ? 1 : 0))
+      .map((p) => ({ key: p.key, name: p.name }));
 
     return (
       <div>
@@ -50,7 +55,7 @@ export default async function HomePage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>{t(locale, "projects.manage")}</Link>
-            <ChatModal projects={dash.map((p) => ({ key: p.key, name: p.name }))} locale={locale} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
+            <ChatModal projects={chatProjects} locale={locale} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
           </div>
         </div>
         <DevDashboard projects={dash} devNames={devNames} now={nowMs()} locale={locale} />
@@ -61,7 +66,11 @@ export default async function HomePage() {
   // —— Контрибьютор/клиент/сотрудник: задачи с табами проект→статус ——
   const all = await be.listProjects();
   const visible = visibleProjects(me, all);
-  const projects = visible.map((p) => ({ key: p.key, name: p.name }));
+  // Фидбек-проект (Lamb.dev) — всегда ПОСЛЕДНИМ в списках и НЕ дефолтом в селекте создания задачи,
+  // иначе клиент по невнимательности создаёт задачи своего проекта в Lamb.dev.
+  const fbSet = new Set(all.filter((p) => p.meta.feedback).map((p) => p.key));
+  const byFeedbackLast = (a: { key: string }, b: { key: string }) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0);
+  const projects = visible.map((p) => ({ key: p.key, name: p.name })).sort(byFeedbackLast);
   const visibleKeys = new Set(visible.map((p) => p.key));
 
   let tasks, reads, projectSeen;
@@ -107,7 +116,6 @@ export default async function HomePage() {
 
   // Метка New на проекте: активность задач позже последнего открытия проекта.
   // Фидбек-проект (Lamb.dev) — всегда последним табом; первым — основной проект пользователя.
-  const fbSet = new Set(all.filter((p) => p.meta.feedback).map((p) => p.key));
   const projectsWithNew = projects
     .map((p) => {
       const seen = projectSeen.get(p.key) ?? 0;
@@ -116,7 +124,7 @@ export default async function HomePage() {
       );
       return { key: p.key, name: p.name, hasNew };
     })
-    .sort((a, b) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0));
+    .sort(byFeedbackLast);
 
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
   const canDelete = me.realRole === "admin" || me.role === "client";
@@ -139,6 +147,8 @@ export default async function HomePage() {
   // —— Разработчик: дашборд своих проектов (инфо, прогресс, счётчики, доступы) ——
   if (me.role === "contributor") {
     const myProjects = visible.filter((p) => !p.meta.feedback);
+    // Lamb.dev (фидбек) — последней карточкой, как и у остальных участников (без доступов/прод-ссылки).
+    const fbProject = visible.find((p) => p.meta.feedback);
     return (
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -148,13 +158,19 @@ export default async function HomePage() {
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 18 }}>
-          {myProjects.length === 0 ? (
+          {myProjects.length === 0 && !fbProject ? (
             <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "dash.empty")}</p>
           ) : (
-            myProjects.map((p) => {
-              const { counts, newCount } = projCounts(p.key);
-              return <ProjectInfoCard key={p.key} project={p} canEdit showDevLink counts={counts} newCount={newCount} now={now} locale={locale} />;
-            })
+            <>
+              {myProjects.map((p) => {
+                const { counts, newCount } = projCounts(p.key);
+                return <ProjectInfoCard key={p.key} project={p} canEdit showDevLink counts={counts} newCount={newCount} now={now} locale={locale} />;
+              })}
+              {fbProject && (() => {
+                const { counts, newCount } = projCounts(fbProject.key);
+                return <ProjectInfoCard key={fbProject.key} project={fbProject} counts={counts} newCount={newCount} now={now} locale={locale} />;
+              })()}
+            </>
           )}
         </div>
       </div>
