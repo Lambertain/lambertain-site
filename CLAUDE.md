@@ -12,6 +12,13 @@
 - Next.js 16 + React 19 + Tailwind 4 + TypeScript. Хостинг: Railway.
 - `/` — публичное портфолио; `/admin` — PM-портал (см. PM_PORTAL.md); `/tma` — Telegram Mini App.
 
+## Дизайн (анти-дженерик)
+- Перед версткой нового UI/лендинга — НЕ выдумывать палитру «из головы» (это даёт одинаковый warm-cream/serif/terracotta на всех проектах). Сначала получить арт-дирекшен скилом `ui-ux-pro-max`:
+  `python .claude/skills/ui-ux-pro-max/scripts/search.py "<продукт> <индустрия> <тон>" --design-system`
+  → вернёт паттерн, стиль, палитру (hex-токены), пару шрифтов, эффекты и список AVOID (включая «AI purple/pink gradients»). Строить ровно по этим токенам.
+- Доменные запросы: `--domain color|style|typography|landing|ux "<keywords>"`. Доп. скилы: `frontend-design` (вкус/различимость), `web-design-guidelines` (a11y/ревью), `customer-journey` (UX-флоу).
+- Разные продукты → разные системы (fintech→amber/минимализм, kids→blue/clay, luxury→near-black/glass). Если две задачи дают одинаковую палитру — менять ключевые слова запроса.
+
 ## Railway
 - Endpoint GraphQL: `https://backboard.railway.app/graphql/v2`, заголовок `Authorization: Bearer $RAILWAY_TOKEN` (токен — в `.env.local`).
 - Нативный fetch в .mjs, `{ projects }` (не `{ me { projects } }`), variableUpsert через variables.
