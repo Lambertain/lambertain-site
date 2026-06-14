@@ -5,7 +5,7 @@ import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment, editOwnPending, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
+import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
@@ -136,10 +136,10 @@ export async function moderateEdit(commentId: string, taskId: string, text: stri
   return "error" in r ? r : { ok: true };
 }
 
-/** Модерация (супер-админ): отклонить pending-коммент (клиент его не видел). */
-export async function moderateDiscard(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
+/** Модерация (супер-админ): отклонить клиент-facing коммент, оставив его ВНУТРЕННИМ (текст остаётся в треде, клиент не видит). */
+export async function moderateReject(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
   if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
-  await discardModeratedComment(commentId);
+  await rejectToInternal(commentId);
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
 }

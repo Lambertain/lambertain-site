@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { markTaskRead } from "../../tasks-actions";
-import { moderateApprove, moderateEdit, moderateDiscard, editPendingComment, discardPendingComment, superDeleteComment } from "./actions";
+import { moderateApprove, moderateEdit, moderateReject, editPendingComment, discardPendingComment, superDeleteComment } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -106,7 +106,7 @@ export function CommentsView({
                 )}
                 <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
                 {/* Удаление любого коммента — только супер-админу (pending удаляется через «Відхилити» в панели модерации). */}
-                {canModerate && !pending && <SuperDelete taskId={taskId} commentId={c.id} locale={locale} />}
+                {canModerate && <SuperDelete taskId={taskId} commentId={c.id} locale={locale} />}
               </div>
               <Markdown>{c.text}</Markdown>
               {pending && canModerate
@@ -152,7 +152,7 @@ function Moderation({ taskId, commentId, text, locale }: { taskId: string; comme
           <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginRight: 4 }}>{t(locale, "mod.note")}</span>
           <button onClick={() => start(() => { moderateApprove(commentId, taskId); })} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{t(locale, "mod.approve")}</button>
           <button onClick={() => { setDraft(text); setEditing(true); }} style={ui.btn}>{t(locale, "mod.edit")}</button>
-          <button onClick={() => start(() => { moderateDiscard(commentId, taskId); })} disabled={pending} style={{ ...ui.btn, color: "#ff5b5b", borderColor: "#ff5b5b" }}>{t(locale, "mod.discard")}</button>
+          <button onClick={() => start(() => { moderateReject(commentId, taskId); })} disabled={pending} style={ui.btn}>{t(locale, "mod.keepInternal")}</button>
         </div>
       )}
     </div>

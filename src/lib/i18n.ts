@@ -353,6 +353,7 @@ export const DICT: Record<string, Entry> = {
   "mod.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
   "mod.editApprove": { uk: "Зберегти і схвалити", ru: "Сохранить и одобрить", en: "Save & approve" },
   "mod.discard": { uk: "Відхилити", ru: "Отклонить", en: "Discard" },
+  "mod.keepInternal": { uk: "Не клієнту (внутр.)", ru: "Не клиенту (внутр.)", en: "Keep internal" },
   "mod.save": { uk: "Зберегти", ru: "Сохранить", en: "Save" },
   "mod.ownNote": { uk: "На модерації — можете виправити до публікації:", ru: "На модерации — можно поправить до публикации:", en: "Pending review — you can edit before it's published:" },
   "owner.needLabel": { uk: "Потрібна дія власника (деплой / реєстрація / токен)", ru: "Нужно действие владельца (деплой / регистрация / токен)", en: "Owner action required (deploy / registration / token)" },

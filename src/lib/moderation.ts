@@ -53,9 +53,12 @@ export async function editModeratedComment(commentId: string, body: string): Pro
   return approveModeratedComment(commentId);
 }
 
-/** Отклонить pending-коммент (удалить — клиент его не видел). */
-export async function discardModeratedComment(commentId: string): Promise<void> {
-  await q("DELETE FROM comments WHERE id = $1 AND approved = false", [commentId]);
+/**
+ * Отклонить клиент-facing коммент команды, но ОСТАВИТЬ его внутренним: текст остаётся в треде для команды,
+ * клиент не видит, очередь модерации чистится. Полное удаление — отдельной корзиной (deleteCommentAny).
+ */
+export async function rejectToInternal(commentId: string): Promise<void> {
+  await q("UPDATE comments SET approved = true, visibility = 'internal' WHERE id = $1 AND approved = false", [commentId]);
 }
 
 /** Автор-член правит СВОЙ pending-коммент (до модерации). Проверяет авторство и что ещё не опубликован. */

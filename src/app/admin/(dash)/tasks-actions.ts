@@ -6,7 +6,8 @@ import { getBackend } from "@/lib/tasks";
 import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus } from "@/lib/db";
 import { draftTask } from "@/lib/drafter";
 import { statusBucket } from "@/lib/statuses";
-import { notifyProjectClients } from "@/lib/notify";
+import { notifyProjectClients, notifyLogins } from "@/lib/notify";
+import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { revalidatePath } from "next/cache";
 
 export async function updateTaskStatus(id: string, status: string): Promise<{ ok?: boolean; error?: string }> {
@@ -80,6 +81,15 @@ export async function setApproval(id: string, status: "approved" | "rejected"): 
         await setTaskAiStatus(id, "pending");
         after(() => draftTask(id));
       }
+    } else {
+      // Reject → задача на «Доработку» + уведомление постановщику (создателю), чтобы доработал.
+      await getBackend().updateStatus(id, "Rework").catch(() => {});
+      try {
+        const task = await getBackend().getTask(id);
+        if (task.reporter?.login) {
+          await notifyLogins([task.reporter.login], `↩️ <b>Возвращено на доработку</b> · ${id}: ${task.summary}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` });
+        }
+      } catch { /* уведомление не критично */ }
     }
     revalidatePath(`/admin/tasks/${id}`);
     revalidatePath("/admin");
