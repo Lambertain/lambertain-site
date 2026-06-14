@@ -931,3 +931,14 @@ export async function submitBrief(token: string, projectType: string, payload: R
 export async function listBriefs(): Promise<Brief[]> {
   return q<Brief>("SELECT * FROM briefs ORDER BY created_at DESC");
 }
+
+/** Привязать бриф к проекту (или отвязать, projectKey=null). */
+export async function linkBriefToProject(briefId: number, projectKey: string | null): Promise<void> {
+  await q("UPDATE briefs SET project_key = $2 WHERE id = $1", [briefId, projectKey]);
+}
+
+/** Бриф, привязанный к проекту (последний, если несколько). */
+export async function getBriefByProject(projectKey: string): Promise<Brief | null> {
+  const rows = await q<Brief>("SELECT * FROM briefs WHERE project_key = $1 ORDER BY submitted_at DESC NULLS LAST, created_at DESC LIMIT 1", [projectKey]);
+  return rows[0] ?? null;
+}

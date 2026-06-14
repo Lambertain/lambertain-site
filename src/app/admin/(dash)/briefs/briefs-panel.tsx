@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { newBrief } from "./actions";
+import { newBrief, linkBrief } from "./actions";
 import { ui } from "../../ui-styles";
 
-type BriefRow = { id: number; token: string; label: string | null; type: string | null; status: string; payload: Record<string, unknown> | null; created: string };
+type Proj = { key: string; name: string };
+type BriefRow = { id: number; token: string; label: string | null; type: string | null; status: string; payload: Record<string, unknown> | null; projectKey: string | null; created: string };
 
 function CopyLink({ url }: { url: string }) {
   const [done, setDone] = useState(false);
@@ -18,8 +19,10 @@ function CopyLink({ url }: { url: string }) {
   );
 }
 
-function Row({ b, base }: { b: BriefRow; base: string }) {
+function Row({ b, base, projects }: { b: BriefRow; base: string; projects: Proj[] }) {
   const [open, setOpen] = useState(false);
+  const [proj, setProj] = useState(b.projectKey ?? "");
+  const [pending, start] = useTransition();
   const url = `${base}/brief/${b.token}`;
   const submitted = b.status === "submitted";
   return (
@@ -33,6 +36,17 @@ function Row({ b, base }: { b: BriefRow; base: string }) {
           {submitted && b.payload && <button onClick={() => setOpen((v) => !v)} style={ui.btn}>{open ? "Скрыть" : "Показать ответы"}</button>}
         </span>
       </div>
+      {/* привязка к проекту */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>Проект:</span>
+        <select value={proj} onChange={(e) => setProj(e.target.value)} style={{ ...ui.input, width: "auto", padding: "6px 10px" }}>
+          <option value="">— не привязан —</option>
+          {projects.map((p) => <option key={p.key} value={p.key}>{p.name} ({p.key})</option>)}
+        </select>
+        {proj !== (b.projectKey ?? "") && (
+          <button onClick={() => start(() => { linkBrief(b.id, proj); })} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{pending ? "…" : "Привязать"}</button>
+        )}
+      </div>
       {open && b.payload && (
         <pre style={{ marginTop: 12, fontSize: 12.5, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--surface-2)", border: "1px solid var(--border-2)", padding: 12, borderRadius: 4 }}>
           {JSON.stringify(b.payload, null, 2)}
@@ -42,7 +56,7 @@ function Row({ b, base }: { b: BriefRow; base: string }) {
   );
 }
 
-export function BriefsPanel({ briefs, base }: { briefs: BriefRow[]; base: string }) {
+export function BriefsPanel({ briefs, projects, base }: { briefs: BriefRow[]; projects: Proj[]; base: string }) {
   const [label, setLabel] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +94,7 @@ export function BriefsPanel({ briefs, base }: { briefs: BriefRow[]; base: string
         {briefs.length === 0 ? (
           <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 10 }}>Пока нет.</p>
         ) : (
-          briefs.map((b) => <Row key={b.id} b={b} base={base} />)
+          briefs.map((b) => <Row key={b.id} b={b} base={base} projects={projects} />)
         )}
       </div>
     </div>
