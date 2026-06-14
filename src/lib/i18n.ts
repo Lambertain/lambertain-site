@@ -347,6 +347,12 @@ export const DICT: Record<string, Entry> = {
   "comment.internalOnly": { uk: "Внутрішній — клієнт не побачить", ru: "Внутренний — клиент не увидит", en: "Internal — client won’t see it" },
   "comment.willSeeClient": { uk: "Клієнт побачить цей коментар", ru: "Клиент увидит этот комментарий", en: "The client will see this comment" },
   "comment.internalBadge": { uk: "внутр.", ru: "внутр.", en: "internal" },
+  "mod.pendingBadge": { uk: "на модерації", ru: "на модерации", en: "pending review" },
+  "mod.note": { uk: "Коментар команди — на модерації:", ru: "Комментарий команды — на модерации:", en: "Team comment — pending review:" },
+  "mod.approve": { uk: "Схвалити", ru: "Одобрить", en: "Approve" },
+  "mod.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
+  "mod.editApprove": { uk: "Зберегти і схвалити", ru: "Сохранить и одобрить", en: "Save & approve" },
+  "mod.discard": { uk: "Відхилити", ru: "Отклонить", en: "Discard" },
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
 
   // — ответ клиенту через ИИ (по фидбеку разраба, от лица Lambertain) —

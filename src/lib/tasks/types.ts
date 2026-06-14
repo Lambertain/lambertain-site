@@ -104,6 +104,8 @@ export interface Comment {
   author: { login: string; fullName: string; role: Role };
   /** "client" — видно клиенту; "internal" — только команде (дев/админ). По умолчанию client. */
   visibility?: "client" | "internal";
+  /** false — на модерации (клиент не видит, без пуша) до апрува супер-админом. По умолчанию true. */
+  approved?: boolean;
 }
 
 /** Структурированная задача из произвольного текста (результат Claude API). */
@@ -148,7 +150,7 @@ export interface TasksBackend {
     autoDone?: boolean;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
-  addComment(id: string, text: string, visibility?: "client" | "internal", authorLogin?: string): Promise<Comment>;
+  addComment(id: string, text: string, visibility?: "client" | "internal", authorLogin?: string, approved?: boolean): Promise<Comment>;
   updateStatus(id: string, status: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
 }

@@ -9,7 +9,8 @@ import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { draftClientQuestion } from "@/lib/replies";
-import { notifyProjectClients, notifyAdmin, notifyLogins } from "@/lib/notify";
+import { notifyAdmin, notifyLogins } from "@/lib/notify";
+import { submitForModeration } from "@/lib/moderation";
 import { ESCALATION_MARK, PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -52,12 +53,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, escalatedTo: task.reporter?.login || "admin" });
     }
 
-    // client: оформляем вопрос от лица агентства, постим клиенту, уведомляем. Задача блокируется до ответа.
+    // client: оформляем вопрос от лица агентства → на МОДЕРАЦИЮ супер-админу (клиент увидит после апрува). Задача блокируется до ответа.
     const polished = await draftClientQuestion(task, question, comments);
-    await be.addComment(taskId, `${ESCALATION_MARK}\n\n${polished}`, "client");
+    await submitForModeration(taskId, `${ESCALATION_MARK}\n\n${polished}`, { taskSummary: task.summary });
     await be.updateStatus(taskId, "Blocked").catch(() => {});
-    await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${taskId}: ${task.summary}\n${polished.slice(0, 500)}`, [], openBtn);
-    return NextResponse.json({ ok: true, escalatedTo: "client", posted: polished });
+    return NextResponse.json({ ok: true, escalatedTo: "client (на модерации)", posted: polished });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
   }

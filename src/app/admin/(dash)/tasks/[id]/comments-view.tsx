@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { markTaskRead } from "../../tasks-actions";
+import { moderateApprove, moderateEdit, moderateDiscard } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -13,6 +14,7 @@ export type ViewComment = {
   authorName: string;
   authorRole: string;
   visibility?: "client" | "internal";
+  approved: boolean;
   isNew: boolean;
 };
 
@@ -26,11 +28,13 @@ export function CommentsView({
   taskId,
   comments,
   isClient,
+  canModerate,
   locale,
 }: {
   taskId: string;
   comments: ViewComment[];
   isClient: boolean;
+  canModerate: boolean;
   locale: Locale;
 }) {
   const newRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -71,7 +75,8 @@ export function CommentsView({
     target?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  const shown = isClient ? comments.filter((c) => c.visibility !== "internal") : comments;
+  // Клиент не видит внутренние И комменты на модерации (approved=false).
+  const shown = isClient ? comments.filter((c) => c.visibility !== "internal" && c.approved) : comments;
 
   return (
     <>
@@ -79,11 +84,12 @@ export function CommentsView({
         {shown.length === 0 && <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "task.noComments")}</p>}
         {shown.map((c) => {
           const internal = c.visibility === "internal";
+          const pending = !c.approved;
           return (
             <div
               key={c.id}
               ref={c.isNew ? (el) => { if (el) newRefs.current.set(c.id, el); } : undefined}
-              style={{ ...ui.card, padding: 14, borderColor: c.isNew ? "var(--accent-line)" : internal ? "var(--border-2)" : "var(--border)", background: internal ? "rgba(255,255,255,0.02)" : undefined }}
+              style={{ ...ui.card, padding: 14, borderColor: pending ? "#e8b339" : c.isNew ? "var(--accent-line)" : internal ? "var(--border-2)" : "var(--border)", background: internal ? "rgba(255,255,255,0.02)" : undefined }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10, ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>
                 <span style={{ color: c.authorRole === "client" ? "#e8b339" : "var(--accent)" }}>
@@ -94,9 +100,13 @@ export function CommentsView({
                 {internal && !isClient && (
                   <span style={{ ...ui.monoLabel, color: "#e8b339", border: "1px solid #e8b339", padding: "1px 6px" }}>{t(locale, "comment.internalBadge")}</span>
                 )}
+                {pending && (
+                  <span style={{ ...ui.monoLabel, color: "#e8b339", border: "1px solid #e8b339", padding: "1px 6px" }}>{t(locale, "mod.pendingBadge")}</span>
+                )}
                 <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
               </div>
               <Markdown>{c.text}</Markdown>
+              {canModerate && pending && <Moderation taskId={taskId} commentId={c.id} text={c.text} locale={locale} />}
             </div>
           );
         })}
@@ -112,5 +122,32 @@ export function CommentsView({
         </button>
       )}
     </>
+  );
+}
+
+/** Контролы модерации pending-коммента (только супер-админ): одобрить / отредактировать+одобрить / отклонить. */
+function Moderation({ taskId, commentId, text, locale }: { taskId: string; commentId: string; text: string; locale: Locale }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const [pending, start] = useTransition();
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-2)" }}>
+      {editing ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} style={{ ...ui.input, resize: "vertical", fontFamily: "inherit", width: "100%" }} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => start(() => { moderateEdit(commentId, taskId, draft); })} disabled={pending || !draft.trim()} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{t(locale, "mod.editApprove")}</button>
+            <button onClick={() => setEditing(false)} style={ui.btn}>{t(locale, "common.cancel")}</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginRight: 4 }}>{t(locale, "mod.note")}</span>
+          <button onClick={() => start(() => { moderateApprove(commentId, taskId); })} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{t(locale, "mod.approve")}</button>
+          <button onClick={() => { setDraft(text); setEditing(true); }} style={ui.btn}>{t(locale, "mod.edit")}</button>
+          <button onClick={() => start(() => { moderateDiscard(commentId, taskId); })} disabled={pending} style={{ ...ui.btn, color: "#ff5b5b", borderColor: "#ff5b5b" }}>{t(locale, "mod.discard")}</button>
+        </div>
+      )}
+    </div>
   );
 }

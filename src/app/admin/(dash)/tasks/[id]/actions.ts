@@ -1,11 +1,12 @@
 "use server";
 
 import { after } from "next/server";
-import { getPrincipal } from "@/lib/principal";
+import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { taskDiff } from "@/lib/review";
-import { draftClientAnswer } from "@/lib/replies";
+import { draftClientAnswer, draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
+import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment } from "@/lib/moderation";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
@@ -28,6 +29,19 @@ export async function addTaskComment(
     for (const a of attachments ?? []) {
       const aid = await saveAttachment(id, a.mime, a.data, a.name);
       if (aid) body = body.replaceAll(`att:${a.localId}`, `/api/files/${aid}`);
+    }
+    // Модерация: клиент-видимый коммент от команды (кроме супер-админа) → полиш в агентский голос + pending,
+    // клиент не видит и без пуша до апрува Никиты.
+    if (me.role !== "client" && visibility === "client" && !isSuperAdmin(me)) {
+      try {
+        const [task, history] = await Promise.all([getBackend().getTask(id), getBackend().getComments(id)]);
+        const polished = (await draftClientMessage(task, body, history)) || body;
+        await submitForModeration(id, polished, { authorLogin: me.youtrackLogin, taskSummary: task.summary });
+      } catch {
+        await submitForModeration(id, body, { authorLogin: me.youtrackLogin });
+      }
+      revalidatePath(`/admin/tasks/${id}`);
+      return { ok: true };
     }
     // Автор коммента = текущий член (по логину); супер-админ без логина → Lambertain. Клиент видит команду как «Lambertain» (маскируется при выводе).
     await getBackend().addComment(id, body, visibility, me.youtrackLogin);
@@ -67,6 +81,30 @@ export async function addTaskComment(
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
+}
+
+/** Модерация (супер-админ): одобрить pending-коммент → публикуется клиенту + пуш. */
+export async function moderateApprove(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
+  const r = await approveModeratedComment(commentId);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? r : { ok: true };
+}
+
+/** Модерация (супер-админ): отредактировать и сразу одобрить. */
+export async function moderateEdit(commentId: string, taskId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
+  if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
+  const r = await editModeratedComment(commentId, text);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? r : { ok: true };
+}
+
+/** Модерация (супер-админ): отклонить pending-коммент (клиент его не видел). */
+export async function moderateDiscard(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
+  await discardModeratedComment(commentId);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return { ok: true };
 }
 
 /**

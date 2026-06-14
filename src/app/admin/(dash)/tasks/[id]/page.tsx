@@ -52,7 +52,6 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   // Внутренняя задача (разработчик → админ) клиенту не видна.
   if (task.internal && me.role === "client") redirect(backHref);
 
-  const canReview = isAdmin || me.role === "contributor";
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
   // Новые комменты — появившиеся после последнего открытия задачи.
   const prevRead = reads.get(id) ?? 0;
@@ -63,9 +62,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     authorName: c.author.fullName,
     authorRole: c.author.role,
     visibility: c.visibility,
+    approved: c.approved !== false,
     isNew: c.created > prevRead,
   }));
-  const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal").length : viewComments.length;
+  const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal" && c.approved).length : viewComments.length;
 
   return (
     <div>
@@ -159,8 +159,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <div style={ui.monoLabel}>
           {t(locale, "task.comments")} · {shownCount}
         </div>
-        <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} locale={locale} />
-        {canReview && <ClientReply id={task.id} locale={locale} />}
+        <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} locale={locale} />
+        {/* Прямой ИИ-ответ клиенту (мимо модерации) — только супер-админу. Команда пишет через обычный коммент → модерация. */}
+        {isSuperAdmin(me) && <ClientReply id={task.id} locale={locale} />}
         <CommentBox id={task.id} locale={locale} canChooseVisibility={me.role !== "client"} />
       </div>
     </div>

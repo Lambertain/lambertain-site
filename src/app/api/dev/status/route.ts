@@ -10,7 +10,8 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
+import { notifyAdmin } from "@/lib/notify";
+import { submitForModeration } from "@/lib/moderation";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -46,9 +47,9 @@ export async function POST(req: Request) {
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
       await be.updateStatus(taskId, "Review");
+      // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
       if (summary) {
-        await be.addComment(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, "client");
-        await notifyProjectClients(projectKey, `✅ <b>Готово до перевірки</b> · ${taskId}: ${task.summary}\n${summary.slice(0, 400)}\n\nℹ️ Відкрийте задачу — прийміть або поверніть на доопрацювання.`, attachmentIdsIn(summary)).catch(() => {});
+        await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary });
       }
       return NextResponse.json({ ok: true, status: "Review" });
     }

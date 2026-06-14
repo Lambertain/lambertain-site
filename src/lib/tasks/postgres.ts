@@ -39,8 +39,8 @@ const TASK_SELECT = `
          t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal, t.auto_done,
          a.login AS assignee_login, a.full_name AS assignee_name,
          r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role,
-         (SELECT count(*) FROM comments c WHERE c.task_id = t.id) AS comment_count,
-         (SELECT max(c.created_at) FROM comments c WHERE c.task_id = t.id) AS last_comment_at
+         (SELECT count(*) FROM comments c WHERE c.task_id = t.id AND c.approved) AS comment_count,
+         (SELECT max(c.created_at) FROM comments c WHERE c.task_id = t.id AND c.approved) AS last_comment_at
   FROM tasks t
   JOIN projects p ON p.id = t.project_id
   LEFT JOIN members a ON a.id = t.assignee_id
@@ -164,8 +164,9 @@ export const postgresBackend: TasksBackend = {
       orig_author_login: string | null;
       orig_author_role: Role | null;
       visibility: string;
+      approved: boolean;
     }>(
-      `SELECT c.id, c.body, c.created_at, c.visibility, c.orig_author_login, c.orig_author_role,
+      `SELECT c.id, c.body, c.created_at, c.visibility, c.approved, c.orig_author_login, c.orig_author_role,
               m.login AS author_login, m.full_name AS author_name, m.role AS author_role
        FROM comments c
        JOIN tasks t ON t.id = c.task_id
@@ -184,6 +185,7 @@ export const postgresBackend: TasksBackend = {
         created: ms(c.created_at) ?? 0,
         author: { login, fullName, role },
         visibility: c.visibility === "internal" ? "internal" : "client",
+        approved: c.approved,
       };
     });
   },
@@ -199,7 +201,7 @@ export const postgresBackend: TasksBackend = {
     await q("DELETE FROM tasks WHERE id = $1", [rows[0].id]);
   },
 
-  async addComment(id: string, text: string, visibility: "client" | "internal" = "client", authorLogin?: string): Promise<Comment> {
+  async addComment(id: string, text: string, visibility: "client" | "internal" = "client", authorLogin?: string, approved: boolean = true): Promise<Comment> {
     const task = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [id]);
     if (!task[0]) throw new Error(`Задача ${id} не найдена`);
     // Автор: член по логину (клиент/разработчик/сотрудник/админ-член). Без логина (бот/супер-админ) — Lambertain.
@@ -213,8 +215,8 @@ export const postgresBackend: TasksBackend = {
     }
     const rows = await q<{ id: number; created_at: string }>(
       `INSERT INTO comments (task_id, author_id, body, visibility, approved, created_at)
-       VALUES ($1, $2, $3, $4, true, now()) RETURNING id, created_at`,
-      [task[0].id, author?.id ?? null, text, visibility],
+       VALUES ($1, $2, $3, $4, $5, now()) RETURNING id, created_at`,
+      [task[0].id, author?.id ?? null, text, visibility, approved],
     );
     return {
       id: String(rows[0].id),
@@ -224,6 +226,7 @@ export const postgresBackend: TasksBackend = {
         ? { login: author.login, fullName: author.full_name || author.login, role: author.role }
         : { login: "lambertain", fullName: "Lambertain", role: "admin" },
       visibility,
+      approved,
     };
   },
 };

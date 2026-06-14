@@ -66,6 +66,30 @@ export async function draftClientQuestion(task: Task, devQuestion: string, histo
 }
 
 /**
+ * Полировка любого сообщения команды → КЛИЕНТУ в голос агентства (для модерации).
+ * Меняет ТОЛЬКО тон/форму; факты, числа, ссылки, маркеры файлов и список вопросов сохраняет дословно.
+ */
+export async function draftClientMessage(task: Task, raw: string, history: Comment[]): Promise<string> {
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const hist = history.slice(-6).map((c) => `${c.author.fullName} (${c.author.role}): ${c.text}`).join("\n");
+  const system =
+    "Ты — проджект-менеджер агентства Lambertain. Перепиши сообщение команды для КЛИЕНТА от имени агентства. " +
+    "Меняй ТОЛЬКО тон и форму: вежливо, формально на «Вы», от первого лица единственного числа в мужском роде, без технического жаргона и внутренней кухни, " +
+    "без приветствий-фамильярностей и без подписи. НЕ упоминай разработчика/исполнителя, не предлагай созвон. " +
+    "СОХРАНИ дословно: все факты, числа, проценты, названия, ссылки и маркеры файлов (вида /api/files/...), markdown. " +
+    "Если это вопросы — оставь их вопросами (понятными, при необходимости с вариантами простыми словами). " +
+    "Пиши на языке исходного сообщения. Верни ТОЛЬКО готовый текст.";
+  const prompt =
+    `Задача ${task.id}: ${task.summary}\n` +
+    (hist ? `Переписка:\n${hist}\n\n` : "") +
+    `Сообщение команды (перепиши его для клиента):\n${raw}\n\n` +
+    `Верни только готовый текст.`;
+  const resp = await client.messages.create({ model: MODEL, max_tokens: 1000, system, messages: [{ role: "user", content: prompt }] });
+  const block = resp.content.find((b) => b.type === "text");
+  return block && block.type === "text" ? block.text.trim() : raw;
+}
+
+/**
  * Черновик ответа клиенту: ИИ читает задачу, переписку и код и сам предлагает ответ
  * на последний вопрос/комментарий клиента — от имени агентства Lambertain (не от лица разработчика).
  * `instructions` — правки разработчика («убери X», «добавь про сроки»); `priorDraft` — текущая версия

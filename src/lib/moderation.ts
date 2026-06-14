@@ -1,0 +1,59 @@
+/**
+ * Модерация клиент-видимых комментов команды.
+ * Любой клиент-видимый коммент от команды (кроме супер-админа и самого клиента) создаётся pending
+ * (approved=false): клиент его НЕ видит и НЕ получает пуш. Уведомление уходит супер-админу (Никите) на модерацию.
+ * После апрува/правки коммент публикуется и клиент получает уведомление. Server-side only.
+ */
+import { getBackend } from "./tasks";
+import { notifyAdmin, notifyProjectClients, attachmentIdsIn } from "./notify";
+import { q } from "./db";
+import { PORTAL_BASE } from "./dev-protocol";
+
+const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
+
+/**
+ * Клиент-видимый коммент от команды → на модерацию супер-админу.
+ * Создаёт pending-коммент (клиент не видит, без пуша) и уведомляет супер-админа.
+ */
+export async function submitForModeration(taskId: string, body: string, opts?: { authorLogin?: string; taskSummary?: string }): Promise<void> {
+  await getBackend().addComment(taskId, body, "client", opts?.authorLogin, false);
+  const summary = opts?.taskSummary ?? (await getBackend().getTask(taskId).then((t) => t.summary).catch(() => ""));
+  await notifyAdmin(`🛡 <b>Коммент на модерацию</b> · ${taskId}: ${summary}\n${body.slice(0, 400)}`, taskBtn(taskId)).catch(() => {});
+}
+
+type Row = { id: number; body: string; readable_id: string; project_key: string; summary: string };
+async function commentInfo(commentId: string): Promise<Row | null> {
+  const rows = await q<Row>(
+    `SELECT c.id, c.body, t.readable_id, p.key AS project_key, t.title AS summary
+     FROM comments c JOIN tasks t ON t.id = c.task_id JOIN projects p ON p.id = t.project_id
+     WHERE c.id = $1`,
+    [commentId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Одобрить pending-коммент → публикуется клиенту + пуш. */
+export async function approveModeratedComment(commentId: string): Promise<{ taskId: string } | { error: string }> {
+  const r = await commentInfo(commentId);
+  if (!r) return { error: "not found" };
+  await q("UPDATE comments SET approved = true WHERE id = $1", [commentId]);
+  await notifyProjectClients(
+    r.project_key,
+    `💬 <b>${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
+    attachmentIdsIn(r.body),
+    taskBtn(r.readable_id),
+  ).catch(() => {});
+  return { taskId: r.readable_id };
+}
+
+/** Отредактировать текст и сразу одобрить (→ публикуется клиенту + пуш). */
+export async function editModeratedComment(commentId: string, body: string): Promise<{ taskId: string } | { error: string }> {
+  if (!body.trim()) return { error: "empty" };
+  await q("UPDATE comments SET body = $2 WHERE id = $1", [commentId, body]);
+  return approveModeratedComment(commentId);
+}
+
+/** Отклонить pending-коммент (удалить — клиент его не видел). */
+export async function discardModeratedComment(commentId: string): Promise<void> {
+  await q("DELETE FROM comments WHERE id = $1 AND approved = false", [commentId]);
+}
