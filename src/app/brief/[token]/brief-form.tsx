@@ -100,6 +100,9 @@ const TXT = {
   sent: { uk: "Дякую! Бриф надіслано — я зв'яжуся з вами.", ru: "Спасибо! Бриф отправлен — я свяжусь с вами." },
   required: { uk: "Заповніть обов'язкові поля.", ru: "Заполните обязательные поля." },
   yes: { uk: "Так", ru: "Да" }, no: { uk: "Ні", ru: "Нет" },
+  other: { uk: "Інше / своє (впишіть, якщо немає серед варіантів)", ru: "Другое / своё (впишите, если нет среди вариантов)" },
+  note: { uk: "Уточнення (необов'язково)", ru: "Уточнение (необязательно)" },
+  extra: { uk: "Що ще важливо? Додаткова інформація", ru: "Что ещё важно? Дополнительная информация" },
 };
 
 export function BriefForm({ token }: { token: string }) {
@@ -144,20 +147,26 @@ export function BriefForm({ token }: { token: string }) {
         {f.kind === "text" && <input value={(v as string) ?? ""} onChange={(e) => set(f.key, e.target.value)} style={{ ...ui.input, width: "100%" }} />}
         {f.kind === "area" && <textarea value={(v as string) ?? ""} onChange={(e) => set(f.key, e.target.value)} rows={3} style={{ ...ui.input, width: "100%", resize: "vertical" }} />}
         {f.kind === "yesno" && (
-          <div style={{ display: "flex", gap: 8 }}>
-            {([["yes", TXT.yes[lang]], ["no", TXT.no[lang]]] as const).map(([val, lbl]) => (
-              <button key={val} type="button" onClick={() => set(f.key, val)} style={{ ...ui.monoLabel, textTransform: "none", padding: "7px 16px", borderRadius: 2, cursor: "pointer", border: "1px solid " + (v === val ? "var(--accent)" : "var(--border-2)"), background: v === val ? "var(--accent)" : "transparent", color: v === val ? "#000" : "var(--muted)" }}>{lbl}</button>
-            ))}
+          <div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {([["yes", TXT.yes[lang]], ["no", TXT.no[lang]]] as const).map(([val, lbl]) => (
+                <button key={val} type="button" onClick={() => set(f.key, val)} style={{ ...ui.monoLabel, textTransform: "none", padding: "7px 16px", borderRadius: 2, cursor: "pointer", border: "1px solid " + (v === val ? "var(--accent)" : "var(--border-2)"), background: v === val ? "var(--accent)" : "transparent", color: v === val ? "#000" : "var(--muted)" }}>{lbl}</button>
+              ))}
+            </div>
+            <input value={(data[f.key + "Other"] as string) ?? ""} onChange={(e) => set(f.key + "Other", e.target.value)} placeholder={TXT.note[lang]} style={{ ...ui.input, width: "100%", marginTop: 8 }} />
           </div>
         )}
         {f.kind === "multi" && (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {f.opts!.map((o) => {
-              const on = Array.isArray(v) && (v as string[]).includes(o.key);
-              return (
-                <button key={o.key} type="button" onClick={() => toggleMulti(f.key, o.key)} style={{ ...ui.monoLabel, textTransform: "none", padding: "7px 14px", borderRadius: 2, cursor: "pointer", border: "1px solid " + (on ? "var(--accent)" : "var(--border-2)"), background: on ? "var(--accent)" : "transparent", color: on ? "#000" : "var(--muted)" }}>{o[lang]}</button>
-              );
-            })}
+          <div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {f.opts!.map((o) => {
+                const on = Array.isArray(v) && (v as string[]).includes(o.key);
+                return (
+                  <button key={o.key} type="button" onClick={() => toggleMulti(f.key, o.key)} style={{ ...ui.monoLabel, textTransform: "none", padding: "7px 14px", borderRadius: 2, cursor: "pointer", border: "1px solid " + (on ? "var(--accent)" : "var(--border-2)"), background: on ? "var(--accent)" : "transparent", color: on ? "#000" : "var(--muted)" }}>{o[lang]}</button>
+                );
+              })}
+            </div>
+            <input value={(data[f.key + "Other"] as string) ?? ""} onChange={(e) => set(f.key + "Other", e.target.value)} placeholder={TXT.other[lang]} style={{ ...ui.input, width: "100%", marginTop: 8 }} />
           </div>
         )}
       </div>
@@ -192,6 +201,10 @@ export function BriefForm({ token }: { token: string }) {
         <>
           {COMMON.map(renderField)}
           {(BRANCH[type] || []).map(renderField)}
+          <div style={{ marginTop: 16 }}>
+            <label style={{ ...ui.fieldLabel, display: "block", marginBottom: 6 }}>{TXT.extra[lang]}</label>
+            <textarea value={(data.extra as string) ?? ""} onChange={(e) => set("extra", e.target.value)} rows={3} style={{ ...ui.input, width: "100%", resize: "vertical" }} />
+          </div>
           {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 14 }}>{error}</p>}
           <button onClick={submit} disabled={pending} style={{ ...ui.btnAccent, marginTop: 22, width: "100%", justifyContent: "center", opacity: pending ? 0.6 : 1 }}>
             {pending ? "…" : TXT.submit[lang]}
