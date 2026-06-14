@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { markTaskRead } from "../../tasks-actions";
-import { moderateApprove, moderateEdit, moderateDiscard } from "./actions";
+import { moderateApprove, moderateEdit, moderateDiscard, editPendingComment, discardPendingComment } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -15,6 +15,7 @@ export type ViewComment = {
   authorRole: string;
   visibility?: "client" | "internal";
   approved: boolean;
+  canEditOwn?: boolean;
   isNew: boolean;
 };
 
@@ -106,7 +107,11 @@ export function CommentsView({
                 <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
               </div>
               <Markdown>{c.text}</Markdown>
-              {canModerate && pending && <Moderation taskId={taskId} commentId={c.id} text={c.text} locale={locale} />}
+              {pending && canModerate
+                ? <Moderation taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
+                : pending && c.canEditOwn
+                  ? <OwnPendingEdit taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
+                  : null}
             </div>
           );
         })}
@@ -146,6 +151,32 @@ function Moderation({ taskId, commentId, text, locale }: { taskId: string; comme
           <button onClick={() => start(() => { moderateApprove(commentId, taskId); })} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{t(locale, "mod.approve")}</button>
           <button onClick={() => { setDraft(text); setEditing(true); }} style={ui.btn}>{t(locale, "mod.edit")}</button>
           <button onClick={() => start(() => { moderateDiscard(commentId, taskId); })} disabled={pending} style={{ ...ui.btn, color: "#ff5b5b", borderColor: "#ff5b5b" }}>{t(locale, "mod.discard")}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Автор правит/удаляет СВОЙ коммент, пока он на модерации (до публикации). */
+function OwnPendingEdit({ taskId, commentId, text, locale }: { taskId: string; commentId: string; text: string; locale: Locale }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const [pending, start] = useTransition();
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-2)" }}>
+      {editing ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} style={{ ...ui.input, resize: "vertical", fontFamily: "inherit", width: "100%" }} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => start(() => { editPendingComment(commentId, taskId, draft); setEditing(false); })} disabled={pending || !draft.trim()} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{t(locale, "mod.save")}</button>
+            <button onClick={() => { setDraft(text); setEditing(false); }} style={ui.btn}>{t(locale, "common.cancel")}</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginRight: 4 }}>{t(locale, "mod.ownNote")}</span>
+          <button onClick={() => setEditing(true)} style={ui.btn}>{t(locale, "mod.edit")}</button>
+          <button onClick={() => start(() => { discardPendingComment(commentId, taskId); })} disabled={pending} style={{ ...ui.btn, color: "#ff5b5b", borderColor: "#ff5b5b" }}>{t(locale, "common.delete")}</button>
         </div>
       )}
     </div>

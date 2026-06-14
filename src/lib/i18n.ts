@@ -353,6 +353,8 @@ export const DICT: Record<string, Entry> = {
   "mod.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
   "mod.editApprove": { uk: "Зберегти і схвалити", ru: "Сохранить и одобрить", en: "Save & approve" },
   "mod.discard": { uk: "Відхилити", ru: "Отклонить", en: "Discard" },
+  "mod.save": { uk: "Зберегти", ru: "Сохранить", en: "Save" },
+  "mod.ownNote": { uk: "На модерації — можете виправити до публікації:", ru: "На модерации — можно поправить до публикации:", en: "Pending review — you can edit before it's published:" },
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
 
   // — ответ клиенту через ИИ (по фидбеку разраба, от лица Lambertain) —

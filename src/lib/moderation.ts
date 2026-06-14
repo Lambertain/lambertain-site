@@ -57,3 +57,30 @@ export async function editModeratedComment(commentId: string, body: string): Pro
 export async function discardModeratedComment(commentId: string): Promise<void> {
   await q("DELETE FROM comments WHERE id = $1 AND approved = false", [commentId]);
 }
+
+/** Автор-член правит СВОЙ pending-коммент (до модерации). Проверяет авторство и что ещё не опубликован. */
+export async function editOwnPending(commentId: string, authorLogin: string, body: string): Promise<{ ok: true } | { error: string }> {
+  if (!body.trim()) return { error: "empty" };
+  const rows = await q<{ approved: boolean; login: string | null }>(
+    "SELECT c.approved, m.login FROM comments c LEFT JOIN members m ON m.id = c.author_id WHERE c.id = $1",
+    [commentId],
+  );
+  const r = rows[0];
+  if (!r) return { error: "not found" };
+  if (r.approved) return { error: "already published" };
+  if (!authorLogin || r.login !== authorLogin) return { error: "not your comment" };
+  await q("UPDATE comments SET body = $2 WHERE id = $1", [commentId, body]);
+  return { ok: true };
+}
+
+/** Автор-член удаляет СВОЙ pending-коммент (до модерации). */
+export async function discardOwnPending(commentId: string, authorLogin: string): Promise<{ ok: true } | { error: string }> {
+  const rows = await q<{ login: string | null }>(
+    "SELECT m.login FROM comments c LEFT JOIN members m ON m.id = c.author_id WHERE c.id = $1 AND c.approved = false",
+    [commentId],
+  );
+  if (!rows[0]) return { error: "not found" };
+  if (!authorLogin || rows[0].login !== authorLogin) return { error: "not your comment" };
+  await q("DELETE FROM comments WHERE id = $1 AND approved = false", [commentId]);
+  return { ok: true };
+}

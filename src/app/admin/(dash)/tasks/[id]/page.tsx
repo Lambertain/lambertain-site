@@ -63,6 +63,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     authorRole: c.author.role,
     visibility: c.visibility,
     approved: c.approved !== false,
+    // Автор может править свой коммент, пока он на модерации (не опубликован).
+    canEditOwn: c.approved === false && me.role !== "client" && !!me.youtrackLogin && c.author.login === me.youtrackLogin,
     isNew: c.created > prevRead,
   }));
   const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal" && c.approved).length : viewComments.length;

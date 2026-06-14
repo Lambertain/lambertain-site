@@ -6,7 +6,7 @@ import { getBackend } from "@/lib/tasks";
 import { taskDiff } from "@/lib/review";
 import { draftClientAnswer, draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment } from "@/lib/moderation";
+import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment, editOwnPending, discardOwnPending } from "@/lib/moderation";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
@@ -81,6 +81,24 @@ export async function addTaskComment(
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
+}
+
+/** Автор (разработчик/команда) правит СВОЙ коммент, пока он на модерации (до публикации). */
+export async function editPendingComment(commentId: string, taskId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.role === "client") return { error: "Нет прав" };
+  const r = await editOwnPending(commentId, me.youtrackLogin || "", text);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? { error: r.error } : { ok: true };
+}
+
+/** Автор удаляет СВОЙ коммент, пока он на модерации. */
+export async function discardPendingComment(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.role === "client") return { error: "Нет прав" };
+  const r = await discardOwnPending(commentId, me.youtrackLogin || "");
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? { error: r.error } : { ok: true };
 }
 
 /** Модерация (супер-админ): одобрить pending-коммент → публикуется клиенту + пуш. */
