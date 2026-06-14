@@ -142,15 +142,58 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
   );
 }
 
+const ROLE_ORDER = ["admin", "contributor", "employee", "client"];
+
+function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} style={{ ...ui.monoLabel, padding: "5px 11px", borderRadius: 2, cursor: "pointer", whiteSpace: "nowrap", border: "1px solid " + (active ? "var(--accent)" : "var(--border-2)"), background: active ? "var(--accent)" : "transparent", color: active ? "#000" : "var(--muted)" }}>
+      {children}
+    </button>
+  );
+}
+
 export function UsersPanel({ users, projects, locale }: { users: PanelUser[]; projects: Proj[]; locale: Locale }) {
+  const [roleF, setRoleF] = useState("all");
+  const [projF, setProjF] = useState("all");
+  const roles = ROLE_ORDER.filter((r) => users.some((u) => u.role === r));
+  const filtered = users.filter(
+    (u) => (roleF === "all" || u.role === roleF) && (projF === "all" || u.projectKeys.includes(projF)),
+  );
+
   return (
     <div style={{ marginTop: 28 }}>
       <div style={ui.monoLabel}>{t(locale, "users.kicker")}</div>
-      <h2 style={{ ...ui.h1, fontSize: 22, marginTop: 8 }}>{t(locale, "users.title")} · {users.length}</h2>
+      <h2 style={{ ...ui.h1, fontSize: 22, marginTop: 8 }}>
+        {t(locale, "users.title")} · {filtered.length}
+        {filtered.length !== users.length && <span style={{ color: "var(--muted)" }}> / {users.length}</span>}
+      </h2>
+
+      {/* фильтры: роли (пилюли) + проект (селект) */}
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <Pill active={roleF === "all"} onClick={() => setRoleF("all")}>{t(locale, "users.allRoles")}</Pill>
+          {roles.map((r) => (
+            <Pill key={r} active={roleF === r} onClick={() => setRoleF(r)}>
+              {t(locale, `role.${r}`)} · {users.filter((u) => u.role === r).length}
+            </Pill>
+          ))}
+        </div>
+        {projects.length > 0 && (
+          <select value={projF} onChange={(e) => setProjF(e.target.value)} style={{ ...ui.input, width: "auto", padding: "6px 10px" }}>
+            <option value="all">{t(locale, "users.allProjects")}</option>
+            {projects.map((p) => (
+              <option key={p.key} value={p.key}>{p.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
       {users.length === 0 ? (
         <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 10 }}>{t(locale, "users.empty")}</p>
+      ) : filtered.length === 0 ? (
+        <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 10 }}>{t(locale, "users.noneMatch")}</p>
       ) : (
-        users.map((u) => <Card key={u.login} user={u} projects={projects} locale={locale} />)
+        filtered.map((u) => <Card key={u.login} user={u} projects={projects} locale={locale} />)
       )}
     </div>
   );
