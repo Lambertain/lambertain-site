@@ -89,6 +89,17 @@ CREATE TABLE IF NOT EXISTS attachments (
   data       BYTEA NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (task_id, name));
+-- Бриф лида (до клиента/проекта): открывается по публичной ссылке /brief/<token>, заполняется, привязывается к проекту позже.
+CREATE TABLE IF NOT EXISTS briefs (
+  id           SERIAL PRIMARY KEY,
+  token        TEXT UNIQUE NOT NULL,
+  label        TEXT,                                  -- метка лида (имя/контакт) для админа
+  project_type TEXT,                                  -- визитка|landing|shop|saas|portfolio|other
+  payload      JSONB,                                 -- ответы формы
+  status       TEXT NOT NULL DEFAULT 'draft',         -- draft | submitted
+  project_key  TEXT,                                  -- привязка к проекту (проставляется позже)
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  submitted_at TIMESTAMPTZ);
 CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
 -- Сохранение исходного автора/исполнителя (логин+роль) для переноса истории при уходе с YouTrack:
 -- член может быть удалён (ник YouTrack), а коммент/задачу потом привяжем к новому tg-пользователю.

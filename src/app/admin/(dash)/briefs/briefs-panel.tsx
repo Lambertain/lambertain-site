@@ -1,0 +1,88 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { newBrief } from "./actions";
+import { ui } from "../../ui-styles";
+
+type BriefRow = { id: number; token: string; label: string | null; type: string | null; status: string; payload: Record<string, unknown> | null; created: string };
+
+function CopyLink({ url }: { url: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      onClick={() => { navigator.clipboard?.writeText(url).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }); }}
+      style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)", background: "transparent", border: "1px solid var(--accent-line)", padding: "4px 10px", cursor: "pointer", borderRadius: 2 }}
+    >
+      {done ? "Скопировано ✓" : "Копировать ссылку"}
+    </button>
+  );
+}
+
+function Row({ b, base }: { b: BriefRow; base: string }) {
+  const [open, setOpen] = useState(false);
+  const url = `${base}/brief/${b.token}`;
+  const submitted = b.status === "submitted";
+  return (
+    <div style={{ ...ui.card, padding: 14, marginTop: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <strong style={{ fontSize: 15 }}>{b.label || "—"}</strong>
+        <span style={{ ...ui.monoLabel, color: submitted ? "var(--accent)" : "var(--muted)" }}>{submitted ? "заполнен" : "ожидает"}</span>
+        {b.type && <span style={{ ...ui.monoLabel, textTransform: "none", padding: "1px 8px", border: "1px solid var(--border-2)", borderRadius: 3 }}>{b.type}</span>}
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <CopyLink url={url} />
+          {submitted && b.payload && <button onClick={() => setOpen((v) => !v)} style={ui.btn}>{open ? "Скрыть" : "Показать ответы"}</button>}
+        </span>
+      </div>
+      {open && b.payload && (
+        <pre style={{ marginTop: 12, fontSize: 12.5, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-word", background: "var(--surface-2)", border: "1px solid var(--border-2)", padding: 12, borderRadius: 4 }}>
+          {JSON.stringify(b.payload, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+export function BriefsPanel({ briefs, base }: { briefs: BriefRow[]; base: string }) {
+  const [label, setLabel] = useState("");
+  const [link, setLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function create() {
+    setError(null); setLink(null);
+    start(async () => {
+      const r = await newBrief(label);
+      if (r.error) setError(r.error);
+      else if (r.token) { setLink(`${base}/brief/${r.token}`); setLabel(""); }
+    });
+  }
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ ...ui.card, padding: 16 }}>
+        <div style={ui.monoLabel}>Новый лид</div>
+        <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 6 }}>Имя/контакт лида → получите ссылку на бриф, отправьте лиду.</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="напр. Алла, медправо (Telegram @...)" style={{ ...ui.input, flex: 1, minWidth: 220 }} />
+          <button onClick={create} disabled={pending || !label.trim()} style={{ ...ui.btnAccent, opacity: pending || !label.trim() ? 0.5 : 1 }}>{pending ? "…" : "Создать бриф"}</button>
+        </div>
+        {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 10 }}>{error}</p>}
+        {link && (
+          <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <a href={link} target="_blank" rel="noreferrer" style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)" }}>{link}</a>
+            <CopyLink url={link} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <div style={ui.monoLabel}>Все брифы · {briefs.length}</div>
+        {briefs.length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 10 }}>Пока нет.</p>
+        ) : (
+          briefs.map((b) => <Row key={b.id} b={b} base={base} />)
+        )}
+      </div>
+    </div>
+  );
+}

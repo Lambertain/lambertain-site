@@ -889,3 +889,45 @@ export async function setState(key: string, value: string): Promise<void> {
     [key, value],
   );
 }
+
+// ——— Брифы лидов (до клиента/проекта) ———
+export interface Brief {
+  id: number;
+  token: string;
+  label: string | null;
+  project_type: string | null;
+  payload: Record<string, unknown> | null;
+  status: string;
+  project_key: string | null;
+  created_at: string;
+  submitted_at: string | null;
+}
+
+/** Завести бриф лида (метка — имя/контакт). Возвращает токен для публичной ссылки /brief/<token>. */
+export async function createBrief(label: string): Promise<{ id: number; token: string }> {
+  const token = randomBytes(16).toString("hex");
+  const rows = await q<{ id: number }>(
+    "INSERT INTO briefs (token, label) VALUES ($1, $2) RETURNING id",
+    [token, label.trim() || null],
+  );
+  return { id: rows[0].id, token };
+}
+
+export async function getBriefByToken(token: string): Promise<Brief | null> {
+  const rows = await q<Brief>("SELECT * FROM briefs WHERE token = $1", [token]);
+  return rows[0] ?? null;
+}
+
+/** Сохранить заполненный бриф (тип проекта + ответы) и пометить отправленным. */
+export async function submitBrief(token: string, projectType: string, payload: Record<string, unknown>): Promise<boolean> {
+  const rows = await q<{ id: number }>(
+    "UPDATE briefs SET project_type = $2, payload = $3, status = 'submitted', submitted_at = now() WHERE token = $1 RETURNING id",
+    [token, projectType, JSON.stringify(payload)],
+  );
+  return rows.length > 0;
+}
+
+/** Список брифов для админа (новые сверху). */
+export async function listBriefs(): Promise<Brief[]> {
+  return q<Brief>("SELECT * FROM briefs ORDER BY created_at DESC");
+}
