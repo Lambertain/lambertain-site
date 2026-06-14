@@ -7,7 +7,11 @@ import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
 import { draftTask } from "@/lib/drafter";
 import { notifyLogins, notifyAdmin, notifyProjectClients } from "@/lib/notify";
+import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { projectHasClient, appendRequestBlocks, setTaskAiStatus, type ReqBlock } from "@/lib/db";
+
+/** Кнопка «Открыть задачу» (в notify конвертируется в web_app Mini App с диплинком). */
+const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
 import type { DraftTask, Role } from "@/lib/tasks/types";
 
 /**
@@ -29,14 +33,13 @@ async function approvalFor(me: Principal, projectKey: string): Promise<{ approva
 }
 
 async function notifyPendingApproval(approver: "client" | "admin", projectKey: string, taskId: string, summary: string): Promise<void> {
-  const text = `🟠 <b>Новая задача — нужно подтверждение</b> · ${taskId}: ${summary}`;
-  if (approver === "client") await notifyProjectClients(projectKey, text);
-  else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${taskId}: ${summary}`);
+  if (approver === "client") await notifyProjectClients(projectKey, `🟠 <b>Новая задача — нужно подтверждение</b> · ${taskId}: ${summary}`, [], taskBtn(taskId));
+  else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${taskId}: ${summary}`, taskBtn(taskId));
 }
 /** Уведомить ответственного разработчика о новой задаче (best-effort). */
 async function notifyNewTask(task: { id: string; summary: string; assignee?: { login: string } | null }): Promise<void> {
   try {
-    if (task.assignee?.login) await notifyLogins([task.assignee.login], `🆕 <b>Новая задача</b> · ${task.id}: ${task.summary}`);
+    if (task.assignee?.login) await notifyLogins([task.assignee.login], `🆕 <b>Новая задача</b> · ${task.id}: ${task.summary}`, [], taskBtn(task.id));
   } catch {
     // best-effort
   }
@@ -96,9 +99,9 @@ export async function createRequestTask(
       });
       await appendRequestBlocks(task.id, blocks);
       if (recipient === "admin") {
-        await notifyAdmin(`🔧 <b>Запрос разработчика</b> · проект «${project?.name || projectKey}» · ${task.id}: ${task.summary}`).catch(() => {});
+        await notifyAdmin(`🔧 <b>Запрос разработчика</b> · проект «${project?.name || projectKey}» · ${task.id}: ${task.summary}`, taskBtn(task.id)).catch(() => {});
       } else {
-        await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${task.id}: ${task.summary}`).catch(() => {});
+        await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${task.id}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
       }
       return { id: task.id, url: task.url };
     }
@@ -118,7 +121,7 @@ export async function createRequestTask(
     });
     await appendRequestBlocks(task.id, blocks);
     if (isFeedback) {
-      await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${task.id}: ${task.summary}\nОт: ${me.fullName}`).catch(() => {});
+      await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${task.id}: ${task.summary}\nОт: ${me.fullName}`, taskBtn(task.id)).catch(() => {});
     } else if (appr.pending && appr.approver) {
       // Задача ждёт утверждения; ИИ-проработку запустим только после апрува (можно отредактировать до этого).
       await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
