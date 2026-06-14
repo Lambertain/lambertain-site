@@ -180,8 +180,10 @@ export const PROJECTS: Project[] = [
     longDesc: "Manifest V3 розширення для Chrome. Збирає імена, телефони, тип оголошення з будь-якої категорії OLX.ua. Підтримка фільтрів, автоматична пагінація, вибір кількості (100-1000). Паралельні запити батчами по 300мс для швидкості. Експорт у CSV/Excel і TXT.",
     tags: ["JavaScript", "Chrome Extension", "Manifest V3", "CSV Export"],
     categories: ["tools"],
-    links: [],
-    noUrlReason: "Ссилка буде пізніше",
+    links: [
+      { url: "https://www.zennotemplates.com/ru/templates/olx-phone-parser", label: "Сторінка товару" },
+    ],
+    noUrlReason: null,
   },
   {
     num: "14",
@@ -265,6 +267,30 @@ export const PROJECTS: Project[] = [
     categories: ["web"],
     links: [
       { url: "https://www.ogstudiovisual.com/", label: "ogstudiovisual.com" },
+    ],
+    noUrlReason: null,
+  },
+  {
+    num: "21",
+    name: "INSTAGRAM DM SENDER",
+    desc: "Chrome-розширення для безпечної розсилки в Instagram Direct по існуючих діалогах зі спінтаксом і прогрівом.",
+    longDesc: "Розсилка повідомлень у Direct по наявних діалогах зі спінтаксом, рандомними паузами та денними лімітами. Безпечний прогрів акаунта (лайки, сторіс, коментарі, перегляд стрічки) для імітації людської поведінки і зниження ризику блокувань. Бічна панель (side panel) для керування кампаніями. Manifest V3, ліцензування через zennotemplates.com.",
+    tags: ["JavaScript", "Chrome Extension", "Manifest V3", "Side Panel"],
+    categories: ["tools"],
+    links: [
+      { url: "https://www.zennotemplates.com/ru/templates/instagram-dm-sender", label: "Сторінка товару" },
+    ],
+    noUrlReason: null,
+  },
+  {
+    num: "22",
+    name: "INSTAGRAM CONTACTS PARSER",
+    desc: "Chrome-розширення для збору контактів бізнесів і фізосіб з Instagram за хештегом, геолокацією чи підписниками.",
+    longDesc: "Збирає контакти бізнесів і фізичних осіб з Instagram за хештегом, геолокацією або списком підписників. Фільтрація результатів і експорт зібраних контактів. Manifest V3, content scripts. Ліцензування через zennotemplates.com.",
+    tags: ["JavaScript", "Chrome Extension", "Manifest V3"],
+    categories: ["tools"],
+    links: [
+      { url: "https://www.zennotemplates.com/ru/templates/instagram-parser", label: "Сторінка товару" },
     ],
     noUrlReason: null,
   },
