@@ -1,10 +1,22 @@
 /** Отправка уведомлений в Telegram (адресно по ролям + картинки). Server-side only. */
 import { q, getAttachment } from "./db";
+import { PUBLIC_SITE } from "./dev-protocol";
 
-/** Кнопка-ссылка под сообщением (открывает страницу в браузере). */
+/** Кнопка-ссылка под сообщением. */
 export interface LinkButton { text: string; url: string }
 
-/** Отправка текста в произвольный чат Telegram (опц. кнопка-ссылка). */
+/**
+ * Inline-кнопка для Telegram. Ссылки на задачу (`/admin/tasks/<id>`) открываем как **web_app** (Mini App):
+ * он авторизуется через Telegram (без выброса на логин) и диплинком ведёт на задачу. Домен — публичный (кастомный).
+ * Остальные ссылки — обычная url-кнопка.
+ */
+function inlineButton(button: LinkButton): Record<string, unknown> {
+  const m = button.url.match(/\/admin\/tasks\/([^/?#]+)/);
+  if (m) return { text: button.text, web_app: { url: `${PUBLIC_SITE}/tma?task=${encodeURIComponent(m[1])}` } };
+  return { text: button.text, url: button.url };
+}
+
+/** Отправка текста в произвольный чат Telegram (опц. кнопка). */
 export async function sendTo(chatId: number | string, text: string, button?: LinkButton): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token || !chatId) return;
@@ -17,7 +29,7 @@ export async function sendTo(chatId: number | string, text: string, button?: Lin
         text,
         parse_mode: "HTML",
         disable_web_page_preview: true,
-        ...(button ? { reply_markup: { inline_keyboard: [[{ text: button.text, url: button.url }]] } } : {}),
+        ...(button ? { reply_markup: { inline_keyboard: [[inlineButton(button)]] } } : {}),
       }),
     });
   } catch {

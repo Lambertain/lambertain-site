@@ -14,6 +14,13 @@ export default function TmaPage() {
   const [errKey, setErrKey] = useState("tma.authing");
   const [locale, setLocale] = useState<Locale>("uk");
 
+  /** Диплинк из web_app-кнопки уведомления (?task=GP-3) → сразу на страницу задачи; иначе на дашборд. */
+  function targetAfterAuth(): string {
+    if (typeof window === "undefined") return "/admin";
+    const task = new URLSearchParams(window.location.search).get("task");
+    return task && /^[A-Za-z0-9]+-\d+$/.test(task) ? `/admin/tasks/${task}` : "/admin";
+  }
+
   function getInitData(): string | null {
     // @ts-expect-error — SDK Telegram подгружается скриптом
     const wa = typeof window !== "undefined" ? window.Telegram?.WebApp : undefined;
@@ -52,7 +59,7 @@ export default function TmaPage() {
         body: JSON.stringify({ initData }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data.ok) ensureWriteAccess(() => router.replace("/admin"));
+      if (res.ok && data.ok) ensureWriteAccess(() => router.replace(targetAfterAuth()));
       else if (data.needRole) setPhase("choose_role");
       else {
         setPhase("error");
