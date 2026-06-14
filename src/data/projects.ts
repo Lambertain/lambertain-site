@@ -256,6 +256,18 @@ export const PROJECTS: Project[] = [
     ],
     noUrlReason: null,
   },
+  {
+    num: "20",
+    name: "OG STUDIO",
+    desc: "Сайт креативної візуальної студії AI-контенту для б'юті-брендів з адмінкою живого редагування дизайну.",
+    longDesc: "Лендинг студії візуального контенту (AI product photography, lifestyle-сцени) для преміальних б'юті-брендів. Адмінка з живим редагуванням: перемикання палітр, масштаб заголовків, вмикання/вимикання секцій (відгуки, тарифи, футер) у реальному часі. JWT-автентифікація (jose), завантаження й оптимізація медіа через Cloudinary і sharp. Next.js 16 App Router + React 19 + Tailwind v4, Prisma 7 + PostgreSQL. Розгорнуто на Railway.",
+    tags: ["Next.js 16", "React 19", "Prisma 7", "Cloudinary", "JWT (jose)", "Railway"],
+    categories: ["web"],
+    links: [
+      { url: "https://www.ogstudiovisual.com/", label: "ogstudiovisual.com" },
+    ],
+    noUrlReason: null,
+  },
 ];
 
 export const STACK = [
