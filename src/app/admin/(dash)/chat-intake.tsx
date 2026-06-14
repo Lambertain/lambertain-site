@@ -37,10 +37,11 @@ function buildBlocks(text: string, atts: Att[]): Block[] {
   return blocks;
 }
 
-export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; feedbackKey?: string }) {
+export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, feedbackKey }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; isAdmin?: boolean; feedbackKey?: string }) {
   // Дефолт — первый НЕ-фидбек проект (Lamb.dev не должен быть выбран по умолчанию).
   const [projectKey, setProjectKey] = useState((projects.find((p) => p.key !== feedbackKey) ?? projects[0])?.key ?? "");
   const [recipient, setRecipient] = useState<"admin" | "client">("admin");
+  const [selfTask, setSelfTask] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [images, setImages] = useState<Att[]>([]);
@@ -153,6 +154,7 @@ export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey 
 
   const isFeedbackSel = !!feedbackKey && projectKey === feedbackKey;
   const showRecipient = !!isContributor && !isFeedbackSel; // разработчик в обычном проекте — выбирает адресата
+  const showSelf = !!isAdmin && !isFeedbackSel; // супер-админ — может поставить задачу СЕБЕ (личная, внутренняя)
   // Предупреждение о женском роде — когда разработчик пишет задачу-вопрос клиенту.
   const femWords = showRecipient && recipient === "client" ? detectFeminine(title + " " + body) : [];
 
@@ -163,7 +165,8 @@ export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey 
     const blocks = buildBlocks(body, images);
     setError(null);
     start(async () => {
-      const res = await createRequestTask(projectKey, title.trim(), blocks, showRecipient ? recipient : undefined);
+      const rcpt = showRecipient ? recipient : showSelf && selfTask ? "self" : undefined;
+      const res = await createRequestTask(projectKey, title.trim(), blocks, rcpt);
       if (res.error) setError(res.error);
       else if (res.id && res.url) {
         setCreated({ id: res.id, url: res.url });
@@ -203,6 +206,17 @@ export function ChatIntake({ projects, locale, fill, isContributor, feedbackKey 
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projects[0] ? projects[0].name : "—"}</span>
         )}
       </div>
+
+      {/* себе (только супер-админ): личная внутренняя задача — без триажа, без дева, клиент не видит */}
+      {showSelf && (
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", ...ui.monoLabel, textTransform: "none" }}>
+            <input type="checkbox" checked={selfTask} onChange={(e) => setSelfTask(e.target.checked)} />
+            {t(locale, "newtask.self")}
+          </label>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, "newtask.selfHint")}</span>
+        </div>
+      )}
 
       {/* адресат (только разработчик в обычном проекте): админ (приватно) или клиент (вопрос) */}
       {showRecipient && (

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import type { TaskFilter } from "@/lib/tasks/types";
-import { getPrincipal } from "@/lib/principal";
+import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
 import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor } from "@/lib/db";
@@ -55,7 +55,7 @@ export default async function HomePage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>{t(locale, "projects.manage")}</Link>
-            <ChatModal projects={chatProjects} locale={locale} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
+            <ChatModal projects={chatProjects} locale={locale} isAdmin={isSuperAdmin(me)} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
           </div>
         </div>
         <DevDashboard projects={dash} devNames={devNames} now={nowMs()} locale={locale} />

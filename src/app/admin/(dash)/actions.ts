@@ -56,7 +56,7 @@ export async function createRequestTask(
   projectKey: string,
   title: string,
   blocks: ReqBlock[],
-  recipient?: "admin" | "client",
+  recipient?: "admin" | "client" | "self",
 ): Promise<{ id?: string; url?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
@@ -66,6 +66,22 @@ export async function createRequestTask(
     const project = (await be.listProjects()).find((p) => p.key === projectKey);
     const isFeedback = !!project?.meta.feedback;
     const summary = title.trim().slice(0, 120);
+
+    // Супер-админ ставит задачу СЕБЕ (в любом проекте): личная, ВНУТРЕННЯЯ (клиент не видит),
+    // без ИИ-триажа и без уведомления дева — это его собственный todo.
+    if (isSuperAdmin(me) && recipient === "self") {
+      const task = await be.createTask({
+        projectKey,
+        summary,
+        description: "",
+        assigneeLogin: me.youtrackLogin ?? null,
+        reporterLogin: me.youtrackLogin ?? null,
+        approvalStatus: "approved",
+        internal: true,
+      });
+      await appendRequestBlocks(task.id, blocks);
+      return { id: task.id, url: task.url };
+    }
 
     // Разработчик создаёт задачу вручную в своём проекте: адресат — админ (приватно, доступы и т.п.) или клиент (вопрос).
     if (me.role === "contributor" && !isFeedback && (recipient === "admin" || recipient === "client")) {
