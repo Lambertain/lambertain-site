@@ -73,6 +73,11 @@ export async function editOwnPending(commentId: string, authorLogin: string, bod
   return { ok: true };
 }
 
+/** Супер-админ удаляет ЛЮБОЙ коммент (опубликованный или на модерации). */
+export async function deleteCommentAny(commentId: string): Promise<void> {
+  await q("DELETE FROM comments WHERE id = $1", [commentId]);
+}
+
 /** Автор-член удаляет СВОЙ pending-коммент (до модерации). */
 export async function discardOwnPending(commentId: string, authorLogin: string): Promise<{ ok: true } | { error: string }> {
   const rows = await q<{ login: string | null }>(

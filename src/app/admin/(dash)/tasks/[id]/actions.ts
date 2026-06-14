@@ -6,7 +6,7 @@ import { getBackend } from "@/lib/tasks";
 import { taskDiff } from "@/lib/review";
 import { draftClientAnswer, draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment, editOwnPending, discardOwnPending } from "@/lib/moderation";
+import { submitForModeration, approveModeratedComment, editModeratedComment, discardModeratedComment, editOwnPending, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
@@ -99,6 +99,14 @@ export async function discardPendingComment(commentId: string, taskId: string): 
   const r = await discardOwnPending(commentId, me.youtrackLogin || "");
   revalidatePath(`/admin/tasks/${taskId}`);
   return "error" in r ? { error: r.error } : { ok: true };
+}
+
+/** Супер-админ удаляет любой коммент (опубликованный или на модерации). */
+export async function superDeleteComment(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
+  await deleteCommentAny(commentId);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return { ok: true };
 }
 
 /** Модерация (супер-админ): одобрить pending-коммент → публикуется клиенту + пуш. */

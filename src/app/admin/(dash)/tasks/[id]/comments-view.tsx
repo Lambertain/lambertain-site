@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { markTaskRead } from "../../tasks-actions";
-import { moderateApprove, moderateEdit, moderateDiscard, editPendingComment, discardPendingComment } from "./actions";
+import { moderateApprove, moderateEdit, moderateDiscard, editPendingComment, discardPendingComment, superDeleteComment } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -105,6 +105,8 @@ export function CommentsView({
                   <span style={{ ...ui.monoLabel, color: "#e8b339", border: "1px solid #e8b339", padding: "1px 6px" }}>{t(locale, "mod.pendingBadge")}</span>
                 )}
                 <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
+                {/* Удаление любого коммента — только супер-админу (pending удаляется через «Відхилити» в панели модерации). */}
+                {canModerate && !pending && <SuperDelete taskId={taskId} commentId={c.id} locale={locale} />}
               </div>
               <Markdown>{c.text}</Markdown>
               {pending && canModerate
@@ -154,6 +156,25 @@ function Moderation({ taskId, commentId, text, locale }: { taskId: string; comme
         </div>
       )}
     </div>
+  );
+}
+
+/** Удаление коммента супер-админом (иконка → инлайн-подтверждение). */
+function SuperDelete({ taskId, commentId, locale }: { taskId: string; commentId: string; locale: Locale }) {
+  const [confirm, setConfirm] = useState(false);
+  const [pending, start] = useTransition();
+  if (confirm) {
+    return (
+      <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+        <button onClick={() => start(() => { superDeleteComment(commentId, taskId); })} disabled={pending} style={{ ...ui.monoLabel, color: "#ff5b5b", background: "transparent", border: "1px solid #ff5b5b", padding: "1px 7px", cursor: "pointer", borderRadius: 2 }}>{t(locale, "common.delete")}?</button>
+        <button onClick={() => setConfirm(false)} style={{ background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>
+      </span>
+    );
+  }
+  return (
+    <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 2 }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+    </button>
   );
 }
 
