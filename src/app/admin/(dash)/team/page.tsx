@@ -29,14 +29,12 @@ export default async function TeamPage() {
   // Пользователи = присоединившиеся (tg_links), обогащённые alias и проектами.
   const panelUsers: PanelUser[] = links.map((l) => {
     const m = userByLogin.get(l.login);
+    // Разработчик — проекты по defaultAssignee. Клиент/сотрудник — объединяем member_projects и tg_links.project_key
+    // (надёжно: сотрудника проекта без клиента и клиента с сотрудниками одинаково цепляем по проекту).
     const projectKeys =
       l.role === "contributor"
         ? activeProjects.filter((p) => p.meta.defaultAssignee === l.login).map((p) => p.key)
-        : l.role === "employee"
-          ? memberProj.get(l.login) ?? []
-          : l.project_key
-            ? [l.project_key]
-            : [];
+        : Array.from(new Set([...(memberProj.get(l.login) ?? []), ...(l.project_key ? [l.project_key] : [])]));
     return {
       login: l.login,
       fullName: m?.fullName || l.full_name || l.login,
