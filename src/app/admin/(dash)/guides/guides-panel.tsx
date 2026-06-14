@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { saveGuide, removeGuide } from "./actions";
+import { useState, useRef, useTransition } from "react";
+import { saveGuide, removeGuide, uploadGuideImage } from "./actions";
 import { ui } from "../../ui-styles";
 
 type G = { id: number; slug: string; title: string; body: string; ord: number };
@@ -15,7 +15,34 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
   const [removed, setRemoved] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [pending, start] = useTransition();
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   if (removed) return null;
+
+  function insertAtCursor(text: string) {
+    const ta = bodyRef.current;
+    const pos = ta ? ta.selectionStart : body.length;
+    setBody((b) => b.slice(0, pos) + text + b.slice(pos));
+    setTimeout(() => { if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = pos + text.length; } }, 0);
+  }
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+    if (!imgs.length) return;
+    e.preventDefault();
+    setMsg("Загрузка картинки…");
+    imgs.forEach((f) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const [meta, data] = String(reader.result).split(",");
+        const mime = meta.slice(5, meta.indexOf(";"));
+        start(async () => {
+          const r = await uploadGuideImage(mime, data);
+          if (r.url) { insertAtCursor(`\n![](${r.url})\n`); setMsg("Картинка вставлена ✓"); }
+          else setMsg(r.error || "Ошибка загрузки");
+        });
+      };
+      reader.readAsDataURL(f);
+    });
+  }
 
   function save() {
     setMsg(null);
@@ -33,7 +60,7 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
         {isNew && <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="slug (опц.)" style={{ ...ui.input, width: 140 }} />}
         <input value={ord} onChange={(e) => setOrd(e.target.value)} placeholder="№" title="Порядок" style={{ ...ui.input, width: 64 }} />
       </div>
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Текст инструкции (markdown)" rows={6} style={{ ...ui.input, width: "100%", resize: "vertical", marginTop: 8, fontSize: 13, lineHeight: 1.5 }} />
+      <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} onPaste={onPaste} placeholder="Текст инструкции (markdown). Вставьте скрин из буфера — Ctrl+V (он вставится в позицию курсора)." rows={6} style={{ ...ui.input, width: "100%", resize: "vertical", marginTop: 8, fontSize: 13, lineHeight: 1.5 }} />
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
         <button onClick={save} disabled={pending || !title.trim()} style={{ ...ui.btnAccent, opacity: pending || !title.trim() ? 0.5 : 1 }}>{pending ? "…" : isNew ? "Создать гайд" : "Сохранить"}</button>
         {!isNew && g && (confirm ? (

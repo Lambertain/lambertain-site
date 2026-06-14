@@ -982,3 +982,14 @@ export async function getEnabledGuides(projectKey: string): Promise<Guide[]> {
     [projectKey],
   );
 }
+
+/** Сохранить картинку гайда (base64) → id. Отдаётся через /api/guide-files/<id>. */
+export async function saveGuideImage(mime: string, dataB64: string): Promise<number> {
+  const buf = Buffer.from(dataB64, "base64");
+  const rows = await q<{ id: number }>("INSERT INTO guide_images (mime, data) VALUES ($1, $2) RETURNING id", [mime || "image/png", buf]);
+  return rows[0].id;
+}
+export async function getGuideImage(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
+  const rows = await q<{ mime: string | null; data: Buffer }>("SELECT mime, data FROM guide_images WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}

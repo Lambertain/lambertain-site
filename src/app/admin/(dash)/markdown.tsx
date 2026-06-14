@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { CSSProperties } from "react";
+import { ZoomableImage } from "./zoomable-image";
 
 /**
  * Рендер описания задачи как markdown (картинки, ссылки, жирный, списки).
@@ -20,8 +21,7 @@ export function Markdown({ children }: { children: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // eslint-disable-next-line @next/next/no-img-element
-          img: (props) => <img {...props} alt={props.alt || ""} style={imgStyle} loading="lazy" />,
+          img: (props) => <ZoomableImage src={typeof props.src === "string" ? props.src : undefined} alt={props.alt} style={imgStyle} />,
           a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" style={linkStyle} />,
           p: (props) => <p style={{ margin: "8px 0" }}>{props.children}</p>,
           ul: (props) => <ul style={{ margin: "8px 0", paddingLeft: 20 }}>{props.children}</ul>,

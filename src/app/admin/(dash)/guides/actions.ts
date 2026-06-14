@@ -1,8 +1,16 @@
 "use server";
 
 import { requireAdmin } from "@/lib/principal";
-import { createGuide, updateGuide, deleteGuide } from "@/lib/db";
+import { createGuide, updateGuide, deleteGuide, saveGuideImage } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+
+/** Загрузить картинку гайда (из буфера). Возвращает URL для вставки в markdown. */
+export async function uploadGuideImage(mime: string, dataB64: string): Promise<{ url?: string; error?: string }> {
+  await requireAdmin();
+  if (!dataB64) return { error: "Пустая картинка" };
+  const id = await saveGuideImage(mime, dataB64);
+  return { url: `/api/guide-files/${id}` };
+}
 
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "guide";

@@ -113,6 +113,12 @@ CREATE TABLE IF NOT EXISTS project_guides (
   project_key TEXT NOT NULL,
   guide_id    INT  NOT NULL REFERENCES guides(id) ON DELETE CASCADE,
   PRIMARY KEY (project_key, guide_id));
+-- Картинки гайдов (скрины из буфера обмена): отдаются через /api/guide-files/<id>.
+CREATE TABLE IF NOT EXISTS guide_images (
+  id         SERIAL PRIMARY KEY,
+  mime       TEXT,
+  data       BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 -- Стартовые гайды (идемпотентно).
 INSERT INTO guides (slug, title, body, ord) VALUES
  ('github', 'Реєстрація GitHub', E'Потрібен акаунт GitHub, щоб зберігати код проєкту.\n\n1. Відкрийте https://github.com/signup\n2. Вкажіть e-mail, придумайте пароль і ім''я користувача.\n3. Підтвердіть e-mail (лист від GitHub).\n4. Надішліть мені ваш нік (username) — додам вас до репозиторію.', 10),
