@@ -116,8 +116,10 @@ CREATE TABLE IF NOT EXISTS contractors (
   bank_mfo     TEXT,
   bank_edrpou  TEXT,
   phone        TEXT,
+  email        TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE contractors ADD COLUMN IF NOT EXISTS email TEXT;
 CREATE TABLE IF NOT EXISTS contract_templates (
   id           SERIAL PRIMARY KEY,
   title        TEXT NOT NULL,
@@ -1038,28 +1040,29 @@ export interface Contractor {
   bank_mfo: string | null;
   bank_edrpou: string | null;
   phone: string | null;
+  email: string | null;
 }
 export type ContractorInput = Omit<Contractor, "id">;
 
 export async function listContractors(): Promise<Contractor[]> {
-  return q<Contractor>("SELECT id, name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone FROM contractors ORDER BY name");
+  return q<Contractor>("SELECT id, name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone, email FROM contractors ORDER BY name");
 }
 export async function getContractor(id: number): Promise<Contractor | null> {
-  const rows = await q<Contractor>("SELECT id, name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone FROM contractors WHERE id = $1", [id]);
+  const rows = await q<Contractor>("SELECT id, name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone, email FROM contractors WHERE id = $1", [id]);
   return rows[0] ?? null;
 }
 export async function createContractor(c: ContractorInput): Promise<number> {
   const rows = await q<{ id: number }>(
-    `INSERT INTO contractors (name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-    [c.name, c.address, c.ipn, c.iban, c.bank_name, c.bank_mfo, c.bank_edrpou, c.phone],
+    `INSERT INTO contractors (name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone, email)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+    [c.name, c.address, c.ipn, c.iban, c.bank_name, c.bank_mfo, c.bank_edrpou, c.phone, c.email],
   );
   return rows[0].id;
 }
 export async function updateContractor(id: number, c: ContractorInput): Promise<void> {
   await q(
-    `UPDATE contractors SET name=$2, address=$3, ipn=$4, iban=$5, bank_name=$6, bank_mfo=$7, bank_edrpou=$8, phone=$9 WHERE id=$1`,
-    [id, c.name, c.address, c.ipn, c.iban, c.bank_name, c.bank_mfo, c.bank_edrpou, c.phone],
+    `UPDATE contractors SET name=$2, address=$3, ipn=$4, iban=$5, bank_name=$6, bank_mfo=$7, bank_edrpou=$8, phone=$9, email=$10 WHERE id=$1`,
+    [id, c.name, c.address, c.ipn, c.iban, c.bank_name, c.bank_mfo, c.bank_edrpou, c.phone, c.email],
   );
 }
 export async function deleteContractor(id: number): Promise<void> {

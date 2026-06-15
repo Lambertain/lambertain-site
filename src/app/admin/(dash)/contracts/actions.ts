@@ -16,7 +16,7 @@ export async function saveContractor(input: ContractorInput & { id?: number }): 
   if (!input.name.trim()) return { error: "Назва ФОПа порожня" };
   const data: ContractorInput = {
     name: input.name.trim(), address: input.address, ipn: input.ipn, iban: input.iban,
-    bank_name: input.bank_name, bank_mfo: input.bank_mfo, bank_edrpou: input.bank_edrpou, phone: input.phone,
+    bank_name: input.bank_name, bank_mfo: input.bank_mfo, bank_edrpou: input.bank_edrpou, phone: input.phone, email: input.email,
   };
   if (input.id) await updateContractor(input.id, data);
   else await createContractor(data);

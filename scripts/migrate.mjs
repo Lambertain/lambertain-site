@@ -145,7 +145,8 @@ CREATE TABLE IF NOT EXISTS onboarding_media (
 -- Договоры: ФОПы-исполнители (наши реквизиты), шаблоны с плейсхолдерами {{key}}, сгенерированные договоры.
 CREATE TABLE IF NOT EXISTS contractors (
   id SERIAL PRIMARY KEY, name TEXT NOT NULL, address TEXT, ipn TEXT, iban TEXT,
-  bank_name TEXT, bank_mfo TEXT, bank_edrpou TEXT, phone TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+  bank_name TEXT, bank_mfo TEXT, bank_edrpou TEXT, phone TEXT, email TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+ALTER TABLE contractors ADD COLUMN IF NOT EXISTS email TEXT;
 CREATE TABLE IF NOT EXISTS contract_templates (
   id SERIAL PRIMARY KEY, title TEXT NOT NULL, lang TEXT NOT NULL DEFAULT 'uk', body TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
@@ -309,6 +310,7 @@ const CONTRACT_TEMPLATE_UK = `# ДОГОВІР № {{number}}
 IBAN: {{contractor.iban}}
 Банк: {{contractor.bank_name}}, МФО {{contractor.bank_mfo}}, ЄДРПОУ банку {{contractor.bank_edrpou}}
 Тел.: {{contractor.phone}}
+E-mail: {{contractor.email}}
 
 _______________________ / {{contractor.name}}
 
@@ -374,6 +376,14 @@ async function main() {
      SELECT $1, 'uk', $2
      WHERE NOT EXISTS (SELECT 1 FROM contract_templates WHERE title = $1)`,
     ["Послуги веб-розробки (ФОП)", CONTRACT_TEMPLATE_UK],
+  );
+  // Одноразово дотягиваем e-mail-строку в уже засеянный типовой шаблон (только если его не правили вручную).
+  await pool.query(
+    `UPDATE contract_templates
+       SET body = replace(body, E'Тел.: {{contractor.phone}}', E'Тел.: {{contractor.phone}}\nE-mail: {{contractor.email}}'),
+           updated_at = now()
+     WHERE title = $1 AND body LIKE '%Тел.: {{contractor.phone}}%' AND body NOT LIKE '%{{contractor.email}}%'`,
+    ["Послуги веб-розробки (ФОП)"],
   );
   // ФОП-исполнитель по умолчанию — только если справочник ещё пуст (дальше правится через UI).
   await pool.query(

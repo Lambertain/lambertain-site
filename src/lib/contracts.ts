@@ -19,6 +19,7 @@ export const CONTRACTOR_FIELDS = [
   "bank_mfo",
   "bank_edrpou",
   "phone",
+  "email",
 ] as const;
 export type ContractorField = (typeof CONTRACTOR_FIELDS)[number];
 
@@ -31,6 +32,7 @@ export interface ContractorData {
   bank_mfo?: string | null;
   bank_edrpou?: string | null;
   phone?: string | null;
+  email?: string | null;
 }
 
 /** Ключи, которые не являются динамическими полями формы (обрабатываются отдельным UI). */

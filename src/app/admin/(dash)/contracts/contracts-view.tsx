@@ -14,14 +14,14 @@ import {
 
 type Contractor = {
   id: number; name: string; address: string | null; ipn: string | null; iban: string | null;
-  bank_name: string | null; bank_mfo: string | null; bank_edrpou: string | null; phone: string | null;
+  bank_name: string | null; bank_mfo: string | null; bank_edrpou: string | null; phone: string | null; email: string | null;
 };
 type Template = { id: number; title: string; lang: string; body: string };
 type ContractRow = { id: number; number: string | null; title: string | null; date: string | null; createdAt: string };
 
 const CONTRACTOR_LABELS: Record<string, string> = {
   name: "Найменування (ФОП …)", address: "Адреса", ipn: "ІПН / ЄДРПОУ", iban: "IBAN",
-  bank_name: "Банк", bank_mfo: "МФО", bank_edrpou: "ЄДРПОУ банку", phone: "Телефон",
+  bank_name: "Банк", bank_mfo: "МФО", bank_edrpou: "ЄДРПОУ банку", phone: "Телефон", email: "E-mail",
 };
 
 const TABS = [
@@ -195,10 +195,10 @@ function ContractorsTab({ contractors }: { contractors: Contractor[] }) {
 }
 
 function ContractorEditor({ c, isNew }: { c?: Contractor; isNew?: boolean }) {
-  const empty = { name: "", address: "", ipn: "", iban: "", bank_name: "", bank_mfo: "", bank_edrpou: "", phone: "" };
+  const empty = { name: "", address: "", ipn: "", iban: "", bank_name: "", bank_mfo: "", bank_edrpou: "", phone: "", email: "" };
   const [f, setF] = useState<Record<string, string>>(c ? {
     name: c.name ?? "", address: c.address ?? "", ipn: c.ipn ?? "", iban: c.iban ?? "",
-    bank_name: c.bank_name ?? "", bank_mfo: c.bank_mfo ?? "", bank_edrpou: c.bank_edrpou ?? "", phone: c.phone ?? "",
+    bank_name: c.bank_name ?? "", bank_mfo: c.bank_mfo ?? "", bank_edrpou: c.bank_edrpou ?? "", phone: c.phone ?? "", email: c.email ?? "",
   } : empty);
   const [msg, setMsg] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
@@ -210,13 +210,13 @@ function ContractorEditor({ c, isNew }: { c?: Contractor; isNew?: boolean }) {
     start(async () => {
       const r = await saveContractor({
         id: c?.id, name: f.name, address: f.address, ipn: f.ipn, iban: f.iban,
-        bank_name: f.bank_name, bank_mfo: f.bank_mfo, bank_edrpou: f.bank_edrpou, phone: f.phone,
+        bank_name: f.bank_name, bank_mfo: f.bank_mfo, bank_edrpou: f.bank_edrpou, phone: f.phone, email: f.email,
       });
       if (r.error) setMsg(r.error);
       else { setMsg("Збережено ✓"); if (isNew) setF(empty); }
     });
   }
-  const keys = ["name", "address", "ipn", "iban", "bank_name", "bank_mfo", "bank_edrpou", "phone"];
+  const keys = ["name", "address", "ipn", "iban", "bank_name", "bank_mfo", "bank_edrpou", "phone", "email"];
   return (
     <div style={{ ...ui.card, padding: 14, marginTop: 10 }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
