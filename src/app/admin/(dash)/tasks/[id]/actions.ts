@@ -7,7 +7,7 @@ import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction } from "@/lib/db";
+import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
@@ -91,6 +91,30 @@ export async function editPendingComment(commentId: string, taskId: string, text
   const r = await editOwnPending(commentId, me.youtrackLogin || "", text);
   revalidatePath(`/admin/tasks/${taskId}`);
   return "error" in r ? { error: r.error } : { ok: true };
+}
+
+/** Клиент (или админ) подтверждает действие по client_action: данные → секреты, задача возвращается разработчику. */
+export async function markClientActionDone(taskId: string, data: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || (me.role !== "client" && me.realRole !== "admin")) return { error: "Нет прав" };
+  const be = getBackend();
+  const task = await be.getTask(taskId);
+  if (!task.clientAction) return { error: "Действие уже выполнено" };
+  const projectKey = taskId.split("-")[0];
+  const proj = await getProjectFull(projectKey);
+  const value = (data || "").trim();
+  // Данные (токен/логины), которые ввёл клиент → в секреты проекта (видит админ + Claude-код разработчика).
+  if (value) {
+    await upsertSecret(projectKey, { name: `Реєстрація · ${taskId}`, value, note: task.clientAction.slice(0, 300), filledBy: "client" });
+  }
+  await setClientAction(taskId, null, null);
+  await be.addComment(taskId, `✅ <b>Клієнт виконав реєстрацію.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
+  // Возвращаем разработчику: уведомляем ответственного, он продолжает (данные — в /api/dev/secrets).
+  const dev = proj?.meta.defaultAssignee;
+  if (dev) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${taskId}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});
+  await notifyAdmin(`✅ <b>Клиент выполнил регистрацию</b> · ${taskId}: ${task.summary}`).catch(() => {});
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return { ok: true };
 }
 
 /** Автор правит СВОЙ опубликованный коммент, пока на него не ответили (клиент тоже может). */

@@ -686,6 +686,10 @@ export async function claimTaskForTriage(readableId: string): Promise<boolean> {
 export async function setOwnerAction(readableId: string, action: string | null): Promise<void> {
   await q("UPDATE tasks SET owner_action = $2, updated_at = now() WHERE readable_id = $1", [readableId, action]);
 }
+/** «Нужно действие клиента» (зарегистрировать сервис/дать доступ) + id гайда-инструкции. null = снять. */
+export async function setClientAction(readableId: string, action: string | null, guideId: number | null = null): Promise<void> {
+  await q("UPDATE tasks SET client_action = $2, client_action_guide = $3, updated_at = now() WHERE readable_id = $1", [readableId, action, guideId]);
+}
 export async function getTaskAiStatus(readableId: string): Promise<string | null> {
   const rows = await q<{ ai_status: string | null }>("SELECT ai_status FROM tasks WHERE readable_id = $1", [readableId]);
   return rows[0]?.ai_status ?? null;
@@ -1048,6 +1052,10 @@ export interface Guide { id: number; slug: string; title: string; body: string; 
 
 export async function listGuides(): Promise<Guide[]> {
   return q<Guide>("SELECT id, slug, title, body, ord FROM guides ORDER BY ord, title");
+}
+export async function getGuide(id: number): Promise<Guide | null> {
+  const rows = await q<Guide>("SELECT id, slug, title, body, ord FROM guides WHERE id = $1", [id]);
+  return rows[0] ?? null;
 }
 export async function createGuide(slug: string, title: string, body: string, ord: number): Promise<{ id?: number; error?: string }> {
   try {

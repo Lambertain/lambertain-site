@@ -101,6 +101,10 @@ export interface Task {
   autoDone?: boolean;
   /** Задача ждёт ручного ops-шага владельца (деплой/регистрация/токен): что нужно сделать. Клиент не видит. */
   ownerAction?: string | null;
+  /** Задача ждёт действия КЛИЕНТА (зарегистрировать сервис/дать доступ): что нужно сделать. Клиент видит и жмёт «Готово». */
+  clientAction?: string | null;
+  /** id гайда-инструкции к действию клиента (как зарегистрировать). */
+  clientActionGuide?: number | null;
 }
 
 export interface Comment {

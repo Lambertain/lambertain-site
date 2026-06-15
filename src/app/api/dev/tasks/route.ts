@@ -62,6 +62,8 @@ export async function GET(req: Request) {
       url: t.url,
       // Передана владельцу на ops-шаг — НЕ бери в работу, пропусти (см. протокол).
       ownerAction: t.ownerAction ?? null,
+      // Ждёт действия клиента (регистрация/доступ) — тоже пропусти, продолжишь после ответа клиента.
+      clientAction: t.clientAction ?? null,
     })),
   });
 }

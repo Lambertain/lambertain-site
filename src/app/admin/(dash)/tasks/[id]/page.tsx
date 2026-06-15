@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -11,6 +11,7 @@ import { ApprovalBar } from "./approval-bar";
 import { ReviewActions } from "./review-actions";
 import { CommentsView, type ViewComment } from "./comments-view";
 import { OwnerActionBar } from "./owner-action-bar";
+import { ClientActionBar } from "./client-action-bar";
 import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
 import { Markdown } from "../../markdown";
@@ -53,6 +54,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   if (task.internal && me.role === "client") redirect(backHref);
 
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
+  // Гайд-инструкция к действию клиента (как зарегистрировать) — если привязан.
+  const cg = task.clientActionGuide ? await getGuide(task.clientActionGuide) : null;
+  const clientGuide = cg ? { title: cg.title, body: cg.body } : null;
+
   // Новые комменты — появившиеся после последнего открытия задачи.
   const prevRead = reads.get(id) ?? 0;
   const myLogin = me.youtrackLogin;
@@ -99,6 +104,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       {/* Нужно действие владельца (деплой/регистрация/токен) — команде, не клиенту (клиент видит «в работе») */}
       {me.role !== "client" && task.ownerAction && (
         <OwnerActionBar taskId={task.id} action={task.ownerAction} canResolve={isSuperAdmin(me)} locale={locale} />
+      )}
+
+      {/* Нужно действие КЛИЕНТА (зарегистрировать/дать доступ) — клиенту и админу: инструкция + поле + «Готово» */}
+      {task.clientAction && (me.role === "client" || isAdmin) && (
+        <ClientActionBar taskId={task.id} action={task.clientAction} guide={clientGuide} />
       )}
 
       {/* Теги триажа (тип/сложность/скилы) — команде, не клиенту */}

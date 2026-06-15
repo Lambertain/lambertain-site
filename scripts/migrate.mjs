@@ -78,6 +78,8 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS auto_done BOOLEAN NOT NULL DEFAULT fa
 -- Действие владельца: задача требует ручного ops-шага только владельца (деплой/регистрация/токен) — передаётся
 -- супер-админу «на доработку». Клиент видит «в работе» (status не меняется); это внутренний флаг.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS owner_action TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action_guide INT;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

@@ -1,16 +1,16 @@
 /**
- * Передача задачи ВЛАДЕЛЬЦУ: задача требует ручного ops-шага, который может сделать только владелец
- * (деплой на хостинг, регистрация сервиса/аккаунта, получение токена/ключей, DNS, биллинг, сторы).
+ * Эскалация ручного ops-шага. Портал-Клод классифицирует, КТО должен сделать:
+ *  - self   — разработчик может сам (в коде/конфиге) → возвращаем note, флаги не ставим;
+ *  - client — действие клиента (зарегистрировать сервис / дать доступ) → клиенту коммент+гайд+пуш, поле для данных;
+ *  - owner  — инфра агентства (наш деплой/биллинг/токены) → владельцу (как раньше).
  * POST /api/dev/handoff  { taskId, action }
- *  - action: что нужно сделать владельцу (понятным текстом).
- *  - Клиент НИЧЕГО не видит: статус остаётся «в работе» (In Progress). Это внутренний флаг owner_action.
- *  - Супер-админу (владельцу) уходит уведомление. Разработчик берёт СЛЕДУЮЩУЮ незаблокированную задачу.
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken, setOwnerAction } from "@/lib/db";
+import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyAdmin } from "@/lib/notify";
+import { notifyAdmin, notifyProjectClients } from "@/lib/notify";
+import { classifyHandoff } from "@/lib/handoff-classify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -34,13 +34,31 @@ export async function POST(req: Request) {
   const be = getBackend();
   try {
     const task = await be.getTask(taskId);
-    await setOwnerAction(taskId, action);
-    // Клиент видит «в работе»: если задача ещё Open — переведём в In Progress, иначе статус не трогаем.
+    const proj = await getProjectFull(projectKey);
+    const cls = await classifyHandoff(action, { summary: task.summary, projectSpec: proj?.meta.spec });
+    const taskBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
+
+    if (cls.kind === "self") {
+      // Разработчик может сам — флаги не ставим, возвращаем note (и оставляем внутренний след).
+      await be.addComment(taskId, `🧩 <i>Этот шаг можно сделать самому: ${action}</i>`, "internal").catch(() => {});
+      return NextResponse.json({ ok: true, handedOff: "self", note: "Это можешь сделать сам (код/конфиг). Не эскалируй — выполни в рамках задачи." });
+    }
+
+    if (cls.kind === "client") {
+      const short = cls.clientShort || action.slice(0, 120);
+      const full = cls.clientText || action;
+      await setClientAction(taskId, full, cls.guideId ?? null);
+      await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — нижче в задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client").catch(() => {});
+      if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
+      await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${taskId}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => {});
+      return NextResponse.json({ ok: true, handedOff: "client", needGuide: cls.guideId == null, note: "Запрос ушёл клиенту с инструкцией. Бери следующую незаблокированную задачу." });
+    }
+
+    // owner
+    const ownerText = cls.ownerText || action;
+    await setOwnerAction(taskId, ownerText);
     if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
-    await notifyAdmin(
-      `🛠 <b>Нужно действие владельца</b> · ${taskId}: ${task.summary}\n${action.slice(0, 600)}`,
-      { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` },
-    ).catch(() => {});
+    await notifyAdmin(`🛠 <b>Нужно действие владельца</b> · ${taskId}: ${task.summary}\n${ownerText.slice(0, 600)}`, taskBtn).catch(() => {});
     return NextResponse.json({ ok: true, handedOff: "owner", note: "Клиент видит «в работе». Бери следующую незаблокированную задачу." });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
