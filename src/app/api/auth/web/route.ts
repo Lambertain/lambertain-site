@@ -17,12 +17,16 @@ function publicBase(req: Request): string {
 }
 
 export async function GET(req: Request) {
-  const token = new URL(req.url).searchParams.get("token") || "";
+  const url = new URL(req.url);
+  const token = url.searchParams.get("token") || "";
+  // Куда вести после входа: та же страница, на которой юзер был в апке. Только относительный /admin-путь.
+  const nextRaw = url.searchParams.get("next") || "/admin";
+  const next = nextRaw.startsWith("/admin") && !nextRaw.startsWith("//") ? nextRaw : "/admin";
   const base = publicBase(req);
   const tgId = token ? await consumeWebLoginToken(token) : null;
   if (!tgId) {
     return NextResponse.redirect(`${base}/admin/login?e=expired`);
   }
   await setSession(`tg:${tgId}`);
-  return NextResponse.redirect(`${base}/admin`);
+  return NextResponse.redirect(`${base}${next}`);
 }

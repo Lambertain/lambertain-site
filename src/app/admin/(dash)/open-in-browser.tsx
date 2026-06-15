@@ -24,7 +24,9 @@ export function OpenInBrowser({ label }: { label: string }) {
       const res = await fetch("/api/web-login-token", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (data.ok && data.token) {
-        const url = `${window.location.origin}/api/auth/web?token=${data.token}`;
+        // Открываем в браузере ту же страницу, на которой пользователь был в апке.
+        const next = window.location.pathname + window.location.search;
+        const url = `${window.location.origin}/api/auth/web?token=${data.token}&next=${encodeURIComponent(next)}`;
         // @ts-expect-error — SDK Telegram
         const wa = window.Telegram?.WebApp;
         if (wa?.openLink) wa.openLink(url);
