@@ -142,6 +142,19 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY, value JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS onboarding_media (
   id SERIAL PRIMARY KEY, mime TEXT, data BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+-- Договоры: ФОПы-исполнители (наши реквизиты), шаблоны с плейсхолдерами {{key}}, сгенерированные договоры.
+CREATE TABLE IF NOT EXISTS contractors (
+  id SERIAL PRIMARY KEY, name TEXT NOT NULL, address TEXT, ipn TEXT, iban TEXT,
+  bank_name TEXT, bank_mfo TEXT, bank_edrpou TEXT, phone TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS contract_templates (
+  id SERIAL PRIMARY KEY, title TEXT NOT NULL, lang TEXT NOT NULL DEFAULT 'uk', body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS contracts (
+  id SERIAL PRIMARY KEY, number TEXT, contract_date DATE, city TEXT, title TEXT,
+  template_id INT REFERENCES contract_templates(id) ON DELETE SET NULL,
+  contractor_id INT REFERENCES contractors(id) ON DELETE SET NULL,
+  client_requisites TEXT, vars JSONB NOT NULL DEFAULT '{}', body TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 `;
 
 // Подробная пошаговая инструкция онбординга клиента (украинский). Сидится один раз —
@@ -241,6 +254,81 @@ const ROLES = [
   ["korolnik2001", "client"],
 ];
 
+// Типовой договор на услуги веб-разработки (укр) с плейсхолдерами {{key}}. Сидится один раз.
+const CONTRACT_TEMPLATE_UK = `# ДОГОВІР № {{number}}
+## про надання послуг з розробки веб-сайту
+
+**м. {{city}}**, {{date}}
+
+{{contractor.name}}, що діє на підставі виписки з Єдиного державного реєстру (далі — «Виконавець»), з однієї сторони, та {{client.name}} (далі — «Замовник»), з іншої сторони, а разом — «Сторони», уклали цей Договір про наступне:
+
+## 1. ПРЕДМЕТ ДОГОВОРУ
+1.1. Виконавець зобов'язується за завданням Замовника надати послуги з розробки, дизайну та програмування веб-сайту (далі — «Послуги»), а Замовник зобов'язується прийняти та оплатити їх на умовах цього Договору.
+1.2. Склад та обсяг Послуг: {{subject}}
+1.3. Результатом робіт є працездатний веб-сайт, розміщений за погодженою Сторонами адресою (доменом).
+
+## 2. ВАРТІСТЬ ПОСЛУГ ТА ПОРЯДОК РОЗРАХУНКІВ
+2.1. Загальна вартість Послуг за цим Договором становить {{price}} грн ({{price_words}}). Виконавець не є платником ПДВ.
+2.2. Порядок оплати: {{prepay}}
+2.3. Розрахунки здійснюються у безготівковій формі шляхом перерахування коштів на поточний рахунок Виконавця, зазначений у розділі 9 цього Договору.
+2.4. Днем оплати вважається день зарахування коштів на поточний рахунок Виконавця.
+
+## 3. СТРОКИ ВИКОНАННЯ
+3.1. Строк надання Послуг: {{term}}.
+3.2. Строк може бути продовжено за взаємною згодою Сторін у разі зміни обсягу робіт або несвоєчасного надання Замовником матеріалів, доступів чи інформації.
+
+## 4. ПРАВА ТА ОБОВ'ЯЗКИ СТОРІН
+4.1. Виконавець зобов'язується надати Послуги якісно та у погоджені строки.
+4.2. Замовник зобов'язується своєчасно надавати Виконавцю всі необхідні матеріали, доступи та інформацію, а також прийняти й оплатити Послуги.
+4.3. Замовник має право контролювати хід надання Послуг, не втручаючись у господарську діяльність Виконавця.
+
+## 5. ПЕРЕДАЧА ПРАВ ІНТЕЛЕКТУАЛЬНОЇ ВЛАСНОСТІ
+5.1. Майнові права інтелектуальної власності на створений за цим Договором веб-сайт переходять до Замовника після повної оплати вартості Послуг.
+5.2. Виконавець гарантує, що результати робіт не порушують прав інтелектуальної власності третіх осіб.
+
+## 6. ПРИЙМАННЯ ПОСЛУГ
+6.1. Приймання наданих Послуг оформлюється Актом наданих послуг.
+6.2. У разі наявності зауважень Замовник надає їх письмово протягом 5 (п'яти) робочих днів. За відсутності зауважень у цей строк Послуги вважаються прийнятими в повному обсязі.
+
+## 7. ВІДПОВІДАЛЬНІСТЬ СТОРІН ТА ФОРС-МАЖОР
+7.1. За невиконання або неналежне виконання зобов'язань Сторони несуть відповідальність згідно з чинним законодавством України.
+7.2. Сторони звільняються від відповідальності за часткове або повне невиконання зобов'язань, якщо воно є наслідком дії обставин непереборної сили (форс-мажор).
+
+## 8. СТРОК ДІЇ ТА ІНШІ УМОВИ
+8.1. Договір набирає чинності з моменту підписання та діє до повного виконання Сторонами своїх зобов'язань.
+8.2. Усі зміни та доповнення до Договору оформлюються письмово за взаємною згодою Сторін.
+8.3. Спори вирішуються шляхом переговорів, а в разі недосягнення згоди — у судовому порядку згідно із законодавством України.
+8.4. Договір складено у двох примірниках, що мають однакову юридичну силу, по одному для кожної зі Сторін.
+
+## 9. РЕКВІЗИТИ ТА ПІДПИСИ СТОРІН
+
+**ВИКОНАВЕЦЬ**
+{{contractor.name}}
+Адреса: {{contractor.address}}
+ІПН/ЄДРПОУ: {{contractor.ipn}}
+IBAN: {{contractor.iban}}
+Банк: {{contractor.bank_name}}, МФО {{contractor.bank_mfo}}, ЄДРПОУ банку {{contractor.bank_edrpou}}
+Тел.: {{contractor.phone}}
+
+_______________________ / {{contractor.name}}
+
+**ЗАМОВНИК**
+{{client.requisites}}
+
+_______________________ /`;
+
+// Пример нашего ФОПа-исполнителя (реквизиты Никиты). Сидится, только если справочник пуст.
+const SEED_CONTRACTOR = {
+  name: "ФОП Герасимюк Наталія Борисівна",
+  address: "29015, м. Хмельницький, проспект Миру, 78/2, кв. 1а",
+  ipn: "2871021324",
+  iban: "UA373220010000026008370097416",
+  bank_name: 'АТ "УНІВЕРСАЛ БАНК"',
+  bank_mfo: "322001",
+  bank_edrpou: "21133352",
+  phone: "0676019264",
+};
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     console.error("DATABASE_URL не задан");
@@ -279,6 +367,20 @@ async function main() {
     `INSERT INTO projects (key, name, meta) VALUES ('DEV', 'Lamb.dev', $1::jsonb)
      ON CONFLICT (key) DO UPDATE SET meta = projects.meta || $1::jsonb`,
     [JSON.stringify({ feedback: true, devGit: "https://github.com/Lambertain/lambertain-site.git" })],
+  );
+  // Типовой договор веб-разработки — сидим один раз (по точному заголовку, чтобы не плодить дубли).
+  await pool.query(
+    `INSERT INTO contract_templates (title, lang, body)
+     SELECT $1, 'uk', $2
+     WHERE NOT EXISTS (SELECT 1 FROM contract_templates WHERE title = $1)`,
+    ["Послуги веб-розробки (ФОП)", CONTRACT_TEMPLATE_UK],
+  );
+  // ФОП-исполнитель по умолчанию — только если справочник ещё пуст (дальше правится через UI).
+  await pool.query(
+    `INSERT INTO contractors (name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone)
+     SELECT $1,$2,$3,$4,$5,$6,$7,$8 WHERE NOT EXISTS (SELECT 1 FROM contractors)`,
+    [SEED_CONTRACTOR.name, SEED_CONTRACTOR.address, SEED_CONTRACTOR.ipn, SEED_CONTRACTOR.iban,
+     SEED_CONTRACTOR.bank_name, SEED_CONTRACTOR.bank_mfo, SEED_CONTRACTOR.bank_edrpou, SEED_CONTRACTOR.phone],
   );
   const c = await pool.query("SELECT count(*)::int AS n FROM role_overrides");
   const s = await pool.query("SELECT count(*)::int AS n FROM skills");

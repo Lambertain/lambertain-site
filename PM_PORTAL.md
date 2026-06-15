@@ -219,6 +219,24 @@ Lamb.dev всегда идёт **последним** во всех списка
 - **Инвайт** (`/admin/team`): для клиента — чекбокс «Показати інструкцію при вході» (`invites.show_onboarding`).
   При redeem ставит `project.meta.showOnboarding=true`. Тогда на главной клиента — баннер со ссылкой на `/onboarding`.
 
+## Договоры (генерация по шаблонам)
+
+Экран `/admin/contracts` (только админ) — сборка договоров из шаблонов с плейсхолдерами `{{key}}`.
+Три вкладки: **Договори** (список + просмотр/печать), **Новий договір** (мастер), **Виконавці (ФОПи)**, **Шаблони**.
+
+- **Модель данных** (`db.ts` + `scripts/migrate.mjs`): `contractors` (наши ФОПы-исполнители: name/address/ipn/iban/
+  bank_name/bank_mfo/bank_edrpou/phone), `contract_templates` (title/lang/body), `contracts` (number/contract_date/
+  city/title/template_id/contractor_id/client_requisites/vars JSONB/body — body это снимок отрендеренного текста).
+- **Плейсхолдеры** (`src/lib/contracts.ts`, чистая логика): `{{contractor.<field>}}` подставляются из выбранного ФОПа;
+  `{{client.requisites}}` — поле «Реквізити Замовника» (вставка блока реквизитов клиента); `{{number}}/{{date}}/{{city}}` —
+  реквизиты договора (`date` форматируется в укр. вид `formatUaDate` → «15» червня 2026 р.); любые прочие `{{поле}}`
+  (`subject`, `price`, `term`…) автоматически становятся полями в мастере (`dynamicPlaceholders`). Подписи — `FIELD_LABELS_UK`,
+  многострочные — `MULTILINE_KEYS`.
+- **Создание**: `createContractAction` рендерит `renderContract(template, ctx)` → сохраняет снимок `body`. Просмотр
+  `/admin/contracts/[id]` — белый «лист» (serif), `@media print` прячет навигацию → печать или сохранение в PDF браузером.
+- **Сид** (миграция, идемпотентно): типовой договор «Послуги веб-розробки (ФОП)» (укр) + один ФОП-исполнитель, если
+  справочник пуст. Дальше всё правится через UI.
+
 ## Скилы интейка (плейбуки)
 
 Интейк подбирает под тип задачи **скил** — плейбук с инструкциями. Работает по модели

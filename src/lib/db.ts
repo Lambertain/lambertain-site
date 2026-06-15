@@ -106,6 +106,39 @@ CREATE TABLE IF NOT EXISTS member_projects (
 );
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
+CREATE TABLE IF NOT EXISTS contractors (
+  id           SERIAL PRIMARY KEY,
+  name         TEXT NOT NULL,
+  address      TEXT,
+  ipn          TEXT,
+  iban         TEXT,
+  bank_name    TEXT,
+  bank_mfo     TEXT,
+  bank_edrpou  TEXT,
+  phone        TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS contract_templates (
+  id           SERIAL PRIMARY KEY,
+  title        TEXT NOT NULL,
+  lang         TEXT NOT NULL DEFAULT 'uk',
+  body         TEXT NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS contracts (
+  id                SERIAL PRIMARY KEY,
+  number            TEXT,
+  contract_date     DATE,
+  city              TEXT,
+  title             TEXT,
+  template_id       INT REFERENCES contract_templates(id) ON DELETE SET NULL,
+  contractor_id     INT REFERENCES contractors(id) ON DELETE SET NULL,
+  client_requisites TEXT,
+  vars              JSONB NOT NULL DEFAULT '{}',
+  body              TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
 
 // Цены Opus 4.8 ($/млн токенов). Поправить при изменении тарифа.
@@ -992,4 +1025,112 @@ export async function saveGuideImage(mime: string, dataB64: string): Promise<num
 export async function getGuideImage(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
   const rows = await q<{ mime: string | null; data: Buffer }>("SELECT mime, data FROM guide_images WHERE id = $1", [id]);
   return rows[0] ?? null;
+}
+
+// ——— Договоры: ФОПы-исполнители, шаблоны, сгенерированные договоры ———
+export interface Contractor {
+  id: number;
+  name: string;
+  address: string | null;
+  ipn: string | null;
+  iban: string | null;
+  bank_name: string | null;
+  bank_mfo: string | null;
+  bank_edrpou: string | null;
+  phone: string | null;
+}
+export type ContractorInput = Omit<Contractor, "id">;
+
+export async function listContractors(): Promise<Contractor[]> {
+  return q<Contractor>("SELECT id, name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone FROM contractors ORDER BY name");
+}
+export async function getContractor(id: number): Promise<Contractor | null> {
+  const rows = await q<Contractor>("SELECT id, name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone FROM contractors WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}
+export async function createContractor(c: ContractorInput): Promise<number> {
+  const rows = await q<{ id: number }>(
+    `INSERT INTO contractors (name, address, ipn, iban, bank_name, bank_mfo, bank_edrpou, phone)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+    [c.name, c.address, c.ipn, c.iban, c.bank_name, c.bank_mfo, c.bank_edrpou, c.phone],
+  );
+  return rows[0].id;
+}
+export async function updateContractor(id: number, c: ContractorInput): Promise<void> {
+  await q(
+    `UPDATE contractors SET name=$2, address=$3, ipn=$4, iban=$5, bank_name=$6, bank_mfo=$7, bank_edrpou=$8, phone=$9 WHERE id=$1`,
+    [id, c.name, c.address, c.ipn, c.iban, c.bank_name, c.bank_mfo, c.bank_edrpou, c.phone],
+  );
+}
+export async function deleteContractor(id: number): Promise<void> {
+  await q("DELETE FROM contractors WHERE id=$1", [id]);
+}
+
+export interface ContractTemplate { id: number; title: string; lang: string; body: string }
+export async function listTemplates(): Promise<ContractTemplate[]> {
+  return q<ContractTemplate>("SELECT id, title, lang, body FROM contract_templates ORDER BY title");
+}
+export async function getTemplate(id: number): Promise<ContractTemplate | null> {
+  const rows = await q<ContractTemplate>("SELECT id, title, lang, body FROM contract_templates WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}
+export async function createTemplate(title: string, lang: string, body: string): Promise<number> {
+  const rows = await q<{ id: number }>("INSERT INTO contract_templates (title, lang, body) VALUES ($1,$2,$3) RETURNING id", [title, lang, body]);
+  return rows[0].id;
+}
+export async function updateTemplate(id: number, title: string, lang: string, body: string): Promise<void> {
+  await q("UPDATE contract_templates SET title=$2, lang=$3, body=$4, updated_at=now() WHERE id=$1", [id, title, lang, body]);
+}
+export async function deleteTemplate(id: number): Promise<void> {
+  await q("DELETE FROM contract_templates WHERE id=$1", [id]);
+}
+
+export interface Contract {
+  id: number;
+  number: string | null;
+  contract_date: string | null;
+  city: string | null;
+  title: string | null;
+  template_id: number | null;
+  contractor_id: number | null;
+  client_requisites: string | null;
+  vars: Record<string, string>;
+  body: string | null;
+  created_at: string;
+}
+export interface ContractInput {
+  number: string | null;
+  contract_date: string | null;
+  city: string | null;
+  title: string | null;
+  template_id: number | null;
+  contractor_id: number | null;
+  client_requisites: string | null;
+  vars: Record<string, string>;
+  body: string;
+}
+export async function listContracts(): Promise<Contract[]> {
+  return q<Contract>(
+    `SELECT id, number, to_char(contract_date,'YYYY-MM-DD') AS contract_date, city, title, template_id, contractor_id, client_requisites, vars, body, created_at
+     FROM contracts ORDER BY created_at DESC`,
+  );
+}
+export async function getContract(id: number): Promise<Contract | null> {
+  const rows = await q<Contract>(
+    `SELECT id, number, to_char(contract_date,'YYYY-MM-DD') AS contract_date, city, title, template_id, contractor_id, client_requisites, vars, body, created_at
+     FROM contracts WHERE id = $1`,
+    [id],
+  );
+  return rows[0] ?? null;
+}
+export async function createContract(c: ContractInput): Promise<number> {
+  const rows = await q<{ id: number }>(
+    `INSERT INTO contracts (number, contract_date, city, title, template_id, contractor_id, client_requisites, vars, body)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9) RETURNING id`,
+    [c.number, c.contract_date, c.city, c.title, c.template_id, c.contractor_id, c.client_requisites, JSON.stringify(c.vars), c.body],
+  );
+  return rows[0].id;
+}
+export async function deleteContract(id: number): Promise<void> {
+  await q("DELETE FROM contracts WHERE id=$1", [id]);
 }
