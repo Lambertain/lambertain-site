@@ -228,10 +228,13 @@ Lamb.dev всегда идёт **последним** во всех списка
   bank_name/bank_mfo/bank_edrpou/phone), `contract_templates` (title/lang/body), `contracts` (number/contract_date/
   city/title/template_id/contractor_id/client_requisites/vars JSONB/body — body это снимок отрендеренного текста).
 - **Плейсхолдеры** (`src/lib/contracts.ts`, чистая логика): `{{contractor.<field>}}` подставляются из выбранного ФОПа;
-  `{{client.requisites}}` — поле «Реквізити Замовника» (вставка блока реквизитов клиента); `{{number}}/{{date}}/{{city}}` —
-  реквизиты договора (`date` форматируется в укр. вид `formatUaDate` → «15» червня 2026 р.); любые прочие `{{поле}}`
-  (`subject`, `price`, `term`…) автоматически становятся полями в мастере (`dynamicPlaceholders`). Подписи — `FIELD_LABELS_UK`,
-  многострочные — `MULTILINE_KEYS`.
+  `{{client.requisites}}` — поле «Реквізити Замовника» (вставка блока реквизитов клиента); `{{payments}}` — конструктор
+  графика платежей; `{{number}}/{{date}}/{{city}}` — реквизиты договора (`date` форматируется в укр. вид `formatUaDate` →
+  «15» червня 2026 р.); любые прочие `{{поле}}` (`subject`, `price`, `term`…) автоматически становятся полями в мастере
+  (`dynamicPlaceholders`). Подписи — `FIELD_LABELS_UK`, многострочные — `MULTILINE_KEYS`.
+- **График платежей** (`{{payments}}`, `PaymentsBuilder`): строки «сумма + условие», где условие свободное — срок ИЛИ
+  этап разработки (первый платёж по умолчанию помечен предоплатой). `buildPaymentsText` собирает «Платіж № 1: 10 000 грн — …;»
+  построчно; `paymentsSum` сверяет сумму графика с общей стоимостью (`{{price}}`) и подсвечивает расхождение.
 - **Создание**: `createContractAction` рендерит `renderContract(template, ctx)` → сохраняет снимок `body`. Просмотр
   `/admin/contracts/[id]` — белый «лист» (serif), `@media print` прячет навигацию → печать или сохранение в PDF браузером.
 - **Сид** (миграция, идемпотентно): типовой договор «Послуги веб-розробки (ФОП)» (укр) + один ФОП-исполнитель, если

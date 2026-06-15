@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ui } from "../../ui-styles";
 import {
   extractPlaceholders, dynamicPlaceholders, fieldLabel, MULTILINE_KEYS,
+  buildPaymentsText, paymentsSum, type PaymentItem,
 } from "@/lib/contracts";
 import {
   saveContractor, removeContractor, saveTemplate, removeTemplate,
@@ -108,6 +109,7 @@ function CreateContract({ contractors, templates, today }: { contractors: Contra
   const [title, setTitle] = useState("");
   const [clientReq, setClientReq] = useState("");
   const [vars, setVars] = useState<Record<string, string>>({});
+  const [payments, setPayments] = useState<PaymentItem[]>([{ amount: "", condition: "передоплата при підписанні Договору" }]);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -121,9 +123,10 @@ function CreateContract({ contractors, templates, today }: { contractors: Contra
   function submit() {
     if (!templateId || !contractorId) { setMsg("Оберіть шаблон і виконавця"); return; }
     setMsg(null);
+    const finalVars = has("payments") ? { ...vars, payments: buildPaymentsText(payments) } : vars;
     const payload: NewContractInput = {
       templateId: Number(templateId), contractorId: Number(contractorId),
-      number, date, city, title, clientRequisites: clientReq, vars,
+      number, date, city, title, clientRequisites: clientReq, vars: finalVars,
     };
     start(async () => {
       const r = await createContractAction(payload);
@@ -173,6 +176,8 @@ function CreateContract({ contractors, templates, today }: { contractors: Contra
             : <input value={vars[k] ?? ""} onChange={(e) => setVar(k, e.target.value)} style={ui.input} />}
         </Field>
       ))}
+
+      {has("payments") && <PaymentsBuilder payments={payments} setPayments={setPayments} totalHint={vars.price} />}
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 14, flexWrap: "wrap" }}>
         <button onClick={submit} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{pending ? "Створення…" : "Створити договір"}</button>
@@ -284,6 +289,55 @@ function TemplateEditor({ t, isNew }: { t?: Template; isNew?: boolean }) {
             style={{ ...ui.monoLabel, color: "#ff5b5b", background: "transparent", border: "1px solid #ff5b5b", padding: "8px 12px", cursor: "pointer", borderRadius: 2 }}>Видалити</button>
         )}
         {msg && <span style={{ ...ui.monoLabel, textTransform: "none", color: msg.includes("✓") ? "var(--accent)" : "#ff5b5b" }}>{msg}</span>}
+      </div>
+    </div>
+  );
+}
+
+function PaymentsBuilder({ payments, setPayments, totalHint }: {
+  payments: PaymentItem[]; setPayments: (v: PaymentItem[]) => void; totalHint?: string;
+}) {
+  function update(i: number, patch: Partial<PaymentItem>) {
+    setPayments(payments.map((p, idx) => (idx === i ? { ...p, ...patch } : p)));
+  }
+  function add() { setPayments([...payments, { amount: "", condition: "" }]); }
+  function remove(i: number) { setPayments(payments.filter((_, idx) => idx !== i)); }
+
+  const sum = paymentsSum(payments);
+  const total = totalHint ? Number(totalHint.replace(/\s/g, "").replace(",", ".")) : NaN;
+  const mismatch = sum !== null && !Number.isNaN(total) && Math.abs(sum - total) > 0.001;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <span style={ui.fieldLabel}>Графік платежів (перший платіж — передоплата; умова кожного платежу — строк або етап робіт)</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {payments.map((p, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ ...ui.monoLabel, width: 70, textTransform: "none" }}>Платіж {i + 1}</span>
+            <input
+              value={p.amount} onChange={(e) => update(i, { amount: e.target.value })}
+              placeholder="10 000" style={{ ...ui.input, width: 120 }}
+            />
+            <span style={{ color: "var(--muted)", fontSize: 13 }}>грн —</span>
+            <input
+              value={p.condition} onChange={(e) => update(i, { condition: e.target.value })}
+              placeholder={i === 0 ? "передоплата при підписанні Договору" : "напр. через 10 днів / після завершення етапу дизайну"}
+              style={{ ...ui.input, flex: 1, minWidth: 220 }}
+            />
+            {payments.length > 1 && (
+              <button onClick={() => remove(i)} title="Видалити платіж"
+                style={{ ...ui.monoLabel, color: "#ff5b5b", background: "transparent", border: "1px solid #ff5b5b", padding: "8px 10px", cursor: "pointer", borderRadius: 2 }}>✕</button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+        <button onClick={add} style={{ ...ui.btn, padding: "8px 16px" }}>+ Додати платіж</button>
+        {sum !== null && (
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: mismatch ? "#e8b339" : "var(--muted)" }}>
+            Сума за графіком: {sum.toLocaleString("uk-UA")} грн{mismatch ? ` ≠ загальна вартість ${total.toLocaleString("uk-UA")} грн` : ""}
+          </span>
+        )}
       </div>
     </div>
   );

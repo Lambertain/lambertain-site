@@ -39,6 +39,7 @@ export interface ContractorData {
 export const SPECIAL_KEYS = new Set<string>([
   ...CONTRACTOR_FIELDS.map((f) => `contractor.${f}`),
   "client.requisites",
+  "payments",
   "number",
   "date",
   "city",
@@ -56,8 +57,36 @@ export const FIELD_LABELS_UK: Record<string, string> = {
   prepay: "Передоплата",
   term: "Строк виконання",
   warranty: "Гарантійний строк",
+  payments: "Графік платежів",
   "client.requisites": "Реквізити Замовника",
 };
+
+/** Один платёж графика: сумма + условие (срок ИЛИ этап разработки — свободный текст). */
+export interface PaymentItem { amount: string; condition: string }
+
+/** Собрать текст графика платежей в тело договора: «Платіж № 1: 10 000 грн — …;» построчно. */
+export function buildPaymentsText(items: PaymentItem[]): string {
+  const rows = items.filter((p) => p.amount.trim() || p.condition.trim());
+  return rows
+    .map((p, i) => {
+      const end = i === rows.length - 1 ? "." : ";";
+      const amount = p.amount.trim();
+      const cond = p.condition.trim();
+      return `Платіж № ${i + 1}: ${amount} грн${cond ? ` — ${cond}` : ""}${end}`;
+    })
+    .join("\n");
+}
+
+/** Сумма платежей графика (для подсказки/сверки с общей стоимостью). Возвращает null, если ничего не распарсилось. */
+export function paymentsSum(items: PaymentItem[]): number | null {
+  let sum = 0;
+  let any = false;
+  for (const p of items) {
+    const n = Number(p.amount.replace(/\s/g, "").replace(",", "."));
+    if (!Number.isNaN(n) && p.amount.trim()) { sum += n; any = true; }
+  }
+  return any ? sum : null;
+}
 
 /** Поля, которые удобнее вводить многострочно. */
 export const MULTILINE_KEYS = new Set(["subject", "scope", "price_words", "client.requisites"]);
