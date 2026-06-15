@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { getBackend } from "@/lib/tasks";
 import { setTaskAiStatus } from "@/lib/db";
-import { notifyLogins } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   const token = bearer(req);
   if (!token || token !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
-  let body: { projectKey?: string; title?: string; description?: string; assigneeLogin?: string; internal?: boolean; triage?: boolean };
+  let body: { projectKey?: string; title?: string; description?: string; assigneeLogin?: string; internal?: boolean; triage?: boolean; recipient?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   const title = String(body.title || "").trim();
@@ -38,6 +38,15 @@ export async function POST(req: Request) {
   if (!project) return NextResponse.json({ error: `project ${projectKey} not found` }, { status: 404 });
 
   try {
+    // Вопрос/задача КЛИЕНТУ: не назначаем разработчику, не триажим, клиент видит и получает пуш.
+    if (body.recipient === "client") {
+      const task = await be.createTask({
+        projectKey, summary: title.slice(0, 120), description,
+        assigneeLogin: null, reporterLogin: null, approvalStatus: "approved", createdByRole: "admin", internal: false,
+      });
+      await notifyProjectClients(projectKey, `❓ <b>Питання по проекту</b> · ${task.id}: ${task.summary}\nВідкрийте задачу на порталі та дайте відповідь у коментарях.`, [], { text: "Відкрити", url: `${PORTAL_BASE}/admin/tasks/${task.id}` }).catch(() => {});
+      return NextResponse.json({ id: task.id, url: task.url, recipient: "client" });
+    }
     if (triage) {
       // Штатный путь портала: исполнителя и теги проставит ИИ-триаж, он же уведомит разработчика.
       // Триаж отложен на ~5 минут (его запустит поллер) — окно, чтобы успеть отредактировать задачу.
