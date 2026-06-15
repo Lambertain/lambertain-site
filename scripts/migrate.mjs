@@ -310,7 +310,6 @@ const CONTRACT_TEMPLATE_UK = `# ДОГОВІР № {{number}}
 IBAN: {{contractor.iban}}
 Банк: {{contractor.bank_name}}, МФО {{contractor.bank_mfo}}, ЄДРПОУ банку {{contractor.bank_edrpou}}
 Тел.: {{contractor.phone}}
-E-mail: {{contractor.email}}
 
 _______________________ / {{contractor.name}}
 
@@ -377,12 +376,13 @@ async function main() {
      WHERE NOT EXISTS (SELECT 1 FROM contract_templates WHERE title = $1)`,
     ["Послуги веб-розробки (ФОП)", CONTRACT_TEMPLATE_UK],
   );
-  // Одноразово дотягиваем e-mail-строку в уже засеянный типовой шаблон (только если его не правили вручную).
+  // Убираем e-mail-строку исполнителя из типового шаблона (добавлена по ошибке; реквизиты ФОПа — без email).
+  // Безопасно: трогаем только нетронутый сид (если пользователь правил шаблон — якорь не совпадёт).
   await pool.query(
     `UPDATE contract_templates
-       SET body = replace(body, E'Тел.: {{contractor.phone}}', E'Тел.: {{contractor.phone}}\nE-mail: {{contractor.email}}'),
+       SET body = replace(body, E'Тел.: {{contractor.phone}}\nE-mail: {{contractor.email}}', E'Тел.: {{contractor.phone}}'),
            updated_at = now()
-     WHERE title = $1 AND body LIKE '%Тел.: {{contractor.phone}}%' AND body NOT LIKE '%{{contractor.email}}%'`,
+     WHERE title = $1 AND body LIKE '%E-mail: {{contractor.email}}%'`,
     ["Послуги веб-розробки (ФОП)"],
   );
   // ФОП-исполнитель по умолчанию — только если справочник ещё пуст (дальше правится через UI).
