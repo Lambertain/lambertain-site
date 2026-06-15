@@ -108,9 +108,14 @@ CREATE TABLE IF NOT EXISTS guides (
   id         SERIAL PRIMARY KEY,
   slug       TEXT UNIQUE NOT NULL,
   title      TEXT NOT NULL,
-  body       TEXT NOT NULL DEFAULT '',               -- markdown
+  body       TEXT NOT NULL DEFAULT '',               -- markdown (uk — основная локаль)
   ord        INT NOT NULL DEFAULT 100,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+-- Мультилокальность гайдов: title/body = uk; ru/en — опциональные переводы (fallback на uk).
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS title_ru TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS body_ru TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS title_en TEXT;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS body_en TEXT;
 -- Какие гайды включены клиенту по проекту.
 CREATE TABLE IF NOT EXISTS project_guides (
   project_key TEXT NOT NULL,

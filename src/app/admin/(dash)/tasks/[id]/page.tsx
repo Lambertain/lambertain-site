@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide, guideText } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -54,9 +54,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   if (task.internal && me.role === "client") redirect(backHref);
 
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
-  // Гайд-инструкция к действию клиента (как зарегистрировать) — если привязан.
+  // Гайд-инструкция к действию клиента (как зарегистрировать) — если привязан, на локали пользователя.
   const cg = task.clientActionGuide ? await getGuide(task.clientActionGuide) : null;
-  const clientGuide = cg ? { title: cg.title, body: cg.body } : null;
+  const clientGuide = cg ? guideText(cg, locale) : null;
 
   // Новые комменты — появившиеся после последнего открытия задачи.
   const prevRead = reads.get(id) ?? 0;

@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyProjectClients } from "@/lib/notify";
-import { classifyHandoff } from "@/lib/handoff-classify";
+import { classifyHandoff, generateGuide } from "@/lib/handoff-classify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -47,7 +47,10 @@ export async function POST(req: Request) {
     if (cls.kind === "client") {
       const short = cls.clientShort || action.slice(0, 120);
       const full = cls.clientText || action;
-      await setClientAction(taskId, full, cls.guideId ?? null);
+      // Гайда нет — генерим его сразу (подробно, для клиента, в 3 локалях) и привязываем.
+      let guideId = cls.guideId ?? null;
+      if (guideId == null) guideId = await generateGuide(short).catch(() => null);
+      await setClientAction(taskId, full, guideId);
       await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — нижче в задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client").catch(() => {});
       if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
       await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${taskId}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => {});

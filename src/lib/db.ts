@@ -1047,26 +1047,45 @@ export async function getBriefByProject(projectKey: string): Promise<Brief | nul
   return rows[0] ?? null;
 }
 
-// ——— Гайды-инструкции (библиотека) ———
-export interface Guide { id: number; slug: string; title: string; body: string; ord: number }
+// ——— Гайды-инструкции (библиотека, мультилокальные: uk основной + ru/en) ———
+export interface Guide {
+  id: number; slug: string; title: string; body: string; ord: number;
+  title_ru: string | null; body_ru: string | null; title_en: string | null; body_en: string | null;
+}
+export interface GuideLoc { title_ru?: string | null; body_ru?: string | null; title_en?: string | null; body_en?: string | null }
+
+const GUIDE_COLS = "id, slug, title, body, ord, title_ru, body_ru, title_en, body_en";
+
+/** Заголовок+тело гайда на нужной локали с fallback на uk (основную). */
+export function guideText(g: Guide, locale: "uk" | "ru" | "en"): { title: string; body: string } {
+  if (locale === "ru") return { title: g.title_ru || g.title, body: g.body_ru || g.body };
+  if (locale === "en") return { title: g.title_en || g.title, body: g.body_en || g.body };
+  return { title: g.title, body: g.body };
+}
 
 export async function listGuides(): Promise<Guide[]> {
-  return q<Guide>("SELECT id, slug, title, body, ord FROM guides ORDER BY ord, title");
+  return q<Guide>(`SELECT ${GUIDE_COLS} FROM guides ORDER BY ord, title`);
 }
 export async function getGuide(id: number): Promise<Guide | null> {
-  const rows = await q<Guide>("SELECT id, slug, title, body, ord FROM guides WHERE id = $1", [id]);
+  const rows = await q<Guide>(`SELECT ${GUIDE_COLS} FROM guides WHERE id = $1`, [id]);
   return rows[0] ?? null;
 }
-export async function createGuide(slug: string, title: string, body: string, ord: number): Promise<{ id?: number; error?: string }> {
+export async function createGuide(slug: string, title: string, body: string, ord: number, loc?: GuideLoc): Promise<{ id?: number; error?: string }> {
   try {
-    const rows = await q<{ id: number }>("INSERT INTO guides (slug, title, body, ord) VALUES ($1,$2,$3,$4) RETURNING id", [slug, title, body, ord]);
+    const rows = await q<{ id: number }>(
+      "INSERT INTO guides (slug, title, body, ord, title_ru, body_ru, title_en, body_en) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
+      [slug, title, body, ord, loc?.title_ru ?? null, loc?.body_ru ?? null, loc?.title_en ?? null, loc?.body_en ?? null],
+    );
     return { id: rows[0].id };
   } catch {
     return { error: "slug занят" };
   }
 }
-export async function updateGuide(id: number, title: string, body: string, ord: number): Promise<void> {
-  await q("UPDATE guides SET title=$2, body=$3, ord=$4 WHERE id=$1", [id, title, body, ord]);
+export async function updateGuide(id: number, title: string, body: string, ord: number, loc?: GuideLoc): Promise<void> {
+  await q(
+    "UPDATE guides SET title=$2, body=$3, ord=$4, title_ru=$5, body_ru=$6, title_en=$7, body_en=$8 WHERE id=$1",
+    [id, title, body, ord, loc?.title_ru ?? null, loc?.body_ru ?? null, loc?.title_en ?? null, loc?.body_en ?? null],
+  );
 }
 export async function deleteGuide(id: number): Promise<void> {
   await q("DELETE FROM guides WHERE id=$1", [id]);

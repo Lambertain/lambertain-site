@@ -5,7 +5,7 @@ import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
-import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor, getEnabledGuides } from "@/lib/db";
+import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor, getEnabledGuides, guideText } from "@/lib/db";
 import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
 import { ProjectInfoCard } from "./project-info-card";
@@ -187,7 +187,7 @@ export default async function HomePage() {
 
   return (
     <div>
-      <ClientGuides guides={clientGuides.map((g) => ({ id: g.id, title: g.title, body: g.body }))} locale={locale} />
+      <ClientGuides guides={clientGuides.map((g) => ({ id: g.id, ...guideText(g, locale) }))} locale={locale} />
       {showOnboarding && (
         <Link href="/onboarding" style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", marginBottom: 18, borderRadius: 10, border: "1px solid var(--accent-line)", background: "rgba(185,255,75,0.06)", textDecoration: "none", color: "var(--text)" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
