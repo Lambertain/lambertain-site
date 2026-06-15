@@ -45,7 +45,10 @@ export async function GET(req: Request) {
   // Список задач проекта.
   const all = url.searchParams.get("all") === "1";
   // Внутренние задачи (разработчик → админ, напр. доступы) не показываем в рабочей очереди Claude.
-  const tasks = (await be.listTasks({ projectKey, unresolvedOnly: !all, order: "updated_desc" })).filter((t) => !t.internal);
+  // Внутренние задачи скрываем из очереди Claude — КРОМЕ поставленных админом разработчику мимо клиента
+  // (created_by_role = admin/super): их разработчик берёт в работу, а клиент их не видит.
+  const tasks = (await be.listTasks({ projectKey, unresolvedOnly: !all, order: "updated_desc" }))
+    .filter((t) => !t.internal || t.createdByRole === "admin" || t.createdByRole === "super");
   return NextResponse.json({
     project: projectKey,
     count: tasks.length,

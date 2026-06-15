@@ -58,6 +58,7 @@ export async function createRequestTask(
   title: string,
   blocks: ReqBlock[],
   recipient?: "admin" | "client" | "self",
+  internal?: boolean,
 ): Promise<{ id?: string; url?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
@@ -108,6 +109,9 @@ export async function createRequestTask(
     const appr = isFeedback
       ? { approvalStatus: "approved" as const, createdByRole: me.role, pending: false, approver: null }
       : await approvalFor(me, projectKey);
+    // Внутренняя задача (клиент не видит) — только когда её ставит админ/супер-админ. Разработчик такую
+    // задачу получит (dev API пускает internal с created_by_role=admin/super), а клиент — нет.
+    const wantInternal = internal === true && !isFeedback && (isSuperAdmin(me) || me.realRole === "admin");
     const task = await be.createTask({
       projectKey,
       summary,
@@ -116,6 +120,7 @@ export async function createRequestTask(
       reporterLogin: me.youtrackLogin ?? null,
       approvalStatus: appr.approvalStatus,
       createdByRole: appr.createdByRole,
+      internal: wantInternal,
     });
     await appendRequestBlocks(task.id, blocks);
     if (isFeedback) {

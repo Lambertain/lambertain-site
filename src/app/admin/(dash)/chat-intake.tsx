@@ -46,6 +46,7 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
   const [projectKey, setProjectKey] = useState((projects.find((p) => p.key !== feedbackKey) ?? projects[0])?.key ?? "");
   const [recipient, setRecipient] = useState<"admin" | "client">("admin");
   const [selfTask, setSelfTask] = useState(false);
+  const [internalTask, setInternalTask] = useState(false); // админ: задача разработчику мимо клиента
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [images, setImages] = useState<Att[]>([]);
@@ -191,8 +192,9 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
     setError(null);
     start(async () => {
       const rcpt = showRecipient ? recipient : showSelf && selfTask ? "self" : undefined;
+      const wantInternal = showSelf && internalTask && !selfTask; // задача разработчику, скрытая от клиента
       try {
-        const res = await createRequestTask(projectKey, title.trim(), blocks, rcpt);
+        const res = await createRequestTask(projectKey, title.trim(), blocks, rcpt, wantInternal);
         if (res.error) setError(res.error);
         else if (res.id && res.url) {
           setCreated({ id: res.id, url: res.url });
@@ -248,6 +250,17 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
             {t(locale, "newtask.self")}
           </label>
           <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, "newtask.selfHint")}</span>
+        </div>
+      )}
+
+      {/* админ → разработчику мимо клиента: задача уйдёт в работу разработчику, клиент её не увидит */}
+      {showSelf && !selfTask && (
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", ...ui.monoLabel, textTransform: "none" }}>
+            <input type="checkbox" checked={internalTask} onChange={(e) => setInternalTask(e.target.checked)} />
+            {t(locale, "newtask.internal")}
+          </label>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, "newtask.internalHint")}</span>
         </div>
       )}
 

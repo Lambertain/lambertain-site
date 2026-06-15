@@ -118,9 +118,16 @@ export async function draftTask(taskId: string): Promise<void> {
       if (ask) {
         const question = String((ask.input as { question?: string }).question || "").trim();
         if (question) {
-          await be.addComment(taskId, `🟡 <b>Вопрос:</b> ${question}`, "client");
-          await notifyProjectClients(task.projectKey, `🟡 <b>Уточнение по задаче</b> · ${taskId}: ${task.summary}\n${question}\nОтветьте в задаче на портале.`).catch(() => {});
-          if (task.reporter?.login) await notifyLogins([task.reporter.login], `🟡 <b>Уточнение по задаче</b> · ${taskId}: ${question}`).catch(() => {});
+          if (task.internal) {
+            // Внутренняя задача (админ → разработчику мимо клиента): уточнение идёт АДМИНУ-постановщику,
+            // НЕ клиенту — иначе скрытность задачи протечёт. Коммент тоже внутренний.
+            await be.addComment(taskId, `🟡 <b>Вопрос:</b> ${question}`, "internal");
+            await notifyAdmin(`🟡 <b>Уточнение по внутренней задаче</b> · ${taskId}: ${task.summary}\n${question}`).catch(() => {});
+          } else {
+            await be.addComment(taskId, `🟡 <b>Вопрос:</b> ${question}`, "client");
+            await notifyProjectClients(task.projectKey, `🟡 <b>Уточнение по задаче</b> · ${taskId}: ${task.summary}\n${question}\nОтветьте в задаче на портале.`).catch(() => {});
+            if (task.reporter?.login) await notifyLogins([task.reporter.login], `🟡 <b>Уточнение по задаче</b> · ${taskId}: ${question}`).catch(() => {});
+          }
         }
         await setTaskAiStatus(taskId, "waiting");
         return;
