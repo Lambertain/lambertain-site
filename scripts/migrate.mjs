@@ -161,6 +161,10 @@ CREATE TABLE IF NOT EXISTS contracts (
 CREATE TABLE IF NOT EXISTS instruction_sets (
   id SERIAL PRIMARY KEY, token TEXT UNIQUE NOT NULL, title TEXT,
   guide_ids INTEGER[] NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS project_secrets (
+  id SERIAL PRIMARY KEY, project_key TEXT NOT NULL, name TEXT NOT NULL, value TEXT, note TEXT, env TEXT,
+  filled_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS project_secrets_uniq ON project_secrets (project_key, name, coalesce(env, ''));
 -- Страховка от дублей номеров задач (основная защита — advisory-lock в createTask).
 -- best-effort: если в проде уже есть дубль (project_id, num) — индекс не создастся, но миграция не упадёт.
 DO $$ BEGIN
@@ -403,6 +407,30 @@ async function main() {
     [SEED_CONTRACTOR.name, SEED_CONTRACTOR.address, SEED_CONTRACTOR.ipn, SEED_CONTRACTOR.iban,
      SEED_CONTRACTOR.bank_name, SEED_CONTRACTOR.bank_mfo, SEED_CONTRACTOR.bank_edrpou, SEED_CONTRACTOR.phone],
   );
+  // Одноразовый перенос существующих секретов проектов (meta.credentials + clientDeploy.railwayToken) на страницу секретов.
+  const projs = await pool.query("SELECT key, meta FROM projects WHERE meta IS NOT NULL");
+  for (const p of projs.rows) {
+    const meta = p.meta || {};
+    const creds = Array.isArray(meta.credentials) ? meta.credentials : [];
+    for (const cr of creds) {
+      if (!cr || (!cr.login && !cr.pass)) continue;
+      const name = `${cr.role || "доступ"}${cr.login ? ` (${cr.login})` : ""}`;
+      const val = [cr.login ? `логін: ${cr.login}` : "", cr.pass ? `пароль: ${cr.pass}` : ""].filter(Boolean).join("\n");
+      await pool.query(
+        `INSERT INTO project_secrets (project_key, name, value, env, filled_by) VALUES ($1,$2,$3,$4,'migrated')
+         ON CONFLICT (project_key, name, coalesce(env,'')) DO NOTHING`,
+        [p.key, name, val, cr.env || null],
+      );
+    }
+    const rt = meta.clientDeploy?.railwayToken;
+    if (rt) {
+      await pool.query(
+        `INSERT INTO project_secrets (project_key, name, value, note, filled_by) VALUES ($1,'Railway token',$2,'клієнтський Railway для деплою','migrated')
+         ON CONFLICT (project_key, name, coalesce(env,'')) DO NOTHING`,
+        [p.key, rt],
+      );
+    }
+  }
   const c = await pool.query("SELECT count(*)::int AS n FROM role_overrides");
   const s = await pool.query("SELECT count(*)::int AS n FROM skills");
   console.log(`Миграция ок. role_overrides: ${c.rows[0].n}, skills: ${s.rows[0].n}.`);

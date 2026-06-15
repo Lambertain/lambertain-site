@@ -149,6 +149,18 @@ CREATE TABLE IF NOT EXISTS instruction_sets (
   guide_ids   INTEGER[] NOT NULL DEFAULT '{}',
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS project_secrets (
+  id           SERIAL PRIMARY KEY,
+  project_key  TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  value        TEXT,
+  note         TEXT,
+  env          TEXT,
+  filled_by    TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS project_secrets_uniq ON project_secrets (project_key, name, coalesce(env, ''));
 `;
 
 // Цены Opus 4.8 ($/млн токенов). Поправить при изменении тарифа.
@@ -1215,6 +1227,24 @@ export async function updateInstructionSet(id: number, title: string | null, gui
 export async function deleteInstructionSet(id: number): Promise<void> {
   await q("DELETE FROM instruction_sets WHERE id=$1", [id]);
 }
+// ——— Секреты проекта (доступы/токены: админ видит, разработчик-человек нет, его Claude-код читает через dev API) ———
+export interface ProjectSecret { id: number; project_key: string; name: string; value: string | null; note: string | null; env: string | null; filled_by: string | null; updated_at: string }
+
+export async function listSecrets(projectKey: string): Promise<ProjectSecret[]> {
+  return q<ProjectSecret>("SELECT id, project_key, name, value, note, env, filled_by, updated_at FROM project_secrets WHERE project_key = $1 ORDER BY name, env", [projectKey]);
+}
+export async function upsertSecret(projectKey: string, s: { name: string; value: string | null; note?: string | null; env?: string | null; filledBy?: string | null }): Promise<void> {
+  await q(
+    `INSERT INTO project_secrets (project_key, name, value, note, env, filled_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6, now())
+     ON CONFLICT (project_key, name, coalesce(env, '')) DO UPDATE SET value=EXCLUDED.value, note=EXCLUDED.note, filled_by=EXCLUDED.filled_by, updated_at=now()`,
+    [projectKey, s.name.trim(), s.value, s.note ?? null, s.env ?? null, s.filledBy ?? null],
+  );
+}
+export async function deleteSecret(id: number): Promise<void> {
+  await q("DELETE FROM project_secrets WHERE id=$1", [id]);
+}
+
 /** Набор по публичному токену + его гайды В ПОРЯДКЕ guide_ids (для публичной страницы). */
 export async function getInstructionSetByToken(token: string): Promise<{ title: string | null; guides: Guide[] } | null> {
   const sets = await q<InstructionSet>("SELECT title, guide_ids FROM instruction_sets WHERE token = $1", [token]);

@@ -1,7 +1,7 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins } from "@/lib/notify";
@@ -83,4 +83,21 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка декомпозиции/создания" };
   }
+}
+
+// ——— Секреты проекта (только админ; разработчик-человек не видит) ———
+export async function saveSecret(projectKey: string, input: { name: string; value: string; note?: string; env?: string }): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  if (!input.name.trim()) return { error: "Назва порожня" };
+  await upsertSecret(projectKey, { name: input.name, value: input.value || null, note: input.note || null, env: input.env || null, filledBy: "admin" });
+  revalidatePath(`/admin/projects/${projectKey}`);
+  return { ok: true };
+}
+export async function removeSecret(projectKey: string, id: number): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  await deleteSecret(id);
+  revalidatePath(`/admin/projects/${projectKey}`);
+  return { ok: true };
 }

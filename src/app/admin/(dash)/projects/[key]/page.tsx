@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/principal";
-import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds } from "@/lib/db";
+import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds, listSecrets } from "@/lib/db";
 import { ProjectGuides } from "./project-guides";
+import { SecretsPanel } from "./secrets-panel";
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -17,8 +18,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
   await requireAdmin();
   const { key } = await params;
   const locale = await getLocale();
-  const [proj, tokens, users, brief, guides, enabledGuides] = await Promise.all([
-    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), getProjectGuideIds(key),
+  const [proj, tokens, users, brief, guides, enabledGuides, secrets] = await Promise.all([
+    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), getProjectGuideIds(key), listSecrets(key),
   ]);
   const contributors = users
     .filter((u) => u.role === "contributor" || u.role === "admin")
@@ -64,6 +65,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
           )}
         </div>
       )}
+
+      <SecretsPanel projectKey={key} secrets={secrets.map((s) => ({ id: s.id, name: s.name, value: s.value, note: s.note, env: s.env, filledBy: s.filled_by }))} />
 
       <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title }))} enabled={enabledGuides} />
 

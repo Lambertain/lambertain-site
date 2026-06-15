@@ -6,22 +6,6 @@ import type { ProjectMeta } from "@/lib/tasks/types";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
-function credsToText(meta: ProjectMeta): string {
-  return (meta.credentials || [])
-    .map((c) => [c.role, c.env, c.login, c.pass].map((x) => x ?? "").join("|"))
-    .join("\n");
-}
-function textToCreds(text: string) {
-  return text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((l) => {
-      const [role, env, login, pass] = l.split("|").map((x) => x?.trim());
-      return { role, env, login, pass };
-    });
-}
-
 const Field = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
   <div>
     <label style={ui.fieldLabel}>{label}</label>
@@ -66,7 +50,6 @@ export function MetaForm({
   const [devBranch, setDevBranch] = useState(m.deploy?.devBranch ?? "");
   const [design, setDesign] = useState(m.design ?? "");
   const [spec, setSpec] = useState(m.spec ?? "");
-  const [creds, setCreds] = useState(credsToText(m));
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -100,7 +83,7 @@ export function MetaForm({
               pgServiceId: cdPg || undefined,
             }
           : undefined,
-      credentials: textToCreds(creds),
+      credentials: m.credentials, // секреты теперь редактируются в «Секрети та доступи» (project_secrets)
     };
     start(async () => {
       const r = await saveMeta(projectKey, name, meta);
@@ -196,11 +179,6 @@ export function MetaForm({
         <label style={ui.fieldLabel}>{t(locale, "projects.spec")}</label>
         <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.specHint")}</div>
         <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={10} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
-      </div>
-
-      <div style={{ marginTop: 18 }}>
-        <label style={ui.fieldLabel}>{t(locale, "projects.creds")}</label>
-        <textarea value={creds} onChange={(e) => setCreds(e.target.value)} rows={4} style={{ ...ui.input, resize: "vertical", fontFamily: "var(--font-mono)", fontSize: 13 }} />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 18 }}>
