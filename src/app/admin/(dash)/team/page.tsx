@@ -27,7 +27,14 @@ export default async function TeamPage() {
   // Лиды — заполненные брифы, ещё не заведённые в проект.
   const leads = briefs
     .filter((b) => !b.project_key)
-    .map((b) => ({ id: b.id, label: b.label, projectType: b.project_type, status: b.status, submittedAt: b.submitted_at, createdAt: b.created_at }));
+    .map((b) => {
+      const p = (b.payload || {}) as Record<string, unknown>;
+      const str = (v: unknown) => (typeof v === "string" ? v : "");
+      return {
+        id: b.id, label: b.label, projectType: b.project_type, status: b.status, submittedAt: b.submitted_at, createdAt: b.created_at,
+        companyName: str(p.companyName), contactPerson: str(p.contactPerson), contacts: str(p.contacts),
+      };
+    });
   const activeProjects = projectsMeta.filter((p) => !p.archived);
   const projOpts = activeProjects.map((p) => ({ key: p.key, name: p.name }));
   const userByLogin = new Map(users.map((u) => [u.login, u]));

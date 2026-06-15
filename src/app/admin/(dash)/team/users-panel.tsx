@@ -6,7 +6,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
 
 type Proj = { key: string; name: string };
-export type Lead = { id: number; label: string | null; projectType: string | null; status: string; submittedAt: string | null; createdAt: string };
+export type Lead = { id: number; label: string | null; projectType: string | null; status: string; submittedAt: string | null; createdAt: string; companyName?: string; contactPerson?: string; contacts?: string };
 export type PanelUser = {
   login: string;
   fullName: string;
@@ -224,8 +224,10 @@ function LeadsPanel({ leads, locale }: { leads: Lead[]; locale: Locale }) {
 
 const DATE_LOC2: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
 function LeadCard({ lead, locale }: { lead: Lead; locale: Locale }) {
-  const [label, setLabel] = useState(lead.label ?? "");
-  const [projName, setProjName] = useState(lead.label ?? "");
+  // Название/контакты клиент указал сам в брифе — подставляем их (а не задаём за него).
+  const defaultName = lead.companyName || lead.label || "";
+  const [label, setLabel] = useState(defaultName);
+  const [projName, setProjName] = useState(defaultName);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pendL, startL] = useTransition();
@@ -252,6 +254,13 @@ function LeadCard({ lead, locale }: { lead: Lead; locale: Locale }) {
         {lead.projectType && <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{lead.projectType}</span>}
         {when && <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>{new Date(when).toLocaleDateString(DATE_LOC2[locale])}</span>}
       </div>
+
+      {(lead.contactPerson || lead.contacts) && (
+        <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 8, lineHeight: 1.6 }}>
+          {lead.contactPerson && <div>👤 {lead.contactPerson}</div>}
+          {lead.contacts && <div style={{ whiteSpace: "pre-wrap" }}>✉ {lead.contacts}</div>}
+        </div>
+      )}
 
       {createdKey ? (
         <div style={{ ...ui.monoLabel, color: "var(--accent)", marginTop: 12 }}>{t(locale, "users.leadProjectCreated")} · {createdKey}</div>

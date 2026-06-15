@@ -18,7 +18,12 @@ const TYPES: { key: string; uk: string; ru: string }[] = [
 ];
 
 const COMMON: Field[] = [
+  { key: "companyName", uk: "Назва компанії / проєкту", ru: "Название компании / проекта", kind: "text", required: true },
+  { key: "contactPerson", uk: "Контактна особа (як до вас звертатися)", ru: "Контактное лицо (как к вам обращаться)", kind: "text", required: true },
+  { key: "contacts", uk: "Контакти для зв'язку (телефон / email / Telegram / Viber)", ru: "Контакты для связи (телефон / email / Telegram / Viber)", kind: "area", required: true },
   { key: "what", uk: "Що за продукт/послуга і для кого?", ru: "Что за продукт/услуга и для кого?", kind: "area", required: true },
+  { key: "budget", uk: "Орієнтовний бюджет (якщо є розуміння)", ru: "Ориентировочный бюджет (если есть понимание)", kind: "text" },
+  { key: "deadline", uk: "Бажані строки / дедлайн", ru: "Желаемые сроки / дедлайн", kind: "text" },
   { key: "brand", uk: "Є готовий бренд? (кольори / лого / шрифти — або «ні»)", ru: "Есть готовый бренд? (цвета / лого / шрифты — или «нет»)", kind: "text" },
   { key: "refLike", uk: "Сайти, які подобаються (посилання)", ru: "Сайты, которые нравятся (ссылки)", kind: "area" },
   { key: "refDislike", uk: "Сайти, які НЕ подобаються (посилання)", ru: "Сайты, которые НЕ нравятся (ссылки)", kind: "area" },
