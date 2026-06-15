@@ -1037,6 +1037,9 @@ export async function listBriefs(): Promise<Brief[]> {
 }
 
 /** Привязать бриф к проекту (или отвязать, projectKey=null). */
+export async function updateBriefLabel(id: number, label: string): Promise<void> {
+  await q("UPDATE briefs SET label = $2 WHERE id = $1", [id, label.trim() || null]);
+}
 export async function linkBriefToProject(briefId: number, projectKey: string | null): Promise<void> {
   await q("UPDATE briefs SET project_key = $2 WHERE id = $1", [briefId, projectKey]);
 }

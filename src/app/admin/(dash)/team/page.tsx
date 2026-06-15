@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/principal";
-import { listAccessRequests, listProjectsWithMeta, listOrphanAuthors, listLinks, memberProjectsMap, listInstructionSets } from "@/lib/db";
+import { listAccessRequests, listProjectsWithMeta, listOrphanAuthors, listLinks, memberProjectsMap, listInstructionSets, listBriefs } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function TeamPage() {
   await requireAdmin();
   const locale = await getLocale();
-  const [requests, projectsMeta, users, orphans, links, memberProj, sets] = await Promise.all([
+  const [requests, projectsMeta, users, orphans, links, memberProj, sets, briefs] = await Promise.all([
     listAccessRequests(),
     listProjectsWithMeta(),
     getBackend().listUsers(),
@@ -22,7 +22,12 @@ export default async function TeamPage() {
     listLinks(),
     memberProjectsMap(),
     listInstructionSets(),
+    listBriefs(),
   ]);
+  // Лиды — заполненные брифы, ещё не заведённые в проект.
+  const leads = briefs
+    .filter((b) => !b.project_key)
+    .map((b) => ({ id: b.id, label: b.label, projectType: b.project_type, status: b.status, submittedAt: b.submitted_at, createdAt: b.created_at }));
   const activeProjects = projectsMeta.filter((p) => !p.archived);
   const projOpts = activeProjects.map((p) => ({ key: p.key, name: p.name }));
   const userByLogin = new Map(users.map((u) => [u.login, u]));
@@ -67,7 +72,7 @@ export default async function TeamPage() {
         <InviteForm projects={projOpts} locale={locale} sets={sets.map((s) => ({ token: s.token, title: s.title, count: s.guide_ids.length }))} />
       </div>
 
-      <UsersPanel users={panelUsers} projects={projOpts} locale={locale} />
+      <UsersPanel users={panelUsers} projects={projOpts} locale={locale} leads={leads} />
 
       <RelinkHistory orphans={orphans} members={users.map((u) => ({ login: u.login, fullName: u.alias || u.fullName }))} locale={locale} />
     </div>

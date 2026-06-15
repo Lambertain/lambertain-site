@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember, updateBriefLabel, linkBriefToProject } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { sendTo, notifyLogins } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
@@ -27,6 +27,31 @@ export async function createInviteLink(
       role === "client" ? instructionSetToken : null,
     );
     return { link };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Переименовать лида (название брифа). */
+export async function updateLeadLabel(briefId: number, label: string): Promise<{ ok?: boolean; error?: string }> {
+  await requireAdmin();
+  await updateBriefLabel(briefId, label);
+  revalidatePath("/admin/team");
+  return { ok: true };
+}
+
+/** Завести проект на лида: создать проект (имя) и привязать к нему бриф. */
+export async function createProjectFromLead(briefId: number, name: string): Promise<{ key?: string; name?: string; error?: string }> {
+  try {
+    await requireAdmin();
+    const n = name.trim();
+    if (!n) return { error: "Укажите название проекта" };
+    const k = await generateProjectKey(n);
+    await createProject(k, n);
+    await linkBriefToProject(briefId, k);
+    revalidatePath("/admin/team");
+    revalidatePath("/admin/projects");
+    return { key: k, name: n };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
