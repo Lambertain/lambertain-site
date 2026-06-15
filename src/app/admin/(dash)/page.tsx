@@ -5,7 +5,7 @@ import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
-import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor, getEnabledGuides, guideText } from "@/lib/db";
+import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor, getEnabledGuides, guideText, commentTimesByTasks } from "@/lib/db";
 import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
 import { ProjectInfoCard } from "./project-info-card";
@@ -94,11 +94,15 @@ export default async function HomePage() {
   const merged = await mergeFeedback(me, all, visibleFiltered);
   const filtered = me.role === "client" ? merged.filter((tk) => !tk.internal) : merged;
   const depMap = await getDepsFor(filtered.map((tk) => tk.id));
+  const commentTimes = await commentTimesByTasks(filtered.map((tk) => tk.id));
   const board: BoardTask[] = filtered.map((tk) => {
     const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
     const lastRead = reads.get(tk.id) ?? 0;
-    // New = новый коммент ИЛИ ещё не открытая задача (created позже последнего просмотра).
-    const unread = (tk.lastCommentAt ?? 0) > lastRead || (tk.created ?? 0) > lastRead;
+    // Новая задача — ещё не открытая (created позже последнего просмотра).
+    const isNew = (tk.created ?? 0) > lastRead;
+    // Число новых комментов — опубликованных позже последнего просмотра задачи.
+    const newComments = (commentTimes.get(tk.id) ?? []).filter((ms) => ms > lastRead).length;
+    const hasNewComments = newComments > 0;
     return {
       id: tk.id,
       projectKey: tk.projectKey,
@@ -109,7 +113,9 @@ export default async function HomePage() {
       updated: tk.updated,
       commentCount: tk.commentCount,
       assignee: me.role === "client" ? null : tk.assignee?.fullName ?? null,
-      unread,
+      unread: isNew || hasNewComments,
+      isNew,
+      newComments,
       blocked: blockers.length > 0,
       blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
     };
@@ -140,8 +146,8 @@ export default async function HomePage() {
     for (const b of board) {
       if (b.projectKey !== k) continue;
       c[b.blocked ? "blocked" : statusBucket(b.status)]++;
-      // NEW — непрочитанное среди АКТИВНЫХ задач; завершённые (Done) счётчик не раздувают.
-      if (b.unread && statusBucket(b.status) !== "done") nw++;
+      // NEW на проекте — кол-во НОВЫХ задач (ещё не открытых), среди активных (Done не считаем).
+      if (b.isNew && statusBucket(b.status) !== "done") nw++;
     }
     return { counts: c as Record<Bucket, number>, newCount: nw };
   };

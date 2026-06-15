@@ -17,15 +17,22 @@ export type BoardTask = {
   commentCount?: number;
   assignee?: string | null;
   unread?: boolean;
+  isNew?: boolean;
+  newComments?: number;
   blocked?: boolean;
   blockers?: { id: string; summary: string }[];
 };
 
 type Proj = { key: string; name: string; hasNew?: boolean };
 
-const NewBadge = () => (
-  <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 6px", borderRadius: 3, fontWeight: 600 }}>NEW</span>
-);
+// На задаче бейдж = число НОВЫХ комментов; если задача ещё не відкривалась і комментів нема — просто «NEW».
+const TaskBadge = ({ newComments, isNew }: { newComments?: number; isNew?: boolean }) => {
+  if (newComments && newComments > 0)
+    return <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 6px", borderRadius: 3, fontWeight: 600 }}>{newComments} 💬</span>;
+  if (isNew)
+    return <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 6px", borderRadius: 3, fontWeight: 600 }}>NEW</span>;
+  return null;
+};
 
 function Row({
   task,
@@ -100,7 +107,7 @@ function Row({
             {task.summary}
           </a>
         )}
-        {task.unread && <NewBadge />}
+        <TaskBadge newComments={task.newComments} isNew={task.isNew} />
         {canDelete && (
           <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>

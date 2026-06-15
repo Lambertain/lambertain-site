@@ -733,10 +733,27 @@ export async function getAiPendingTasks(): Promise<string[]> {
   const rows = await q<{ readable_id: string }>("SELECT readable_id FROM tasks WHERE ai_status = 'pending' ORDER BY updated_at ASC LIMIT 20");
   return rows.map((r) => r.readable_id);
 }
-/** Назначить исполнителя по логину + перевести в «В работе». */
+/** Времена опубликованных комментов по задачам (readable_id → [created_ms…]) — для подсчёта НОВЫХ комментов. */
+export async function commentTimesByTasks(readableIds: string[]): Promise<Map<string, number[]>> {
+  const out = new Map<string, number[]>();
+  if (!readableIds.length) return out;
+  const rows = await q<{ rid: string; ms: string }>(
+    `SELECT t.readable_id AS rid, extract(epoch from c.created_at) * 1000 AS ms
+     FROM comments c JOIN tasks t ON t.id = c.task_id
+     WHERE t.readable_id = ANY($1::text[]) AND c.approved ORDER BY c.created_at`,
+    [readableIds],
+  );
+  for (const r of rows) {
+    const arr = out.get(r.rid) ?? [];
+    arr.push(Number(r.ms));
+    out.set(r.rid, arr);
+  }
+  return out;
+}
+/** Назначить исполнителя по логину. Статус НЕ меняем — «В работе» ставит сам разработчик, коли реально взяв задачу. */
 export async function assignTask(readableId: string, login: string): Promise<void> {
   await q(
-    `UPDATE tasks SET assignee_id = (SELECT id FROM members WHERE login = $2), status = 'In Progress', updated_at = now()
+    `UPDATE tasks SET assignee_id = (SELECT id FROM members WHERE login = $2), updated_at = now()
      WHERE readable_id = $1`,
     [readableId, login],
   );
