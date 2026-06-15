@@ -156,6 +156,10 @@ CREATE TABLE IF NOT EXISTS contracts (
   contractor_id INT REFERENCES contractors(id) ON DELETE SET NULL,
   client_requisites TEXT, vars JSONB NOT NULL DEFAULT '{}', body TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+-- Наборы инструкций: выбранные блоки-гайды → публичная ссылка (для отправки лидам/клиентам) или привязка к инвайту.
+CREATE TABLE IF NOT EXISTS instruction_sets (
+  id SERIAL PRIMARY KEY, token TEXT UNIQUE NOT NULL, title TEXT,
+  guide_ids INTEGER[] NOT NULL DEFAULT '{}', created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 -- Страховка от дублей номеров задач (основная защита — advisory-lock в createTask).
 -- best-effort: если в проде уже есть дубль (project_id, num) — индекс не создастся, но миграция не упадёт.
 DO $$ BEGIN

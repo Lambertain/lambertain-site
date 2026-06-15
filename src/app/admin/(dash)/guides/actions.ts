@@ -1,7 +1,8 @@
 "use server";
 
 import { requireAdmin } from "@/lib/principal";
-import { createGuide, updateGuide, deleteGuide, saveGuideImage } from "@/lib/db";
+import { createGuide, updateGuide, deleteGuide, saveGuideImage,
+  createInstructionSet, updateInstructionSet, deleteInstructionSet } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
 /** Загрузить картинку гайда (из буфера). Возвращает URL для вставки в markdown. */
@@ -33,6 +34,29 @@ export async function saveGuide(input: { id?: number; slug?: string; title: stri
 export async function removeGuide(id: number): Promise<{ ok?: boolean }> {
   await requireAdmin();
   await deleteGuide(id);
+  revalidatePath("/admin/guides");
+  return { ok: true };
+}
+
+/** Создать/обновить набор инструкций (выбранные блоки-гайды) → публичная ссылка. */
+export async function saveInstructionSet(input: { id?: number; title: string; guideIds: number[] }): Promise<{ ok?: boolean; id?: number; token?: string; error?: string }> {
+  await requireAdmin();
+  const ids = (input.guideIds || []).filter((n) => Number.isInteger(n));
+  if (!ids.length) return { error: "Оберіть хоча б один блок" };
+  const title = input.title.trim() || null;
+  if (input.id) {
+    await updateInstructionSet(input.id, title, ids);
+    revalidatePath("/admin/guides");
+    return { ok: true, id: input.id };
+  }
+  const r = await createInstructionSet(title, ids);
+  revalidatePath("/admin/guides");
+  return { ok: true, id: r.id, token: r.token };
+}
+
+export async function removeInstructionSet(id: number): Promise<{ ok: boolean }> {
+  await requireAdmin();
+  await deleteInstructionSet(id);
   revalidatePath("/admin/guides");
   return { ok: true };
 }

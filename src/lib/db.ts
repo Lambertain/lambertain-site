@@ -141,6 +141,13 @@ CREATE TABLE IF NOT EXISTS contracts (
   body              TEXT,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS instruction_sets (
+  id          SERIAL PRIMARY KEY,
+  token       TEXT UNIQUE NOT NULL,
+  title       TEXT,
+  guide_ids   INTEGER[] NOT NULL DEFAULT '{}',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
 
 // Цены Opus 4.8 ($/млн токенов). Поправить при изменении тарифа.
@@ -1171,4 +1178,41 @@ export async function createContract(c: ContractInput): Promise<number> {
 }
 export async function deleteContract(id: number): Promise<void> {
   await q("DELETE FROM contracts WHERE id=$1", [id]);
+}
+
+// ——— Наборы инструкций (блоки-гайды → публичная ссылка / привязка к инвайту) ———
+export interface InstructionSet { id: number; token: string; title: string | null; guide_ids: number[]; created_at: string }
+
+export async function listInstructionSets(): Promise<InstructionSet[]> {
+  return q<InstructionSet>("SELECT id, token, title, guide_ids, created_at FROM instruction_sets ORDER BY created_at DESC");
+}
+export async function getInstructionSet(id: number): Promise<InstructionSet | null> {
+  const rows = await q<InstructionSet>("SELECT id, token, title, guide_ids, created_at FROM instruction_sets WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}
+export async function createInstructionSet(title: string | null, guideIds: number[]): Promise<{ id: number; token: string }> {
+  const token = `is_${randomBytes(9).toString("hex")}`;
+  const rows = await q<{ id: number }>(
+    "INSERT INTO instruction_sets (token, title, guide_ids) VALUES ($1,$2,$3::int[]) RETURNING id",
+    [token, title, guideIds],
+  );
+  return { id: rows[0].id, token };
+}
+export async function updateInstructionSet(id: number, title: string | null, guideIds: number[]): Promise<void> {
+  await q("UPDATE instruction_sets SET title=$2, guide_ids=$3::int[] WHERE id=$1", [id, title, guideIds]);
+}
+export async function deleteInstructionSet(id: number): Promise<void> {
+  await q("DELETE FROM instruction_sets WHERE id=$1", [id]);
+}
+/** Набор по публичному токену + его гайды В ПОРЯДКЕ guide_ids (для публичной страницы). */
+export async function getInstructionSetByToken(token: string): Promise<{ title: string | null; guides: Guide[] } | null> {
+  const sets = await q<InstructionSet>("SELECT title, guide_ids FROM instruction_sets WHERE token = $1", [token]);
+  const set = sets[0];
+  if (!set) return null;
+  const ids = set.guide_ids ?? [];
+  if (!ids.length) return { title: set.title, guides: [] };
+  const guides = await q<Guide>("SELECT id, slug, title, body, ord FROM guides WHERE id = ANY($1::int[])", [ids]);
+  const byId = new Map(guides.map((g) => [g.id, g]));
+  const ordered = ids.map((gid) => byId.get(gid)).filter((g): g is Guide => !!g);
+  return { title: set.title, guides: ordered };
 }
