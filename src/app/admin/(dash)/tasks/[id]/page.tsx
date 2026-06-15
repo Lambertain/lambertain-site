@@ -55,6 +55,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
   // Новые комменты — появившиеся после последнего открытия задачи.
   const prevRead = reads.get(id) ?? 0;
+  const myLogin = me.youtrackLogin;
+  // Время последнего коммента от ДРУГОГО автора (ответа) — свой коммент правим, только пока ответа нет.
+  const lastOtherCreated = comments.reduce((max, c) => (myLogin && c.author.login !== myLogin ? Math.max(max, c.created) : max), 0);
   const viewComments: ViewComment[] = comments.map((c) => ({
     id: c.id,
     text: c.text,
@@ -64,7 +67,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     visibility: c.visibility,
     approved: c.approved !== false,
     // Автор может править свой коммент, пока он на модерации (не опубликован).
-    canEditOwn: c.approved === false && me.role !== "client" && !!me.youtrackLogin && c.author.login === me.youtrackLogin,
+    canEditOwn: c.approved === false && me.role !== "client" && !!myLogin && c.author.login === myLogin,
+    // …или пока опубликованный коммент ещё без ответа другой стороны (доступно и клиенту).
+    canEdit: c.approved !== false && !!myLogin && c.author.login === myLogin && c.created > lastOtherCreated,
     isNew: c.created > prevRead,
   }));
   const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal" && c.approved).length : viewComments.length;

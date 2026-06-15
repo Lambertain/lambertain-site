@@ -5,7 +5,7 @@ import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
+import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
@@ -89,6 +89,15 @@ export async function editPendingComment(commentId: string, taskId: string, text
   const me = await getPrincipal();
   if (!me || me.role === "client") return { error: "Нет прав" };
   const r = await editOwnPending(commentId, me.youtrackLogin || "", text);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? { error: r.error } : { ok: true };
+}
+
+/** Автор правит СВОЙ опубликованный коммент, пока на него не ответили (клиент тоже может). */
+export async function editPublishedComment(commentId: string, taskId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || !me.youtrackLogin) return { error: "Нет прав" };
+  const r = await editOwnPublished(commentId, me.youtrackLogin, text);
   revalidatePath(`/admin/tasks/${taskId}`);
   return "error" in r ? { error: r.error } : { ok: true };
 }

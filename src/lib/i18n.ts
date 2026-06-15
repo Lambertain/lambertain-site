@@ -370,6 +370,8 @@ export const DICT: Record<string, Entry> = {
   "owner.needLabel": { uk: "Потрібна дія власника (деплой / реєстрація / токен)", ru: "Нужно действие владельца (деплой / регистрация / токен)", en: "Owner action required (deploy / registration / token)" },
   "owner.done": { uk: "Виконав", ru: "Выполнил", en: "Done" },
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
+  "comment.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
+  "comment.editLocked": { uk: "На коментар вже відповіли — редагування недоступне.", ru: "На комментарий уже ответили — редактирование недоступно.", en: "The comment has been answered — editing is no longer available." },
 
   // — ответ клиенту через ИИ (по фидбеку разраба, от лица Lambertain) —
   "creply.open": { uk: "Відповісти клієнту (ІІ)", ru: "Ответить клиенту (ИИ)", en: "Reply to client (AI)" },

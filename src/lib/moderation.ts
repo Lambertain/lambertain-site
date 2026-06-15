@@ -76,6 +76,31 @@ export async function editOwnPending(commentId: string, authorLogin: string, bod
   return { ok: true };
 }
 
+/**
+ * Автор правит СВОЙ уже опубликованный коммент — но ТОЛЬКО пока на него не ответила другая сторона
+ * (нет более позднего коммента от другого автора). Так клиент может уточнить мысль до ответа команды.
+ */
+export async function editOwnPublished(commentId: string, authorLogin: string, body: string): Promise<{ ok: true } | { error: "empty" | "not found" | "not your comment" | "answered" }> {
+  if (!body.trim()) return { error: "empty" };
+  if (!authorLogin) return { error: "not your comment" };
+  const rows = await q<{ task_id: number; created_at: string; login: string | null }>(
+    "SELECT c.task_id, c.created_at, m.login FROM comments c LEFT JOIN members m ON m.id = c.author_id WHERE c.id = $1",
+    [commentId],
+  );
+  const r = rows[0];
+  if (!r) return { error: "not found" };
+  if (r.login !== authorLogin) return { error: "not your comment" };
+  // Есть ли в треде более поздний коммент от ДРУГОГО автора (= ответ)? Тогда правка запрещена.
+  const later = await q<{ n: number }>(
+    `SELECT count(*)::int AS n FROM comments c LEFT JOIN members m ON m.id = c.author_id
+     WHERE c.task_id = $1 AND c.created_at > $2 AND (m.login IS DISTINCT FROM $3)`,
+    [r.task_id, r.created_at, authorLogin],
+  );
+  if ((later[0]?.n ?? 0) > 0) return { error: "answered" };
+  await q("UPDATE comments SET body = $2 WHERE id = $1", [commentId, body]);
+  return { ok: true };
+}
+
 /** Супер-админ удаляет ЛЮБОЙ коммент (опубликованный или на модерации). */
 export async function deleteCommentAny(commentId: string): Promise<void> {
   await q("DELETE FROM comments WHERE id = $1", [commentId]);
