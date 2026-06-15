@@ -192,6 +192,8 @@ export const DICT: Record<string, Entry> = {
   "request.placeholder": { uk: "Введіть або вставте опис задачі…", ru: "Введите или вставьте описание задачи…", en: "Type or paste the task description…" },
   "request.titlePh": { uk: "Введіть заголовок", ru: "Введите заголовок", en: "Enter a title" },
   "request.titleRequired": { uk: "Вкажіть заголовок", ru: "Укажите заголовок", en: "Enter a title" },
+  "request.staleVersion": { uk: "Вийшла нова версія порталу. Оновіть сторінку (F5) і надішліть ще раз — текст збережено.", ru: "Вышла новая версия портала. Обновите страницу (F5) и отправьте ещё раз — текст сохранён.", en: "A new portal version was released. Refresh the page (F5) and submit again — your text is saved." },
+  "request.sendFailed": { uk: "Не вдалося надіслати. Спробуйте ще раз — текст збережено.", ru: "Не удалось отправить. Попробуйте ещё раз — текст сохранён.", en: "Couldn't submit. Try again — your text is saved." },
   "request.submit": { uk: "Створити задачу", ru: "Создать задачу", en: "Create task" },
   "request.sent": { uk: "Прийняв, розберуся з кодом. Можете закрити це вікно — ви отримаєте сповіщення в боті, коли задачу буде поставлено, або якщо знадобиться уточнення.", ru: "Принял, разберусь с кодом. Можете закрыть это окно — вы получите уведомление в бот, когда задача будет поставлена, или если понадобится уточнение.", en: "Got it, I'll dig into the code. You can close this window — you'll get a bot notification when the task is ready, or if I need a clarification." },
   "request.another": { uk: "Створити ще одну", ru: "Создать ещё одну", en: "Create another" },

@@ -124,7 +124,8 @@ export async function createRequestTask(
       await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${task.id}: ${task.summary}\nОт: ${me.fullName}`, taskBtn(task.id)).catch(() => {});
     } else if (appr.pending && appr.approver) {
       // Задача ждёт утверждения; ИИ-проработку запустим только после апрува (можно отредактировать до этого).
-      await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary);
+      // best-effort: сбой уведомления не должен превращать уже созданную задачу в ошибку для пользователя.
+      await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary).catch(() => {});
     } else {
       await setTaskAiStatus(task.id, "pending");
       after(() => draftTask(task.id));

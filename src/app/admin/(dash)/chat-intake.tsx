@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useTransition } from "react";
+import { useState, useRef, useTransition, useEffect } from "react";
 import { createRequestTask } from "./actions";
 import { detectFeminine } from "@/lib/gender-check";
 import { t, type Locale } from "@/lib/i18n";
@@ -15,6 +15,10 @@ type Block =
   | { type: "file"; mime: string; data: string; name: string };
 
 const SPEECH_LANG: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
+
+// Черновик задачи в localStorage — чтобы введённый текст не пропал при ошибке/обновлении
+// (в т.ч. когда в момент работы выкатывается новая версия портала → stale Server Action).
+const DRAFT_KEY = "lamb:intake-draft";
 
 /** Разбить тело (markdown с маркерами ![..](att:ID) / [..](att:ID)) на блоки с сохранением порядка. */
 function buildBlocks(text: string, atts: Att[]): Block[] {
@@ -53,6 +57,27 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const recRef = useRef<unknown>(null);
   const idSeq = useRef(0);
+
+  // Восстановить черновик при открытии (если поля ещё пустые) и сохранять его при наборе.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as { title?: string; body?: string; projectKey?: string };
+      if (!title && !body && (d.title || d.body)) {
+        if (d.title) setTitle(d.title);
+        if (d.body) setBody(d.body);
+        if (d.projectKey && projects.some((p) => p.key === d.projectKey)) setProjectKey(d.projectKey);
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      if (title.trim() || body.trim()) localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, body, projectKey }));
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch { /* ignore */ }
+  }, [title, body, projectKey]);
 
   /** Вставить текст в тело на позицию курсора. */
   function insertAtCursor(text: string) {
@@ -166,16 +191,24 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
     setError(null);
     start(async () => {
       const rcpt = showRecipient ? recipient : showSelf && selfTask ? "self" : undefined;
-      const res = await createRequestTask(projectKey, title.trim(), blocks, rcpt);
-      if (res.error) setError(res.error);
-      else if (res.id && res.url) {
-        setCreated({ id: res.id, url: res.url });
-        setTitle(""); setBody(""); setImages([]);
+      try {
+        const res = await createRequestTask(projectKey, title.trim(), blocks, rcpt);
+        if (res.error) setError(res.error);
+        else if (res.id && res.url) {
+          setCreated({ id: res.id, url: res.url });
+          setTitle(""); setBody(""); setImages([]);
+          try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+        }
+      } catch (e) {
+        // Чаще всего — устаревший Server Action после выкатки новой версии портала.
+        // Текст уже сохранён в localStorage, поля НЕ очищаем — после F5 черновик восстановится.
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(t(locale, /server action|deployment/i.test(msg) ? "request.staleVersion" : "request.sendFailed"));
       }
     });
   }
 
-  function startOver() { setCreated(null); setTitle(""); setBody(""); setImages([]); setError(null); }
+  function startOver() { setCreated(null); setTitle(""); setBody(""); setImages([]); setError(null); try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } }
 
   const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, flexShrink: 0, background: "transparent", border: "1px solid var(--border-2)", color: "var(--muted)", cursor: "pointer", borderRadius: 2 };
 
