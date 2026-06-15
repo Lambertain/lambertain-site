@@ -299,22 +299,8 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
         style={{ flex: 1, minHeight: 120, background: "transparent", border: "none", color: "var(--text)", fontSize: 15, lineHeight: 1.6, padding: "14px 16px", outline: "none", resize: "none", fontFamily: "var(--font-body), system-ui, sans-serif" }}
       />
 
-      {/* превью прикреплённых картинок */}
-      {images.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", padding: "8px 12px", borderTop: "1px solid var(--border)" }}>
-          {images.map((a) => (
-            <div key={a.id} style={{ position: "relative" }}>
-              {a.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`data:${a.mime};base64,${a.data}`} alt="" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 4, border: "1px solid var(--border-2)" }} />
-              ) : (
-                <span style={{ ...ui.monoLabel, textTransform: "none", padding: "6px 8px", border: "1px solid var(--border-2)", display: "inline-block", borderRadius: 4 }}>{a.name.slice(0, 18)}</span>
-              )}
-              <button onClick={() => removeImage(a.id)} style={{ position: "absolute", top: -6, right: -6, width: 16, height: 16, borderRadius: "50%", background: "var(--border-2)", color: "var(--text)", border: "none", cursor: "pointer", fontSize: 11, lineHeight: "16px", padding: 0 }}>×</button>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* живой рендер тела: текст + картинки inline на своих местах (а не миниатюрами внизу) */}
+      {images.length > 0 && <BodyPreview body={body} images={images} onRemove={removeImage} />}
 
       {femWords.length > 0 && (
         <p style={{ fontSize: 13, color: "#e8b339", padding: "0 16px", lineHeight: 1.5 }}>⚠️ {t(locale, "gender.warn", { words: femWords.join(", ") })}</p>
@@ -338,6 +324,45 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
           {pending ? "…" : t(locale, "request.submit")}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Живой рендер тела заявки: текст + картинки/файлы inline на своих местах (по att-маркерам). */
+function BodyPreview({ body, images, onRemove }: { body: string; images: Att[]; onRemove: (id: string) => void }) {
+  const re = /(!?)\[[^\]]*\]\(att:([^)]+)\)/g;
+  const nodes: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(body))) {
+    const seg = body.slice(last, m.index);
+    if (seg.trim()) nodes.push(<span key={`t${k++}`} style={{ whiteSpace: "pre-wrap" }}>{seg}</span>);
+    const a = images.find((x) => x.id === m![2]);
+    if (a && a.image) {
+      nodes.push(
+        <span key={`i${k++}`} style={{ position: "relative", display: "block", margin: "8px 0" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`data:${a.mime};base64,${a.data}`} alt={a.name} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 6, border: "1px solid var(--border-2)", display: "block" }} />
+          <button onClick={() => onRemove(a.id)} aria-label="Видалити" style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, lineHeight: "22px", padding: 0 }}>×</button>
+        </span>,
+      );
+    } else if (a) {
+      nodes.push(
+        <span key={`f${k++}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...ui.monoLabel, textTransform: "none", padding: "4px 8px", border: "1px solid var(--border-2)", borderRadius: 4, margin: "0 4px" }}>
+          📎 {a.name.slice(0, 24)}
+          <button onClick={() => onRemove(a.id)} style={{ background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 13, padding: 0 }}>×</button>
+        </span>,
+      );
+    }
+    last = re.lastIndex;
+  }
+  const tail = body.slice(last);
+  if (tail.trim()) nodes.push(<span key="tail" style={{ whiteSpace: "pre-wrap" }}>{tail}</span>);
+  return (
+    <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", fontSize: 14, lineHeight: 1.6, color: "var(--text)", maxHeight: 360, overflowY: "auto" }}>
+      <div style={{ ...ui.monoLabel, color: "var(--muted)", marginBottom: 8 }}>Тіло задачі (попередній перегляд)</div>
+      {nodes}
     </div>
   );
 }
