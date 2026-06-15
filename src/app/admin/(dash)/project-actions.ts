@@ -1,7 +1,7 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins } from "@/lib/notify";
@@ -83,6 +83,19 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка декомпозиции/создания" };
   }
+}
+
+/** Полное удаление проекта (только админ; подтверждается вводом названия на клиенте). */
+export async function deleteProject(projectKey: string, confirmName: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  const p = await getProjectFull(projectKey);
+  if (!p) return { error: "Проект не найден" };
+  if (confirmName.trim() !== p.name.trim()) return { error: "Название не совпадает" };
+  await deleteProjectCascade(projectKey);
+  revalidatePath("/admin/projects");
+  revalidatePath("/admin");
+  return { ok: true };
 }
 
 // ——— Секреты проекта (только админ; разработчик-человек не видит) ———

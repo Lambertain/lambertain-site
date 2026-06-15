@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/principal";
 import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds, listSecrets } from "@/lib/db";
 import { ProjectGuides } from "./project-guides";
 import { SecretsPanel } from "./secrets-panel";
+import { DeleteProject } from "./delete-project";
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -80,6 +81,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
           <TokenRow projectKey={key} name={proj.name} initialToken={tokens.get(key) ?? null} locale={locale} />
         </div>
       </div>
+
+      <DeleteProject projectKey={key} projectName={proj.name} />
     </div>
   );
 }

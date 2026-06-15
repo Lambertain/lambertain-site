@@ -475,6 +475,26 @@ export async function setProjectMeta(key: string, name: string, meta: ProjectMet
   await q("UPDATE projects SET name = $2, meta = $3 WHERE key = $1", [key, name, JSON.stringify(meta)]);
 }
 
+/** Полное удаление проекта со всем связанным (задачи, комменты, токены, связи). Транзакция. */
+export async function deleteProjectCascade(projectKey: string): Promise<void> {
+  await withTransaction(async (query) => {
+    const proj = await query<{ id: number }>("SELECT id FROM projects WHERE key = $1", [projectKey]);
+    if (!proj[0]) return;
+    const pid = proj[0].id;
+    // attachments и task_deps удалятся каскадом при удалении tasks; comments — явно (нет ON DELETE CASCADE).
+    await query("DELETE FROM comments WHERE task_id IN (SELECT id FROM tasks WHERE project_id = $1)", [pid]);
+    await query("DELETE FROM tasks WHERE project_id = $1", [pid]);
+    await query("DELETE FROM project_api_tokens WHERE project_key = $1", [projectKey]);
+    await query("DELETE FROM member_projects WHERE project_key = $1", [projectKey]);
+    await query("DELETE FROM project_guides WHERE project_key = $1", [projectKey]);
+    await query("DELETE FROM project_reads WHERE project_key = $1", [projectKey]);
+    await query("DELETE FROM project_secrets WHERE project_key = $1", [projectKey]);
+    await query("UPDATE briefs SET project_key = NULL WHERE project_key = $1", [projectKey]); // лид возвращается в «Ліди»
+    await query("UPDATE tg_links SET project_key = NULL WHERE project_key = $1", [projectKey]);
+    await query("DELETE FROM projects WHERE id = $1", [pid]);
+  });
+}
+
 /** Флаг «показать клиенту онбординг» на проекте. */
 export async function setProjectShowOnboarding(key: string, on: boolean): Promise<void> {
   const p = await getProjectFull(key);
