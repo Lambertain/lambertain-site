@@ -166,6 +166,30 @@ export async function q<T = unknown>(text: string, params: unknown[] = []): Prom
   return r.rows as T[];
 }
 
+/** Тип запросной функции внутри транзакции (тот же интерфейс, что и q). */
+export type TxQuery = <T = unknown>(text: string, params?: unknown[]) => Promise<T[]>;
+
+/**
+ * Выполнить fn в одной транзакции на выделенном соединении (BEGIN/COMMIT, ROLLBACK при ошибке).
+ * Нужно там, где важна атомарность нескольких запросов или advisory-блокировки (напр. генерация № задачи).
+ */
+export async function withTransaction<T>(fn: (query: TxQuery) => Promise<T>): Promise<T> {
+  await ensureSchema();
+  const client = await pool().connect();
+  try {
+    await client.query("BEGIN");
+    const query: TxQuery = async (text, params = []) => (await client.query(text, params)).rows;
+    const out = await fn(query);
+    await client.query("COMMIT");
+    return out;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 // ---- Связки Telegram ↔ YouTrack ----
 export interface TgLink {
   tg_id: number;

@@ -5,7 +5,7 @@
  */
 import type { TasksBackend, TaskFilter, Project, User, Task, Comment, Role } from "./types";
 import type { ProjectMeta } from "./types";
-import { q } from "../db";
+import { q, withTransaction } from "../db";
 
 function ms(v: string | Date | null | undefined): number | undefined {
   if (!v) return undefined;
@@ -130,11 +130,6 @@ export const postgresBackend: TasksBackend = {
       input.projectKey,
     ]);
     if (!proj[0]) throw new Error(`Проект ${input.projectKey} не найден`);
-    const maxNum = await q<{ n: number | null }>("SELECT max(num) AS n FROM tasks WHERE project_id = $1", [
-      proj[0].id,
-    ]);
-    const num = (maxNum[0]?.n ?? 0) + 1;
-    const readable = `${proj[0].key}-${num}`;
     let assigneeId: number | null = null;
     if (input.assigneeLogin) {
       const a = await q<{ id: number }>("SELECT id FROM members WHERE login = $1", [input.assigneeLogin]);
@@ -147,11 +142,21 @@ export const postgresBackend: TasksBackend = {
     }
     let description = input.description || "";
     if (input.dueDate) description += `\n\n**Дедлайн:** ${input.dueDate}`;
-    await q(
-      `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, reporter_id, created_at, updated_at, source, approval_status, created_by_role, internal, auto_done)
-       VALUES ($1,$2,$3,$4,$5,'Open',$6,$7,$8, now(), now(), 'portal', $9, $10, $11, $12)`,
-      [proj[0].id, num, readable, input.summary, description, input.priority || null, assigneeId, reporterId, input.approvalStatus || "approved", input.createdByRole || null, input.internal || false, input.autoDone || false],
-    );
+
+    // № задачи и INSERT — атомарно в одной транзакции под advisory-блокировкой по проекту:
+    // иначе два одновременных создания читают один max(num) и получают одинаковый номер.
+    const readable = await withTransaction(async (query) => {
+      await query("SELECT pg_advisory_xact_lock(hashtext('tasknum'), $1::int)", [proj[0].id]);
+      const maxNum = await query<{ n: number | null }>("SELECT max(num) AS n FROM tasks WHERE project_id = $1", [proj[0].id]);
+      const num = (maxNum[0]?.n ?? 0) + 1;
+      const rid = `${proj[0].key}-${num}`;
+      await query(
+        `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, reporter_id, created_at, updated_at, source, approval_status, created_by_role, internal, auto_done)
+         VALUES ($1,$2,$3,$4,$5,'Open',$6,$7,$8, now(), now(), 'portal', $9, $10, $11, $12)`,
+        [proj[0].id, num, rid, input.summary, description, input.priority || null, assigneeId, reporterId, input.approvalStatus || "approved", input.createdByRole || null, input.internal || false, input.autoDone || false],
+      );
+      return rid;
+    });
     return this.getTask(readable);
   },
 

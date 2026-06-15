@@ -156,6 +156,13 @@ CREATE TABLE IF NOT EXISTS contracts (
   contractor_id INT REFERENCES contractors(id) ON DELETE SET NULL,
   client_requisites TEXT, vars JSONB NOT NULL DEFAULT '{}', body TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+-- Страховка от дублей номеров задач (основная защита — advisory-lock в createTask).
+-- best-effort: если в проде уже есть дубль (project_id, num) — индекс не создастся, но миграция не упадёт.
+DO $$ BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS tasks_project_num_uniq ON tasks(project_id, num);
+EXCEPTION WHEN others THEN
+  RAISE NOTICE 'tasks_project_num_uniq skipped: %', SQLERRM;
+END $$;
 `;
 
 // Подробная пошаговая инструкция онбординга клиента (украинский). Сидится один раз —
