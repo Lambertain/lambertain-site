@@ -60,15 +60,15 @@ export default async function TeamPage() {
 
       <AccessRequests requests={reqs} projects={projOpts} locale={locale} />
 
-      <UsersPanel users={panelUsers} projects={projOpts} locale={locale} />
-
-      <RelinkHistory orphans={orphans} members={users.map((u) => ({ login: u.login, fullName: u.alias || u.fullName }))} locale={locale} />
-
       <div style={{ marginTop: 28 }}>
         <div style={ui.monoLabel}>{t(locale, "team.inviteKicker")}</div>
         <h2 style={{ ...ui.h1, fontSize: 22, marginTop: 8 }}>{t(locale, "team.inviteTitle")}</h2>
         <InviteForm projects={projOpts} locale={locale} />
       </div>
+
+      <UsersPanel users={panelUsers} projects={projOpts} locale={locale} />
+
+      <RelinkHistory orphans={orphans} members={users.map((u) => ({ login: u.login, fullName: u.alias || u.fullName }))} locale={locale} />
     </div>
   );
 }
