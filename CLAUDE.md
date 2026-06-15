@@ -42,3 +42,5 @@
 `POST /api/admin/create-task`, заголовок `Authorization: Bearer $ADMIN_API_TOKEN` (значение — в `.env.local`).
 Тело: `{ "projectKey": "HH", "title": "...", "description": "...", "assigneeLogin"?: "...", "internal"?: false, "triage"?: true }`.
 По умолчанию `triage:true` — задача проходит ИИ-триаж (заголовок/требование/теги), назначается исполнитель проекта (`meta.defaultAssignee`) и ему уходит уведомление в Telegram — как при создании в портале. `triage:false` — сразу назначить и уведомить без ИИ. Возвращает `{ id, url }`. НЕ ходить в БД напрямую для создания задач.
+
+**Триаж отложен на ~5 минут** (`TRIAGE_DELAY_MIN`, по умолч. 5) — окно, чтобы автор успел отредактировать задачу/коммент до обработки и уведомления разработчика. Механика: при создании задача помечается `ai_status='pending'` (триаж сразу НЕ запускается); поллер (cron `*/5`) находит pending-задачи старше 5 мин и дёргает `POST /api/admin/run-triage {taskId}` (тот же `ADMIN_API_TOKEN`), который атомарно забирает задачу (`pending→triaging`) и запускает `draftTask`. Переменные поллера: `ADMIN_API_TOKEN`, `PORTAL_BASE`, `TRIAGE_DELAY_MIN`, флаг `TRIAGE` (=`0` отключает).

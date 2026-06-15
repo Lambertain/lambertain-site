@@ -7,10 +7,9 @@
  *   - triage:false: сразу назначить assigneeLogin (или defaultAssignee проекта) и уведомить, без ИИ.
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN> (переменная окружения портала).
  */
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { getBackend } from "@/lib/tasks";
 import { setTaskAiStatus } from "@/lib/db";
-import { draftTask } from "@/lib/drafter";
 import { notifyLogins } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -41,13 +40,13 @@ export async function POST(req: Request) {
   try {
     if (triage) {
       // Штатный путь портала: исполнителя и теги проставит ИИ-триаж, он же уведомит разработчика.
+      // Триаж отложен на ~5 минут (его запустит поллер) — окно, чтобы успеть отредактировать задачу.
       const task = await be.createTask({
         projectKey, summary: title.slice(0, 120), description,
         assigneeLogin: null, reporterLogin: null, approvalStatus: "approved", createdByRole: "admin", internal,
       });
       await setTaskAiStatus(task.id, "pending");
-      after(() => draftTask(task.id));
-      return NextResponse.json({ id: task.id, url: task.url, triage: true });
+      return NextResponse.json({ id: task.id, url: task.url, triage: "scheduled" });
     }
     // Без ИИ: сразу назначаем и уведомляем.
     const assignee = (body.assigneeLogin ? String(body.assigneeLogin).trim() : "") || project.meta.defaultAssignee || null;

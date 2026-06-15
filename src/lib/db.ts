@@ -641,6 +641,17 @@ export async function appendRequestBlocks(readableId: string, blocks: ReqBlock[]
 export async function setTaskAiStatus(readableId: string, status: "pending" | "waiting" | "done" | null): Promise<void> {
   await q("UPDATE tasks SET ai_status = $2 WHERE readable_id = $1", [readableId, status]);
 }
+/**
+ * Атомарно «забрать» задачу под отложенный ИИ-триаж: pending → triaging (только если ещё pending).
+ * Возвращает true, если эта попытка забрала задачу (тогда и запускаем draftTask) — защита от двойного триажа.
+ */
+export async function claimTaskForTriage(readableId: string): Promise<boolean> {
+  const rows = await q<{ id: number }>(
+    "UPDATE tasks SET ai_status = 'triaging' WHERE readable_id = $1 AND ai_status = 'pending' RETURNING id",
+    [readableId],
+  );
+  return rows.length > 0;
+}
 /** Флаг «нужно действие владельца» (деплой/регистрация/токен) — задача ждёт ручного ops-шага супер-админа. null = снять. */
 export async function setOwnerAction(readableId: string, action: string | null): Promise<void> {
   await q("UPDATE tasks SET owner_action = $2, updated_at = now() WHERE readable_id = $1", [readableId, action]);

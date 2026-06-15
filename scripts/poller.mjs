@@ -19,6 +19,9 @@ const TG_CHAT = process.env.TELEGRAM_CHAT_ID || "";
 const INTERVAL = Number(process.env.POLL_INTERVAL_SEC || 60) * 1000;
 const ONCE = process.env.POLL_ONCE === "1";
 const DRY = process.env.DRY_RUN === "1";
+const PORTAL_BASE = (process.env.PORTAL_BASE || "https://lambertain-site-production.up.railway.app").replace(/\/$/, "");
+const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN || "";
+const TRIAGE_DELAY_MIN = Number(process.env.TRIAGE_DELAY_MIN || 5); // окно на редактирование до триажа
 
 const flag = (name) => process.env[name] !== "0";
 const DONE_STATES = ["done", "fixed", "verified", "resolved", "готово", "закрыто", "выполнено", "complete"];
@@ -233,9 +236,38 @@ async function checkTokenDigest() {
   await setState("token_digest_day", today);
 }
 
+/**
+ * Отложенный ИИ-триаж: задачи с ai_status='pending', созданные больше TRIAGE_DELAY_MIN минут назад,
+ * отдаём порталу на триаж. Задержка — окно, чтобы автор успел отредактировать задачу/коммент
+ * до того, как триаж обработает её и уведомит разработчика. Эндпоинт сам атомарно «забирает» задачу.
+ */
+async function runDueTriage() {
+  if (!ADMIN_TOKEN) { console.warn("ADMIN_API_TOKEN не задан — отложенный триаж пропущен."); return 0; }
+  const rows = (await pool.query(
+    `SELECT readable_id FROM tasks WHERE ai_status = 'pending' AND created_at < now() - ($1 || ' minutes')::interval ORDER BY created_at LIMIT 25`,
+    [String(TRIAGE_DELAY_MIN)],
+  )).rows;
+  let n = 0;
+  for (const r of rows) {
+    if (DRY) { console.log(`[DRY] триаж → ${r.readable_id}`); n++; continue; }
+    try {
+      const resp = await fetch(`${PORTAL_BASE}/api/admin/run-triage`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${ADMIN_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId: r.readable_id }),
+      });
+      if (resp.ok) n++;
+      else console.error("run-triage", r.readable_id, resp.status, (await resp.text()).slice(0, 120));
+    } catch (e) { console.error("run-triage", r.readable_id, e.message); }
+  }
+  if (n) console.log(`отложенный триаж запущен: ${n}`);
+  return n;
+}
+
 async function cycle() {
   const rmap = await roles();
   let total = 0;
+  if (flag("TRIAGE")) total += await runDueTriage().catch((e) => (console.error("triage:", e.message), 0));
   if (flag("NOTIFY_NEW_TASK")) total += await checkNewTasks(rmap).catch((e) => (console.error("newTasks:", e.message), 0));
   if (flag("NOTIFY_CLIENT_COMMENT")) total += await checkClientComments(rmap).catch((e) => (console.error("comments:", e.message), 0));
   if (flag("NOTIFY_DONE")) total += await checkDone(rmap).catch((e) => (console.error("done:", e.message), 0));

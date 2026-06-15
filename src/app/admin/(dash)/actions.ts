@@ -1,11 +1,9 @@
 "use server";
 
-import { after } from "next/server";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import type { Principal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
-import { draftTask } from "@/lib/drafter";
 import { notifyLogins, notifyAdmin, notifyProjectClients } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { projectHasClient, appendRequestBlocks, setTaskAiStatus, type ReqBlock } from "@/lib/db";
@@ -127,8 +125,9 @@ export async function createRequestTask(
       // best-effort: сбой уведомления не должен превращать уже созданную задачу в ошибку для пользователя.
       await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary).catch(() => {});
     } else {
+      // Триаж отложен: его запустит поллер через ~5 минут после создания — окно, чтобы автор
+      // успел отредактировать задачу/комментарий до того, как ИИ-триаж обработает её и уведомит разработчика.
       await setTaskAiStatus(task.id, "pending");
-      after(() => draftTask(task.id));
     }
     return { id: task.id, url: task.url };
   } catch (e) {
