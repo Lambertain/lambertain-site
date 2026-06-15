@@ -44,4 +44,9 @@
 `internal:true` — задача разработчику **мимо клиента**: клиент её не видит, а разработчик получает (dev API пускает internal-задачи с `created_by_role=admin/super`). В портале то же делает чекбокс «Внутрішня — клієнт не бачить» при создании задачи (для админов).
 По умолчанию `triage:true` — задача проходит ИИ-триаж (заголовок/требование/теги), назначается исполнитель проекта (`meta.defaultAssignee`) и ему уходит уведомление в Telegram — как при создании в портале. `triage:false` — сразу назначить и уведомить без ИИ. Возвращает `{ id, url }`. НЕ ходить в БД напрямую для создания задач.
 
+**Заведение/привязка проекта по API** (тоже `ADMIN_API_TOKEN`, не БД):
+- `POST /api/admin/project/link` `{ projectKey, devGit?, clientGit?, defaultAssignee? }` → проставляет meta, возвращает **токен проекта**, раскладывает bootstrap CLAUDE.md в `Lambertain/*` дев-репо (layProtocol).
+- `POST /api/admin/project/spec` `{ projectKey, spec }` / `GET ?projectKey=` → записать/прочитать `meta.spec` (спеку пишет Claude Code).
+НЕ ходить в БД напрямую для этих операций.
+
 **Триаж отложен на ~5 минут** (`TRIAGE_DELAY_MIN`, по умолч. 5) — окно, чтобы автор успел отредактировать задачу/коммент до обработки и уведомления разработчика. Механика: при создании задача помечается `ai_status='pending'` (триаж сразу НЕ запускается); поллер (cron `*/5`) находит pending-задачи старше 5 мин и дёргает `POST /api/admin/run-triage {taskId}` (тот же `ADMIN_API_TOKEN`), который атомарно забирает задачу (`pending→triaging`) и запускает `draftTask`. Переменные поллера: `ADMIN_API_TOKEN`, `PORTAL_BASE`, `TRIAGE_DELAY_MIN`, флаг `TRIAGE` (=`0` отключает).

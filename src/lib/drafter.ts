@@ -99,8 +99,10 @@ export async function draftTask(taskId: string): Promise<void> {
 
       const triage = toolUses.find((b) => b.name === "submit_triage");
       if (triage) {
-        const inp = triage.input as { title: string; requirement: string; type: string; complexity: "small" | "feature"; skills?: string[]; assigneeLogin?: string | null };
-        const skillSlugs = (inp.skills || []).filter((s) => skills.some((k) => k.slug === s));
+        const inp = triage.input as { title: string; requirement: string; type: string; complexity: "small" | "feature"; skills?: unknown; assigneeLogin?: string | null };
+        // skills от ИИ иногда приходит не массивом (строка/объект) — нормализуем, иначе .filter падает.
+        const rawSkills = Array.isArray(inp.skills) ? inp.skills : typeof inp.skills === "string" ? [inp.skills] : [];
+        const skillSlugs = rawSkills.filter((s): s is string => typeof s === "string" && skills.some((k) => k.slug === s));
         if (inp.title?.trim()) await setTaskTitle(taskId, inp.title.trim());
         await setTaskTags(taskId, { type: inp.type, complexity: inp.complexity, skills: skillSlugs });
         const tagLine = `Тип: ${inp.type} · Сложность: ${inp.complexity === "small" ? "мелкая (без спеки)" : "фича (спека)"}${skillSlugs.length ? ` · Скилы: ${skillSlugs.join(", ")}` : ""}`;

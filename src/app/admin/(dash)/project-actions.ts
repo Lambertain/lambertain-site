@@ -67,7 +67,7 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
         approvalStatus: "approved",
         autoDone: true, // спека супер-админа: на готовности — авто-Готово, без ручной приёмки
       });
-      await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (tk.skills || []).filter(Boolean) });
+      await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (Array.isArray(tk.skills) ? tk.skills : []).filter(Boolean) });
       await setTaskAiStatus(task.id, "done"); // уже размечено — отдельный триаж не нужен
       ids.push(task.id);
     }
