@@ -36,4 +36,9 @@
 - Menu button → `https://lambertain-site-production.up.railway.app/tma`.
 
 ## Доступы
-Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `YOUTRACK_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL`, `GITHUB_TOKEN`. Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
+Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `YOUTRACK_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL`, `GITHUB_TOKEN`, `ADMIN_API_TOKEN`. Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
+
+## Создание задач по API (для Claude/скриптов — без доступа к БД)
+`POST /api/admin/create-task`, заголовок `Authorization: Bearer $ADMIN_API_TOKEN` (значение — в `.env.local`).
+Тело: `{ "projectKey": "HH", "title": "...", "description": "...", "assigneeLogin"?: "...", "internal"?: false, "triage"?: true }`.
+По умолчанию `triage:true` — задача проходит ИИ-триаж (заголовок/требование/теги), назначается исполнитель проекта (`meta.defaultAssignee`) и ему уходит уведомление в Telegram — как при создании в портале. `triage:false` — сразу назначить и уведомить без ИИ. Возвращает `{ id, url }`. НЕ ходить в БД напрямую для создания задач.
