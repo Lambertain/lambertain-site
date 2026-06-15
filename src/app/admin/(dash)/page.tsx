@@ -140,7 +140,8 @@ export default async function HomePage() {
     for (const b of board) {
       if (b.projectKey !== k) continue;
       c[b.blocked ? "blocked" : statusBucket(b.status)]++;
-      if (b.unread) nw++;
+      // NEW — непрочитанное среди АКТИВНЫХ задач; завершённые (Done) счётчик не раздувают.
+      if (b.unread && statusBucket(b.status) !== "done") nw++;
     }
     return { counts: c as Record<Bucket, number>, newCount: nw };
   };
