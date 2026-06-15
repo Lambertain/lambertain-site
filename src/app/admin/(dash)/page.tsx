@@ -179,7 +179,9 @@ export default async function HomePage() {
   }
 
   // —— Клиент: онбординг-баннер + «Подготовка» (гайды) + инфо своего проекта + задачи ——
-  const showOnboarding = me.role === "client" && !!visible.find((p) => p.key === me.projectKey)?.meta.showOnboarding;
+  const myProject = me.role === "client" ? visible.find((p) => p.key === me.projectKey) : undefined;
+  const showOnboarding = me.role === "client" && !!myProject?.meta.showOnboarding;
+  const instructionSetToken = me.role === "client" ? myProject?.meta.onboardingSetToken : undefined;
   const clientProject = me.role === "client" ? visible.find((p) => !p.meta.feedback) : null;
   const clientGuides = me.role === "client" && me.projectKey ? await getEnabledGuides(me.projectKey) : [];
 
@@ -192,6 +194,13 @@ export default async function HomePage() {
           <span style={{ fontSize: 14, flex: 1 }}>{t(locale, "onb.banner")}</span>
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "onb.bannerCta")}</span>
         </Link>
+      )}
+      {instructionSetToken && (
+        <a href={`/i/${instructionSetToken}`} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", marginBottom: 18, borderRadius: 10, border: "1px solid var(--accent-line)", background: "rgba(185,255,75,0.06)", textDecoration: "none", color: "var(--text)" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
+          <span style={{ fontSize: 14, flex: 1 }}>{t(locale, "onb.banner")}</span>
+          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "onb.bannerCta")}</span>
+        </a>
       )}
       {clientProject && (
         <div style={{ marginBottom: 18 }}>

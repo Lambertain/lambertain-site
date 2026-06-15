@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/principal";
-import { listAccessRequests, listProjectsWithMeta, listOrphanAuthors, listLinks, memberProjectsMap } from "@/lib/db";
+import { listAccessRequests, listProjectsWithMeta, listOrphanAuthors, listLinks, memberProjectsMap, listInstructionSets } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -14,13 +14,14 @@ export const dynamic = "force-dynamic";
 export default async function TeamPage() {
   await requireAdmin();
   const locale = await getLocale();
-  const [requests, projectsMeta, users, orphans, links, memberProj] = await Promise.all([
+  const [requests, projectsMeta, users, orphans, links, memberProj, sets] = await Promise.all([
     listAccessRequests(),
     listProjectsWithMeta(),
     getBackend().listUsers(),
     listOrphanAuthors(),
     listLinks(),
     memberProjectsMap(),
+    listInstructionSets(),
   ]);
   const activeProjects = projectsMeta.filter((p) => !p.archived);
   const projOpts = activeProjects.map((p) => ({ key: p.key, name: p.name }));
@@ -63,7 +64,7 @@ export default async function TeamPage() {
       <div style={{ marginTop: 28 }}>
         <div style={ui.monoLabel}>{t(locale, "team.inviteKicker")}</div>
         <h2 style={{ ...ui.h1, fontSize: 22, marginTop: 8 }}>{t(locale, "team.inviteTitle")}</h2>
-        <InviteForm projects={projOpts} locale={locale} />
+        <InviteForm projects={projOpts} locale={locale} sets={sets.map((s) => ({ token: s.token, title: s.title, count: s.guide_ids.length }))} />
       </div>
 
       <UsersPanel users={panelUsers} projects={projOpts} locale={locale} />

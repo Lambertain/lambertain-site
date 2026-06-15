@@ -6,8 +6,9 @@ import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
 
 type Proj = { key: string; name: string };
+type SetOpt = { token: string; title: string | null; count: number };
 
-export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Locale }) {
+export function InviteForm({ projects, locale, sets = [] }: { projects: Proj[]; locale: Locale; sets?: SetOpt[] }) {
   const [role, setRole] = useState<"contributor" | "client" | "employee" | "admin">("contributor");
   const [list, setList] = useState<Proj[]>(projects);
   const [selected, setSelected] = useState<string[]>([]);
@@ -15,6 +16,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
+  const [setToken, setSetToken] = useState("");
   const [pending, start] = useTransition();
 
   // новый проект (ключ генерируется из названия автоматически)
@@ -57,7 +59,7 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
   function gen() {
     setError(null); setLink(null); setCopied(false);
     start(async () => {
-      const res = await createInviteLink(role, selected, showOnboarding);
+      const res = await createInviteLink(role, selected, showOnboarding, setToken || null);
       if (res.error) setError(res.error);
       else setLink(res.link ?? null);
     });
@@ -130,6 +132,17 @@ export function InviteForm({ projects, locale }: { projects: Proj[]; locale: Loc
           </span>
           <span>{t(locale, "invite.showOnboarding")}</span>
         </button>
+      )}
+
+      {/* Клиенту — какой НАБОР инструкций показать при входе (баннер на /i/<token>) */}
+      {role === "client" && sets.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <label style={ui.fieldLabel}>{t(locale, "invite.instructionSet")}</label>
+          <select value={setToken} onChange={(e) => { setSetToken(e.target.value); setLink(null); }} style={{ ...ui.input, maxWidth: 360 }}>
+            <option value="">{t(locale, "invite.noSet")}</option>
+            {sets.map((s) => <option key={s.token} value={s.token}>{(s.title || "Набір інструкцій") + ` · ${s.count} блок.`}</option>)}
+          </select>
+        </div>
       )}
 
       <button onClick={gen} disabled={pending || needProject} style={{ ...ui.btnAccent, marginTop: 16, opacity: pending || needProject ? 0.5 : 1 }}>

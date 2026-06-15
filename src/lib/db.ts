@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS member_projects (
 );
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS instruction_set_token TEXT;
 CREATE TABLE IF NOT EXISTS contractors (
   id           SERIAL PRIMARY KEY,
   name         TEXT NOT NULL,
@@ -316,6 +317,8 @@ export interface Invite {
   project_keys: string | null;
   /** Показать клиенту онбординг-инструкцию при первом входе. */
   show_onboarding: boolean;
+  /** Набор инструкций (token), который клиент увидит при входе (вместо/вместе с онбордингом). */
+  instruction_set_token: string | null;
 }
 
 export async function createInvite(
@@ -325,17 +328,18 @@ export async function createInvite(
   ttlHours: number,
   projectKeys: string[],
   showOnboarding = false,
+  instructionSetToken: string | null = null,
 ): Promise<void> {
   await q(
-    `INSERT INTO invites (token, youtrack_login, role, expires_at, project_key, project_keys, show_onboarding)
-     VALUES ($1, $2, $3, now() + ($4 || ' hours')::interval, $5, $6, $7)`,
-    [token, youtrackLogin, role, String(ttlHours), projectKeys[0] ?? null, projectKeys.join(",") || null, showOnboarding],
+    `INSERT INTO invites (token, youtrack_login, role, expires_at, project_key, project_keys, show_onboarding, instruction_set_token)
+     VALUES ($1, $2, $3, now() + ($4 || ' hours')::interval, $5, $6, $7, $8)`,
+    [token, youtrackLogin, role, String(ttlHours), projectKeys[0] ?? null, projectKeys.join(",") || null, showOnboarding, instructionSetToken],
   );
 }
 
 export async function getInvite(token: string): Promise<Invite | null> {
   const rows = await q<Invite>(
-    "SELECT token, youtrack_login, role, expires_at, used_at, project_key, project_keys, show_onboarding FROM invites WHERE token = $1",
+    "SELECT token, youtrack_login, role, expires_at, used_at, project_key, project_keys, show_onboarding, instruction_set_token FROM invites WHERE token = $1",
     [token],
   );
   return rows[0] ?? null;
@@ -464,6 +468,13 @@ export async function setProjectShowOnboarding(key: string, on: boolean): Promis
   const p = await getProjectFull(key);
   if (!p) return;
   await setProjectMeta(key, p.name, { ...p.meta, showOnboarding: on });
+}
+
+/** Набор инструкций (token), который клиент видит при входе — баннер на /i/<token>. null = убрать. */
+export async function setProjectOnboardingSet(key: string, token: string | null): Promise<void> {
+  const p = await getProjectFull(key);
+  if (!p) return;
+  await setProjectMeta(key, p.name, { ...p.meta, onboardingSetToken: token ?? undefined });
 }
 
 /** Сохранить введённое клиентом значение онбординга в поле проекта (clientGit / railwayToken). */

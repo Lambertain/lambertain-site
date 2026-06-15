@@ -4,7 +4,7 @@
  * Server-side only.
  */
 import { randomBytes } from "node:crypto";
-import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding } from "./db";
+import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet } from "./db";
 import { notifyAdmin, notifyLogins } from "./notify";
 import { t, normalizeLocale, DEFAULT_LOCALE } from "./i18n";
 import type { Role } from "./tasks/types";
@@ -25,9 +25,10 @@ export async function generateInvite(
   projectKeys: string[],
   ttlHours = DEFAULT_TTL_HOURS,
   showOnboarding = false,
+  instructionSetToken: string | null = null,
 ): Promise<{ token: string; link: string }> {
   const token = randomBytes(16).toString("hex");
-  await createInvite(token, "", role, ttlHours, projectKeys, showOnboarding);
+  await createInvite(token, "", role, ttlHours, projectKeys, showOnboarding, instructionSetToken);
   return { token, link: inviteLink(token) };
 }
 
@@ -53,6 +54,8 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   if (inv.role === "employee" && keys.length) await setMemberProjects(login, keys); // сотрудник — несколько проектов
   // Клиент с флагом онбординга — пометить его проект, чтобы показать инструкцию при входе.
   if (inv.role === "client" && inv.show_onboarding && keys[0]) await setProjectShowOnboarding(keys[0], true);
+  // Клиент с привязанным набором инструкций — показать его при входе (баннер на /i/<token>).
+  if (inv.role === "client" && inv.instruction_set_token && keys[0]) await setProjectOnboardingSet(keys[0], inv.instruction_set_token);
   await markInviteUsed(token, user.id);
   await notifyAdmin(
     `✅ <b>${fullName}</b> присоединился по приглашению\n` +

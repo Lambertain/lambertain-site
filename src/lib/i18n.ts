@@ -105,6 +105,8 @@ export const DICT: Record<string, Entry> = {
   "onb.banner": { uk: "Залишилось налаштувати підключення проєкту.", ru: "Осталось настроить подключение проекта.", en: "Finish setting up your project connection." },
   "onb.bannerCta": { uk: "Пройти інструкцію →", ru: "Пройти инструкцию →", en: "Open the guide →" },
   "invite.showOnboarding": { uk: "Показати клієнту інструкцію з підключення при вході", ru: "Показать клиенту инструкцию подключения при входе", en: "Show client the onboarding guide on first login" },
+  "invite.instructionSet": { uk: "Набір інструкцій при вході", ru: "Набор инструкций при входе", en: "Instruction set on login" },
+  "invite.noSet": { uk: "— без набору —", ru: "— без набора —", en: "— none —" },
   "skills.kicker": { uk: "Плейбуки інтейку", ru: "Плейбуки интейка", en: "Intake playbooks" },
   "skills.title": { uk: "Скіли", ru: "Скилы", en: "Skills" },
   "skills.hint": { uk: "Інтейк підбирає скіл під тип задачі, а якщо нема — створює новий (позначено «авто»).", ru: "Интейк подбирает скил под тип задачи, а если нет — создаёт новый (помечено «авто»).", en: "Intake picks a skill per task type, and creates a new one if missing (marked “auto”)." },
