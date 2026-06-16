@@ -86,9 +86,15 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div>
-      <Link href={backHref} style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
-        {t(locale, "task.back")}
-      </Link>
+      {/* «← к задачам» липкая (DEV-3): остаётся видимой при прокрутке длинной задачи — пилюля с фоном поверх контента. */}
+      <div style={{ position: "sticky", top: 0, zIndex: 20, marginBottom: 4, display: "flex" }}>
+        <Link
+          href={backHref}
+          style={{ ...ui.monoLabel, display: "inline-flex", alignItems: "center", color: "var(--muted)", textDecoration: "none", background: "rgba(8,8,8,0.85)", backdropFilter: "blur(8px)", border: "1px solid var(--border-2)", borderRadius: 999, padding: "6px 12px" }}
+        >
+          {t(locale, "task.back")}
+        </Link>
+      </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>
