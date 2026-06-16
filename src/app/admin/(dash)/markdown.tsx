@@ -24,7 +24,7 @@ export function Markdown({ children }: { children: string }) {
           img: (props) => <ZoomableImage src={typeof props.src === "string" ? props.src : undefined} alt={props.alt} style={imgStyle} />,
           a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" style={linkStyle} />,
           p: (props) => <p style={{ margin: "8px 0" }}>{props.children}</p>,
-          {/* listStyle задаём явно: Tailwind-preflight сбрасывает list-style на none → иначе маркеры/нумерация пропадают. */}
+          // listStyle задаём явно: Tailwind-preflight сбрасывает list-style на none → иначе маркеры/нумерация пропадают.
           ul: (props) => <ul style={{ margin: "8px 0", paddingLeft: 22, listStyleType: "disc", listStylePosition: "outside" }}>{props.children}</ul>,
           ol: (props) => <ol style={{ margin: "8px 0", paddingLeft: 22, listStyleType: "decimal", listStylePosition: "outside" }}>{props.children}</ol>,
           li: (props) => <li style={{ margin: "2px 0" }}>{props.children}</li>,
