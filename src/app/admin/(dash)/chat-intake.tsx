@@ -4,6 +4,7 @@ import { useState, useRef, useTransition, useEffect } from "react";
 import { createRequestTask } from "./actions";
 import { detectFeminine } from "@/lib/gender-check";
 import { t, type Locale } from "@/lib/i18n";
+import { MarkdownToolbar } from "./markdown-toolbar";
 import { ui } from "../ui-styles";
 
 type Proj = { key: string; name: string };
@@ -286,6 +287,9 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
         placeholder={t(locale, "request.titlePh")}
         style={{ background: "transparent", border: "none", borderBottom: "1px solid var(--border)", color: "var(--text)", fontSize: 20, fontWeight: 600, padding: "14px 16px", outline: "none" }}
       />
+
+      {/* панель форматирования над описанием */}
+      <div style={{ padding: "8px 12px 0" }}><MarkdownToolbar taRef={bodyRef} value={body} onChange={setBody} locale={locale} /></div>
 
       {/* описание — одно сплошное поле */}
       <textarea

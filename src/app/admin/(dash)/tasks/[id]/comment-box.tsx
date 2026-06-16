@@ -4,6 +4,7 @@ import { useState, useRef, useTransition } from "react";
 import { addTaskComment } from "./actions";
 import { detectFeminine } from "@/lib/gender-check";
 import { t, type Locale } from "@/lib/i18n";
+import { MarkdownToolbar } from "../../markdown-toolbar";
 import { ui } from "../../../ui-styles";
 
 type Att = { localId: string; mime: string; data: string; name: string; image: boolean };
@@ -73,6 +74,7 @@ export function CommentBox({ id, locale, canChooseVisibility }: { id: string; lo
   return (
     <div style={{ marginTop: 16 }}>
       <label style={ui.fieldLabel}>{t(locale, "task.addComment")}</label>
+      <div style={{ marginBottom: 6 }}><MarkdownToolbar taRef={taRef} value={text} onChange={setText} locale={locale} /></div>
       <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} onPaste={onPaste} onDrop={onDrop} onDragOver={onDragOver} rows={3} style={{ ...ui.input, resize: "vertical" }} />
 
       {atts.length > 0 && (

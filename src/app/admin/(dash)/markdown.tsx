@@ -31,6 +31,15 @@ export function Markdown({ children }: { children: string }) {
           h3: (props) => <h4 style={{ fontSize: 15, margin: "10px 0 6px" }}>{props.children}</h4>,
           hr: () => <hr style={{ border: "none", borderTop: "1px solid var(--border)", margin: "12px 0" }} />,
           code: (props) => <code style={{ fontFamily: "var(--font-mono)", fontSize: 13, background: "var(--surface-2)", padding: "1px 4px", borderRadius: 3 }}>{props.children}</code>,
+          blockquote: (props) => <blockquote style={{ borderLeft: "3px solid var(--border-2)", margin: "8px 0", padding: "2px 0 2px 12px", color: "var(--muted)" }}>{props.children}</blockquote>,
+          // GFM-таблицы: горизонтальный скролл на узких экранах (TMA) — таблица не разъезжает вёрстку.
+          table: (props) => (
+            <div style={{ overflowX: "auto", margin: "10px 0", WebkitOverflowScrolling: "touch" }}>
+              <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: "100%" }}>{props.children}</table>
+            </div>
+          ),
+          th: (props) => <th style={{ border: "1px solid var(--border-2)", padding: "6px 10px", background: "var(--surface-2)", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>{props.children}</th>,
+          td: (props) => <td style={{ border: "1px solid var(--border-2)", padding: "6px 10px", verticalAlign: "top" }}>{props.children}</td>,
         }}
       >
         {clean(children)}
