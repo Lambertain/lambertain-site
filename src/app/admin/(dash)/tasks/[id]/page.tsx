@@ -107,6 +107,21 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           task.state && <span style={ui.monoLabel}>{task.state}</span>
         )}
         {task.priority && <span style={ui.monoLabel}>· {task.priority}</span>}
+        {/* Редактирование задачи — иконка-карандаш в правом верхнем углу (только админ). */}
+        {isAdmin && (
+          <span style={{ marginLeft: "auto" }}>
+            <TaskEdit
+              id={task.id}
+              summary={task.summary}
+              description={task.description ?? ""}
+              priority={task.priority ?? ""}
+              assigneeLogin={task.assignee?.login ?? ""}
+              assignees={users.filter((u) => (u.role === "contributor" || u.role === "admin") && !u.banned).map((u) => ({ login: u.login, fullName: u.alias || u.fullName }))}
+              locale={locale}
+              defaultOpen={task.approvalStatus === "pending"}
+            />
+          </span>
+        )}
       </div>
       <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,32px)", marginTop: 10 }}>{task.summary}</h1>
 
@@ -169,18 +184,6 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <ReviewActions id={task.id} locale={locale} />
       )}
 
-      {isAdmin && (
-        <TaskEdit
-          id={task.id}
-          summary={task.summary}
-          description={task.description ?? ""}
-          priority={task.priority ?? ""}
-          assigneeLogin={task.assignee?.login ?? ""}
-          assignees={users.filter((u) => (u.role === "contributor" || u.role === "admin") && !u.banned).map((u) => ({ login: u.login, fullName: u.alias || u.fullName }))}
-          locale={locale}
-          defaultOpen={task.approvalStatus === "pending"}
-        />
-      )}
 
       {/* Перенос задачи в другой проект — только супер-админ (если задача села не в тот проект). */}
       {isSuperAdmin(me) && projects.length > 0 && (

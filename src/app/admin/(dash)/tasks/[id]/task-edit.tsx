@@ -41,18 +41,22 @@ export function TaskEdit({
     });
   }
 
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "1px solid var(--border-2)", padding: "6px 12px", cursor: "pointer", borderRadius: 2, marginTop: 16, display: "inline-flex", alignItems: "center", gap: 8 }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-        {t(locale, "taskedit.edit")}
-      </button>
-    );
-  }
+  // Свёрнуто — компактная иконка-карандаш (её родитель ставит в правый верхний угол задачи).
+  const pencil = (
+    <button onClick={() => setOpen(true)} title={t(locale, "taskedit.edit")} aria-label={t(locale, "taskedit.edit")}
+      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, background: "transparent", border: "1px solid var(--border-2)", color: "var(--muted)", cursor: "pointer", borderRadius: 6 }}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+    </button>
+  );
+  if (!open) return pencil;
 
+  // Открыто — форма в модалке поверх (триггер может стоять где угодно, форма всегда по центру).
   return (
-    <div style={{ ...ui.card, marginTop: 16, padding: 16 }}>
-      <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 10 }}>{t(locale, "taskedit.title")}</div>
+    <>
+      {pencil}
+      <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.6)", display: "grid", placeItems: "center", padding: 16 }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ ...ui.card, padding: 16, width: "min(640px, 100%)", maxHeight: "90dvh", overflowY: "auto", textAlign: "left" }}>
+          <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 10 }}>{t(locale, "taskedit.title")}</div>
 
       <label style={ui.fieldLabel}>{t(locale, "taskedit.summary")}</label>
       <input value={s} onChange={(e) => { setS(e.target.value); setSaved(false); }} style={{ ...ui.input, width: "100%", fontWeight: 600 }} />
@@ -76,12 +80,14 @@ export function TaskEdit({
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
-        <button onClick={save} disabled={pending || !dirty} style={{ ...ui.btnAccent, opacity: pending || !dirty ? 0.5 : 1 }}>{pending ? "…" : t(locale, "projects.save")}</button>
-        <button onClick={() => setOpen(false)} style={{ ...ui.btn }}>{t(locale, "common.cancel")}</button>
-        {saved && !dirty && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "projects.saved")}</span>}
-        {err && <span style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none" }}>{err}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16 }}>
+            <button onClick={save} disabled={pending || !dirty} style={{ ...ui.btnAccent, opacity: pending || !dirty ? 0.5 : 1 }}>{pending ? "…" : t(locale, "projects.save")}</button>
+            <button onClick={() => setOpen(false)} style={{ ...ui.btn }}>{t(locale, "common.cancel")}</button>
+            {saved && !dirty && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "projects.saved")}</span>}
+            {err && <span style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none" }}>{err}</span>}
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
