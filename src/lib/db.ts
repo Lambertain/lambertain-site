@@ -427,6 +427,35 @@ export async function deleteAccessRequest(tgId: number): Promise<void> {
   await q("DELETE FROM access_requests WHERE tg_id = $1", [tgId]);
 }
 
+/**
+ * Подтвердить заявку на доступ: создать участника из его Telegram-личности, связать с ролью и проектом,
+ * удалить заявку. Та же логика, что в team/actions.approveAccess, но для вызова из admin-API (без сессии).
+ */
+export async function approveAccessRequest(
+  tgId: number,
+  projectKey: string,
+  roleOverride?: Role,
+): Promise<{ login: string; role: Role; fullName: string } | { error: string }> {
+  const reqRows = await q<{ username: string | null; full_name: string | null; requested_role: Role }>(
+    "SELECT username, full_name, requested_role FROM access_requests WHERE tg_id = $1",
+    [tgId],
+  );
+  const r = reqRows[0];
+  if (!r) return { error: `заявка от tg_id ${tgId} не найдена` };
+  if (projectKey) {
+    const p = await q("SELECT 1 FROM projects WHERE key = $1", [projectKey]);
+    if (!p.length) return { error: `проект ${projectKey} не найден` };
+  }
+  const role = roleOverride || r.requested_role;
+  const login = r.username ? r.username.toLowerCase() : `tg${tgId}`;
+  const fullName = r.full_name || login;
+  await upsertMember(login, fullName, role, tgId);
+  await upsertLink({ tg_id: tgId, youtrack_login: login, role, full_name: fullName, project_key: projectKey || null });
+  if (role === "contributor" && projectKey) await setDevProjects(login, [projectKey]);
+  await deleteAccessRequest(tgId);
+  return { login, role, fullName };
+}
+
 // ---- Одноразовые токены для входа в веб из апки ----
 export async function createWebLoginToken(token: string, tgId: number, ttlMin: number): Promise<void> {
   await q(
