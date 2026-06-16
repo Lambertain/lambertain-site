@@ -36,7 +36,7 @@
 - Menu button → `https://lambertain-site-production.up.railway.app/tma`.
 
 ## Доступы
-Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `YOUTRACK_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL`, `GITHUB_TOKEN`, `ADMIN_API_TOKEN`. Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
+Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL`, `GITHUB_TOKEN`, `ADMIN_API_TOKEN`. Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
 
 ## Создание задач по API (для Claude/скриптов — без доступа к БД)
 `POST /api/admin/create-task`, заголовок `Authorization: Bearer $ADMIN_API_TOKEN` (значение — в `.env.local`).

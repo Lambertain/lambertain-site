@@ -1,9 +1,8 @@
 /**
  * Доменные типы PM-портала и контракт бэкенда задач.
  *
- * UI, server actions и Telegram-поллер работают ТОЛЬКО через интерфейс TasksBackend.
- * Сегодня его реализует адаптер YouTrack (youtrack.ts).
- * Завтра — собственная БД (postgres.ts). При миграции UI не меняется.
+ * UI и server actions работают ТОЛЬКО через интерфейс TasksBackend.
+ * Его реализует адаптер собственной БД портала (postgres.ts).
  */
 
 /** Роль пользователя в трекере. */
@@ -142,7 +141,7 @@ export interface TaskFilter {
   limit?: number;
 }
 
-/** Контракт бэкенда. Любая реализация (YouTrack, Postgres) обязана его выполнять. */
+/** Контракт бэкенда задач (реализация — postgres.ts). */
 export interface TasksBackend {
   listProjects(): Promise<Project[]>;
   listUsers(): Promise<User[]>;

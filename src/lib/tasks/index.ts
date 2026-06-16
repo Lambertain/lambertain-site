@@ -1,22 +1,11 @@
 /**
- * Выбор активного бэкенда задач.
- * Меняется одной переменной TASKS_BACKEND (по умолчанию youtrack).
- * Когда появится postgres.ts — добавить сюда ветку, UI не трогать.
+ * Активный бэкенд задач — собственная БД портала (Postgres). YouTrack убран.
  */
 import type { TasksBackend } from "./types";
-import { youtrackBackend } from "./youtrack";
 import { postgresBackend } from "./postgres";
 
 export function getBackend(): TasksBackend {
-  const kind = process.env.TASKS_BACKEND || "youtrack";
-  switch (kind) {
-    case "youtrack":
-      return youtrackBackend;
-    case "postgres":
-      return postgresBackend;
-    default:
-      throw new Error(`Неизвестный TASKS_BACKEND: ${kind}`);
-  }
+  return postgresBackend;
 }
 
 export * from "./types";

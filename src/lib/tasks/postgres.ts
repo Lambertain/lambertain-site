@@ -1,7 +1,6 @@
 /**
- * Адаптер TasksBackend поверх собственной БД портала (уход с YouTrack).
- * Таблицы projects/members/tasks/comments создаёт импорт (scripts/import-youtrack.mjs)
- * и поддерживает схема. Server-side only.
+ * Адаптер TasksBackend поверх собственной БД портала.
+ * Таблицы projects/members/tasks/comments создаёт и поддерживает схема (scripts/migrate.mjs). Server-side only.
  */
 import type { TasksBackend, TaskFilter, Project, User, Task, Comment, Role } from "./types";
 import type { ProjectMeta } from "./types";
