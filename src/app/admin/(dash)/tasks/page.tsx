@@ -106,7 +106,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           locale={locale}
           canEditStatus={true}
           canDelete={true}
-          canStart={true}
+          canStart={false}
           empty={t(locale, "tasks.empty")}
           feedbackKey={projectsList.find((p) => p.meta.feedback)?.key}
         />

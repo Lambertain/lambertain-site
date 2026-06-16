@@ -135,7 +135,9 @@ export default async function HomePage() {
 
   const canEditStatus = me.realRole === "admin" || me.role === "contributor";
   const canDelete = me.realRole === "admin" || me.role === "client";
-  const canStart = me.realRole === "admin" || me.role === "contributor";
+  // «Взять в работу по клику» (Open → In Progress) — только исполнитель-разработчик (кому задача адресована).
+  // Админ/супер-админ просматривает всё, но его клик НЕ меняет статус (открывает задачу).
+  const canStart = me.role === "contributor";
   const feedbackKey = all.find((p) => p.meta.feedback)?.key;
   const now = nowMs();
 
