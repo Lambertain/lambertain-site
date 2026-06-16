@@ -37,5 +37,5 @@ export async function GET(req: Request) {
   if (!projectKey) return NextResponse.json({ error: "projectKey required" }, { status: 400 });
   const proj = await getProjectFull(projectKey);
   if (!proj) return NextResponse.json({ error: `project ${projectKey} not found` }, { status: 404 });
-  return NextResponse.json({ projectKey, spec: proj.meta.spec ?? null });
+  return NextResponse.json({ projectKey, name: proj.name, spec: proj.meta.spec ?? null });
 }
