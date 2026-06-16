@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveUserProjects, renameUser, deleteUser, updateLeadLabel, createProjectFromLead } from "./actions";
+import { saveUserProjects, renameUser, deleteUser } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../ui-styles";
 
 type Proj = { key: string; name: string };
-export type Lead = { id: number; label: string | null; projectType: string | null; status: string; submittedAt: string | null; createdAt: string; companyName?: string; contactPerson?: string; contacts?: string };
 export type PanelUser = {
   login: string;
   fullName: string;
@@ -153,8 +152,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
-export function UsersPanel({ users, projects, locale, leads = [] }: { users: PanelUser[]; projects: Proj[]; locale: Locale; leads?: Lead[] }) {
-  const [tab, setTab] = useState<"users" | "leads">("users");
+export function UsersPanel({ users, projects, locale }: { users: PanelUser[]; projects: Proj[]; locale: Locale }) {
   const [roleF, setRoleF] = useState("all");
   const [projF, setProjF] = useState("all");
   const roles = ROLE_ORDER.filter((r) => users.some((u) => u.role === r));
@@ -170,16 +168,6 @@ export function UsersPanel({ users, projects, locale, leads = [] }: { users: Pan
         {filtered.length !== users.length && <span style={{ color: "var(--muted)" }}> / {users.length}</span>}
       </h2>
 
-      {/* табы: пользователи / лиды */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <Pill active={tab === "users"} onClick={() => setTab("users")}>{t(locale, "users.tabUsers")} · {users.length}</Pill>
-        <Pill active={tab === "leads"} onClick={() => setTab("leads")}>{t(locale, "users.tabLeads")} · {leads.length}</Pill>
-      </div>
-
-      {tab === "leads" ? (
-        <LeadsPanel leads={leads} locale={locale} />
-      ) : (
-      <>
       {/* фильтры: роли (пилюли) + проект (селект) */}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -207,70 +195,7 @@ export function UsersPanel({ users, projects, locale, leads = [] }: { users: Pan
       ) : (
         filtered.map((u) => <Card key={u.login} user={u} projects={projects} locale={locale} />)
       )}
-      </>
-      )}
     </div>
   );
 }
 
-function LeadsPanel({ leads, locale }: { leads: Lead[]; locale: Locale }) {
-  if (!leads.length) return <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 16 }}>{t(locale, "users.leadsEmpty")}</p>;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
-      {leads.map((l) => <LeadCard key={l.id} lead={l} locale={locale} />)}
-    </div>
-  );
-}
-
-const DATE_LOC2: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
-function LeadCard({ lead, locale }: { lead: Lead; locale: Locale }) {
-  // Название/контакты клиент указал сам в брифе — подставляем их (а не задаём за него).
-  const defaultName = lead.companyName || lead.label || "";
-  const [label, setLabel] = useState(defaultName);
-  const [projName, setProjName] = useState(defaultName);
-  const [createdKey, setCreatedKey] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [pendL, startL] = useTransition();
-  const [pendP, startP] = useTransition();
-  const when = lead.submittedAt || lead.createdAt;
-
-  function saveLabel() {
-    startL(async () => { const r = await updateLeadLabel(lead.id, label); setMsg(r.error || "✓"); });
-  }
-  function makeProject() {
-    setMsg(null);
-    startP(async () => {
-      const r = await createProjectFromLead(lead.id, projName);
-      if (r.error) setMsg(r.error);
-      else setCreatedKey(r.key ?? null);
-    });
-  }
-
-  return (
-    <div style={{ ...ui.card, padding: 14 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t(locale, "users.leadName")} style={{ ...ui.input, flex: 1, minWidth: 200, fontWeight: 600 }} />
-        <button onClick={saveLabel} disabled={pendL} style={{ ...ui.btn, padding: "9px 14px" }}>{pendL ? "…" : t(locale, "users.leadRename")}</button>
-        {lead.projectType && <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{lead.projectType}</span>}
-        {when && <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>{new Date(when).toLocaleDateString(DATE_LOC2[locale])}</span>}
-      </div>
-
-      {(lead.contactPerson || lead.contacts) && (
-        <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 8, lineHeight: 1.6 }}>
-          {lead.contactPerson && <div>👤 {lead.contactPerson}</div>}
-          {lead.contacts && <div style={{ whiteSpace: "pre-wrap" }}>✉ {lead.contacts}</div>}
-        </div>
-      )}
-
-      {createdKey ? (
-        <div style={{ ...ui.monoLabel, color: "var(--accent)", marginTop: 12 }}>{t(locale, "users.leadProjectCreated")} · {createdKey}</div>
-      ) : (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap", paddingTop: 12, borderTop: "1px solid var(--border-2)" }}>
-          <input value={projName} onChange={(e) => setProjName(e.target.value)} placeholder={t(locale, "users.leadProjectName")} style={{ ...ui.input, flex: 1, minWidth: 200 }} />
-          <button onClick={makeProject} disabled={pendP || !projName.trim()} style={{ ...ui.btnAccent, opacity: pendP || !projName.trim() ? 0.5 : 1 }}>{pendP ? "…" : t(locale, "users.leadMakeProject")}</button>
-        </div>
-      )}
-      {msg && <span style={{ ...ui.monoLabel, textTransform: "none", color: msg === "✓" ? "var(--accent)" : "#ff5b5b", display: "block", marginTop: 8 }}>{msg === "✓" ? t(locale, "projects.saved") : msg}</span>}
-    </div>
-  );
-}

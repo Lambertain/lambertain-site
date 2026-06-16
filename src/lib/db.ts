@@ -623,53 +623,6 @@ export async function getReviewRef(taskId: string): Promise<string | null> {
   return rows[0]?.review_ref ?? null;
 }
 
-// ---- Перенос истории: «осиротевшие» авторы (удалённые ники YouTrack) → новый tg-пользователь ----
-export interface OrphanAuthor {
-  login: string;
-  role: Role | null;
-  comments: number;
-  assigneeTasks: number;
-  reporterTasks: number;
-}
-
-/** Логины из orig_*_login, для которых нет члена в members (удалённые ники YouTrack) + счётчики. */
-export async function listOrphanAuthors(): Promise<OrphanAuthor[]> {
-  const rows = await q<{ login: string; role: Role | null; comments: string; assignee_tasks: string; reporter_tasks: string }>(
-    `WITH orphans AS (
-        SELECT orig_author_login AS login, orig_author_role AS role, 'comment' AS kind
-          FROM comments WHERE author_id IS NULL AND orig_author_login IS NOT NULL
-        UNION ALL SELECT orig_assignee_login, NULL, 'assignee' FROM tasks WHERE assignee_id IS NULL AND orig_assignee_login IS NOT NULL
-        UNION ALL SELECT orig_reporter_login, NULL, 'reporter' FROM tasks WHERE reporter_id IS NULL AND orig_reporter_login IS NOT NULL
-      )
-      SELECT o.login,
-             max(o.role) FILTER (WHERE o.role IS NOT NULL) AS role,
-             count(*) FILTER (WHERE kind='comment')  AS comments,
-             count(*) FILTER (WHERE kind='assignee') AS assignee_tasks,
-             count(*) FILTER (WHERE kind='reporter') AS reporter_tasks
-        FROM orphans o
-       WHERE NOT EXISTS (SELECT 1 FROM members m WHERE m.login = o.login)
-       GROUP BY o.login ORDER BY o.login`,
-  );
-  return rows.map((r) => ({
-    login: r.login,
-    role: r.role,
-    comments: Number(r.comments),
-    assigneeTasks: Number(r.assignee_tasks),
-    reporterTasks: Number(r.reporter_tasks),
-  }));
-}
-
-/** Привязать историю старого логина (orig_*) к существующему члену newLogin. Заполняет только пустые ссылки. */
-export async function relinkMember(origLogin: string, newLogin: string): Promise<{ comments: number; assignee: number; reporter: number }> {
-  const m = await q<{ id: number }>("SELECT id FROM members WHERE login = $1", [newLogin]);
-  if (!m[0]) throw new Error(`Пользователь ${newLogin} не найден`);
-  const id = m[0].id;
-  const c = await q("UPDATE comments SET author_id = $1 WHERE orig_author_login = $2 AND author_id IS NULL RETURNING id", [id, origLogin]);
-  const a = await q("UPDATE tasks SET assignee_id = $1 WHERE orig_assignee_login = $2 AND assignee_id IS NULL RETURNING id", [id, origLogin]);
-  const r = await q("UPDATE tasks SET reporter_id = $1 WHERE orig_reporter_login = $2 AND reporter_id IS NULL RETURNING id", [id, origLogin]);
-  return { comments: c.length, assignee: a.length, reporter: r.length };
-}
-
 /** Блок запроса: текст, картинка или файл (base64). Порядок блоков = хронология ввода. */
 export type ReqBlock =
   | { type: "text"; text: string }

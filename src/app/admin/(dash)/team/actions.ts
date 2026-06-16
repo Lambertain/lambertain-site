@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, relinkMember, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember, updateBriefLabel, linkBriefToProject } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { sendTo, notifyLogins } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
@@ -27,31 +27,6 @@ export async function createInviteLink(
       role === "client" ? instructionSetToken : null,
     );
     return { link };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка" };
-  }
-}
-
-/** Переименовать лида (название брифа). */
-export async function updateLeadLabel(briefId: number, label: string): Promise<{ ok?: boolean; error?: string }> {
-  await requireAdmin();
-  await updateBriefLabel(briefId, label);
-  revalidatePath("/admin/team");
-  return { ok: true };
-}
-
-/** Завести проект на лида: создать проект (имя) и привязать к нему бриф. */
-export async function createProjectFromLead(briefId: number, name: string): Promise<{ key?: string; name?: string; error?: string }> {
-  try {
-    await requireAdmin();
-    const n = name.trim();
-    if (!n) return { error: "Укажите название проекта" };
-    const k = await generateProjectKey(n);
-    await createProject(k, n);
-    await linkBriefToProject(briefId, k);
-    revalidatePath("/admin/team");
-    revalidatePath("/admin/projects");
-    return { key: k, name: n };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
@@ -151,23 +126,6 @@ export async function renameUser(login: string, alias: string): Promise<{ ok?: b
     revalidatePath("/admin/team");
     revalidatePath("/admin");
     return { ok: true };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка" };
-  }
-}
-
-/** Привязать историю старого ника YouTrack (orig_*) к существующему tg-пользователю. */
-export async function relinkHistory(
-  origLogin: string,
-  newLogin: string,
-): Promise<{ ok?: boolean; comments?: number; tasks?: number; error?: string }> {
-  try {
-    await requireAdmin();
-    if (!origLogin || !newLogin) return { error: "Укажите старый логин и пользователя" };
-    const r = await relinkMember(origLogin, newLogin);
-    revalidatePath("/admin/team");
-    revalidatePath("/admin");
-    return { ok: true, comments: r.comments, tasks: r.assignee + r.reporter };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }

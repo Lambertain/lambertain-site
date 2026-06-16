@@ -73,7 +73,7 @@ export const DICT: Record<string, Entry> = {
   "nav.tasks": { uk: "Задачі", ru: "Задачи", en: "Tasks" },
   "nav.clients": { uk: "Клієнти", ru: "Клиенты", en: "Clients" },
   "nav.overdue": { uk: "Прострочення", ru: "Просрочки", en: "Overdue" },
-  "nav.team": { uk: "Команда", ru: "Команда", en: "Team" },
+  "nav.team": { uk: "Користувачі", ru: "Пользователи", en: "Users" },
   "nav.briefs": { uk: "Бріфи", ru: "Брифы", en: "Briefs" },
   "nav.guides": { uk: "Гайди", ru: "Гайды", en: "Guides" },
   "nav.contracts": { uk: "Договори", ru: "Договоры", en: "Contracts" },
@@ -270,7 +270,7 @@ export const DICT: Record<string, Entry> = {
 
   // — команда —
   "team.kicker": { uk: "Доступ за ролями", ru: "Доступ по ролям", en: "Role-based access" },
-  "team.title": { uk: "Команда", ru: "Команда", en: "Team" },
+  "team.title": { uk: "Користувачі", ru: "Пользователи", en: "Users" },
   "team.hint": {
     uk: "Підтверджуй заявки на доступ або генеруй посилання-запрошення. Прив’язка з’єднує Telegram-користувача з обліковкою та роллю.",
     ru: "Подтверждай заявки на доступ или генерируй ссылку-приглашение. Привязка соединяет Telegram-пользователя с учёткой и ролью.",
@@ -511,14 +511,6 @@ export const DICT: Record<string, Entry> = {
   "users.kicker": { uk: "Хто приєднався", ru: "Кто присоединился", en: "Who joined" },
   "users.title": { uk: "Користувачі", ru: "Пользователи", en: "Users" },
   "users.empty": { uk: "Поки ніхто не приєднався.", ru: "Пока никто не присоединился.", en: "Nobody has joined yet." },
-  "users.tabUsers": { uk: "Користувачі", ru: "Пользователи", en: "Users" },
-  "users.tabLeads": { uk: "Ліди", ru: "Лиды", en: "Leads" },
-  "users.leadsEmpty": { uk: "Поки немає лідів (заповнених брифів).", ru: "Пока нет лидов (заполненных брифов).", en: "No leads (filled briefs) yet." },
-  "users.leadName": { uk: "Назва ліда", ru: "Название лида", en: "Lead name" },
-  "users.leadRename": { uk: "Перейменувати", ru: "Переименовать", en: "Rename" },
-  "users.leadProjectName": { uk: "Назва проєкту", ru: "Название проекта", en: "Project name" },
-  "users.leadMakeProject": { uk: "Завести проєкт", ru: "Завести проект", en: "Create project" },
-  "users.leadProjectCreated": { uk: "Проєкт створено", ru: "Проект создан", en: "Project created" },
   "users.allRoles": { uk: "Всі ролі", ru: "Все роли", en: "All roles" },
   "users.allProjects": { uk: "Всі проєкти", ru: "Все проекты", en: "All projects" },
   "users.noneMatch": { uk: "Немає за фільтром.", ru: "Нет по фильтру.", en: "Nothing matches the filter." },
@@ -526,18 +518,6 @@ export const DICT: Record<string, Entry> = {
   "users.delete": { uk: "Видалити користувача", ru: "Удалить пользователя", en: "Delete user" },
   "users.deleteConfirm": { uk: "Видалити безповоротно? Доступ і привʼязки зникнуть (історія задач збережеться).", ru: "Удалить безвозвратно? Доступ и привязки исчезнут (история задач сохранится).", en: "Delete permanently? Access and links will be removed (task history is kept)." },
   "users.deleteYes": { uk: "Так, видалити", ru: "Да, удалить", en: "Yes, delete" },
-
-  // — перенос истории (старый ник YouTrack → новый tg-пользователь) —
-  "relink.kicker": { uk: "Старі ніки YouTrack", ru: "Старые ники YouTrack", en: "Former YouTrack logins" },
-  "relink.title": { uk: "Перенос історії", ru: "Перенос истории", en: "History transfer" },
-  "relink.hint": {
-    uk: "Коментарі та задачі видалених нікнеймів YouTrack. Прив’яжи до нового користувача, який зайшов по Telegram.",
-    ru: "Комментарии и задачи удалённых никнеймов YouTrack. Привяжи к новому пользователю, зашедшему по Telegram.",
-    en: "Comments and tasks of deleted YouTrack nicknames. Bind them to the new user who joined via Telegram.",
-  },
-  "relink.counts": { uk: "коментарів: {c} · задач: {tk}", ru: "комментариев: {c} · задач: {tk}", en: "comments: {c} · tasks: {tk}" },
-  "relink.bind": { uk: "Прив’язати", ru: "Привязать", en: "Bind" },
-  "relink.done": { uk: "Перенесено: {c} коментарів, {tk} задач ✓", ru: "Перенесено: {c} комментариев, {tk} задач ✓", en: "Transferred: {c} comments, {tk} tasks ✓" },
 
   // — поля проекта: экономика —
   "field.cost": { uk: "Вартість", ru: "Стоимость", en: "Cost" },
