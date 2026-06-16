@@ -5,7 +5,7 @@ import { newBrief, linkBrief } from "./actions";
 import { ui } from "../../ui-styles";
 
 type Proj = { key: string; name: string };
-type BriefRow = { id: number; token: string; label: string | null; type: string | null; status: string; payload: Record<string, unknown> | null; projectKey: string | null; created: string };
+type BriefRow = { id: number; token: string; link: string; label: string | null; type: string | null; status: string; payload: Record<string, unknown> | null; projectKey: string | null; created: string; tg: string | null };
 
 function CopyLink({ url }: { url: string }) {
   const [done, setDone] = useState(false);
@@ -19,16 +19,17 @@ function CopyLink({ url }: { url: string }) {
   );
 }
 
-function Row({ b, base, projects }: { b: BriefRow; base: string; projects: Proj[] }) {
+function Row({ b, projects }: { b: BriefRow; projects: Proj[] }) {
   const [open, setOpen] = useState(false);
   const [proj, setProj] = useState(b.projectKey ?? "");
   const [pending, start] = useTransition();
-  const url = `${base}/brief/${b.token}`;
+  const url = b.link;
   const submitted = b.status === "submitted";
   return (
     <div style={{ ...ui.card, padding: 14, marginTop: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <strong style={{ fontSize: 15 }}>{b.label || "—"}</strong>
+        {b.tg && <span style={{ ...ui.monoLabel, textTransform: "none", color: "#e8b339" }}>✈ {b.tg}</span>}
         <span style={{ ...ui.monoLabel, color: submitted ? "var(--accent)" : "var(--muted)" }}>{submitted ? "заполнен" : "ожидает"}</span>
         {b.type && <span style={{ ...ui.monoLabel, textTransform: "none", padding: "1px 8px", border: "1px solid var(--border-2)", borderRadius: 3 }}>{b.type}</span>}
         <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -56,7 +57,7 @@ function Row({ b, base, projects }: { b: BriefRow; base: string; projects: Proj[
   );
 }
 
-export function BriefsPanel({ briefs, projects, base }: { briefs: BriefRow[]; projects: Proj[]; base: string }) {
+export function BriefsPanel({ briefs, projects }: { briefs: BriefRow[]; projects: Proj[] }) {
   const [label, setLabel] = useState("");
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export function BriefsPanel({ briefs, projects, base }: { briefs: BriefRow[]; pr
     start(async () => {
       const r = await newBrief(label);
       if (r.error) setError(r.error);
-      else if (r.token) { setLink(`${base}/brief/${r.token}`); setLabel(""); }
+      else if (r.link) { setLink(r.link); setLabel(""); }
     });
   }
 
@@ -94,7 +95,7 @@ export function BriefsPanel({ briefs, projects, base }: { briefs: BriefRow[]; pr
         {briefs.length === 0 ? (
           <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 10 }}>Пока нет.</p>
         ) : (
-          briefs.map((b) => <Row key={b.id} b={b} base={base} projects={projects} />)
+          briefs.map((b) => <Row key={b.id} b={b} projects={projects} />)
         )}
       </div>
     </div>

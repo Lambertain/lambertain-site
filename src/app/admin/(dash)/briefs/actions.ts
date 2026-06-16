@@ -2,14 +2,16 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { createBrief, linkBriefToProject } from "@/lib/db";
+import { briefLink } from "@/lib/invites";
 import { revalidatePath } from "next/cache";
 
-/** Завести нового лида/бриф (метка — имя/контакт). Возвращает токен для ссылки /brief/<token>. */
-export async function newBrief(label: string): Promise<{ token?: string; error?: string }> {
+/** Завести новый бриф. Контакт лида определится по Telegram при заполнении — метку указывать необязательно.
+ *  Возвращает Mini App ссылку: клиент авторизуется в боте → попадает как лид. */
+export async function newBrief(label: string): Promise<{ token?: string; link?: string; error?: string }> {
   await requireAdmin();
-  if (!label.trim()) return { error: "Укажите имя/контакт лида" };
-  const { token } = await createBrief(label);
-  return { token };
+  const { token } = await createBrief(label.trim() || "лід");
+  revalidatePath("/admin/briefs");
+  return { token, link: briefLink(token) };
 }
 
 /** Привязать бриф к проекту (projectKey="" — отвязать). */

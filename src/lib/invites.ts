@@ -38,6 +38,11 @@ export function inviteLink(token: string): string {
   return app ? `https://t.me/${bot}/${app}?startapp=${token}` : `https://t.me/${bot}?startapp=${token}`;
 }
 
+/** Ссылка на бриф через Mini App: клиент авторизуется в боте → попадает как лид с tg-контактом. */
+export function briefLink(token: string): string {
+  return inviteLink(`brief-${token}`);
+}
+
 /** Применить инвайт: создать участника и связку. true при успехе. */
 export async function redeemInvite(token: string, user: TgUser): Promise<boolean> {
   const inv = await getInvite(token);

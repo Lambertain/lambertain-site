@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/principal";
 import { listBriefs } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { PUBLIC_SITE } from "@/lib/dev-protocol";
+import { briefLink } from "@/lib/invites";
 import { BriefsPanel } from "./briefs-panel";
 import { ui } from "../../ui-styles";
 
@@ -19,9 +19,8 @@ export default async function BriefsPage() {
         Когда заводите проект — привяжите к нему бриф (ответы станут доступны проекту и вашему Claude через токен).
       </p>
       <BriefsPanel
-        briefs={briefs.map((b) => ({ id: b.id, token: b.token, label: b.label, type: b.project_type, status: b.status, payload: b.payload, projectKey: b.project_key, created: b.created_at }))}
+        briefs={briefs.map((b) => ({ id: b.id, token: b.token, link: briefLink(b.token), label: b.label, type: b.project_type, status: b.status, payload: b.payload, projectKey: b.project_key, created: b.created_at, tg: b.tg_username || b.tg_name || (b.tg_id ? String(b.tg_id) : null) }))}
         projects={projects.map((p) => ({ key: p.key, name: p.name }))}
-        base={PUBLIC_SITE}
       />
     </div>
   );

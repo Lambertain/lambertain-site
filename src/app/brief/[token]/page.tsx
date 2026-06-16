@@ -1,3 +1,4 @@
+import Script from "next/script";
 import { getBriefByToken } from "@/lib/db";
 import { BriefForm } from "./brief-form";
 import { ui } from "../../admin/ui-styles";
@@ -26,6 +27,7 @@ export default async function BriefPage({ params }: { params: Promise<{ token: s
   }
   return (
     <div style={{ ...ui.page, minHeight: "100dvh" }}>
+      <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
       <BriefForm token={token} />
     </div>
   );

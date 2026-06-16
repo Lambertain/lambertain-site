@@ -232,6 +232,18 @@ Lamb.dev всегда идёт **последним** во всех списка
 - **Гайды мультилокальные** (uk основная + `title_ru/body_ru/title_en/body_en`, fallback на uk через `guideText`). Редактор —
   табы UA/RU/EN; клиент видит на своей локали; на `/i/<token>` — переключатель `?lang=`.
 
+## Бриф (нулевая стадия: лид → Telegram → ответы)
+
+Бриф — стадия до клиента/цены/проекта. Контакт лида **не спрашивается формой** — он определяется по Telegram при авторизации.
+- `/admin/briefs` («Брифы»): «Новый лид» (метку можно не указывать) → `createBrief` → ссылка `briefLink(token)` =
+  Mini App диплинк `https://t.me/<bot>/<app>?startapp=brief-<token>`. Отправляешь лиду — он жмёт «Открыть».
+- Бот открывает Mini App `/tma`; `start_param` вида `brief-<token>` → `/tma` редиректит на `/brief/<token>` (в TMA-контексте,
+  страница подключает `telegram-web-app.js`). Лид заполняет бриф; форма читает `window.Telegram.WebApp.initData`.
+- `submitBriefAction` валидирует initData (`validateInitData`) → `submitBrief(token, type, payload, tg)` пишет
+  `tg_id/tg_username/tg_name`; `label` подставляется из названия компании, иначе из tg-имени/`@username`. Ответы — в `/admin/briefs`
+  (с tg-контактом в строке) и в бот админу. Поля формы общие: компания (обяз.), что нужно, бюджет, дедлайн — **без поля контактов**.
+- Привязка брифа к проекту — селект в строке (`linkBrief`): ответы становятся доступны проекту и Claude через токен.
+
 ## Секреты проекта + умный handoff (self/client/owner)
 
 - **Секреты** (`project_secrets`, страница «Секрети та доступи» на проекте, только админ — страница `requireAdmin`):

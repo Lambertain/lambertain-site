@@ -103,6 +103,10 @@ CREATE TABLE IF NOT EXISTS briefs (
   project_key  TEXT,                                  -- привязка к проекту (проставляется позже)
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   submitted_at TIMESTAMPTZ);
+-- Контакт лида = Telegram (определяется при авторизации в боте, не спрашиваем в форме).
+ALTER TABLE briefs ADD COLUMN IF NOT EXISTS tg_id BIGINT;
+ALTER TABLE briefs ADD COLUMN IF NOT EXISTS tg_username TEXT;
+ALTER TABLE briefs ADD COLUMN IF NOT EXISTS tg_name TEXT;
 -- Гайды-инструкции (растущая библиотека): регистрация GitHub/хостинг/бот и т.п. Каждый гайд — markdown-страница.
 CREATE TABLE IF NOT EXISTS guides (
   id         SERIAL PRIMARY KEY,

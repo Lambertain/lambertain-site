@@ -18,9 +18,8 @@ const TYPES: { key: string; uk: string; ru: string }[] = [
 ];
 
 const COMMON: Field[] = [
+  // Контакт лида не спрашиваем — он определяется по Telegram (авторизация в боте).
   { key: "companyName", uk: "Назва компанії / проєкту", ru: "Название компании / проекта", kind: "text", required: true },
-  { key: "contactPerson", uk: "Контактна особа (як до вас звертатися)", ru: "Контактное лицо (как к вам обращаться)", kind: "text", required: true },
-  { key: "contacts", uk: "Контакти для зв'язку (телефон / email / Telegram / Viber)", ru: "Контакты для связи (телефон / email / Telegram / Viber)", kind: "area", required: true },
   { key: "what", uk: "Що за продукт/послуга і для кого?", ru: "Что за продукт/услуга и для кого?", kind: "area", required: true },
   { key: "budget", uk: "Орієнтовний бюджет (якщо є розуміння)", ru: "Ориентировочный бюджет (если есть понимание)", kind: "text" },
   { key: "deadline", uk: "Бажані строки / дедлайн", ru: "Желаемые сроки / дедлайн", kind: "text" },
@@ -129,8 +128,14 @@ export function BriefForm({ token }: { token: string }) {
     setError(null);
     const fields = [...COMMON, ...(BRANCH[type] || [])];
     for (const f of fields) if (f.required && !String(data[f.key] ?? "").trim()) { setError(TXT.required[lang]); return; }
+    // Контакт лида берём из Telegram Mini App (если открыт в боте) — подписанный initData.
+    let initData: string | undefined;
+    try {
+      // @ts-expect-error — Telegram WebApp SDK подгружается скриптом
+      initData = typeof window !== "undefined" ? window.Telegram?.WebApp?.initData || undefined : undefined;
+    } catch { /* ignore */ }
     start(async () => {
-      const r = await submitBriefAction(token, type, data);
+      const r = await submitBriefAction(token, type, data, initData);
       if (r.error) setError(r.error);
       else setSent(true);
     });

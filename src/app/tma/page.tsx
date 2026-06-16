@@ -52,6 +52,10 @@ export default function TmaPage() {
       setErrKey("tma.openInTelegram");
       return;
     }
+    // Бриф через бота: start_param "brief-<token>" → страница брифа (TMA-контекст, контакт из Telegram).
+    // @ts-expect-error — Telegram SDK
+    const sp = window.Telegram?.WebApp?.initDataUnsafe?.start_param as string | undefined;
+    if (sp && sp.startsWith("brief-")) { router.replace(`/brief/${sp.slice(6)}`); return; }
     try {
       const res = await fetch("/api/tma/auth", {
         method: "POST",

@@ -1051,6 +1051,9 @@ export interface Brief {
   project_key: string | null;
   created_at: string;
   submitted_at: string | null;
+  tg_id: number | null;
+  tg_username: string | null;
+  tg_name: string | null;
 }
 
 /** Завести бриф лида (метка — имя/контакт). Возвращает токен для публичной ссылки /brief/<token>. */
@@ -1068,11 +1071,17 @@ export async function getBriefByToken(token: string): Promise<Brief | null> {
   return rows[0] ?? null;
 }
 
-/** Сохранить заполненный бриф (тип проекта + ответы) и пометить отправленным. */
-export async function submitBrief(token: string, projectType: string, payload: Record<string, unknown>): Promise<boolean> {
+/** Сохранить заполненный бриф (тип + ответы) и пометить отправленным. tg — контакт лида из Telegram (если зашёл через бота). */
+export async function submitBrief(token: string, projectType: string, payload: Record<string, unknown>, tg?: { id: number; username?: string; name?: string }): Promise<boolean> {
+  // Метка лида для админа = название из брифа, иначе tg-имя/username.
+  const company = typeof payload.companyName === "string" ? payload.companyName.trim() : "";
+  const label = company || tg?.name || (tg?.username ? `@${tg.username}` : null);
   const rows = await q<{ id: number }>(
-    "UPDATE briefs SET project_type = $2, payload = $3, status = 'submitted', submitted_at = now() WHERE token = $1 RETURNING id",
-    [token, projectType, JSON.stringify(payload)],
+    `UPDATE briefs SET project_type = $2, payload = $3, status = 'submitted', submitted_at = now(),
+       tg_id = COALESCE($4, tg_id), tg_username = COALESCE($5, tg_username), tg_name = COALESCE($6, tg_name),
+       label = COALESCE(label, $7)
+     WHERE token = $1 RETURNING id`,
+    [token, projectType, JSON.stringify(payload), tg?.id ?? null, tg?.username ?? null, tg?.name ?? null, label],
   );
   return rows.length > 0;
 }
