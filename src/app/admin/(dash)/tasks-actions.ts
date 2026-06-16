@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus, moveTaskToProject } from "@/lib/db";
 import { draftTask } from "@/lib/drafter";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients, notifyLogins } from "@/lib/notify";
@@ -53,6 +53,19 @@ export async function deleteTask(id: string): Promise<{ ok?: boolean; error?: st
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
+}
+
+/** Перенести задачу в другой проект (новый № в целевом проекте). Только супер-админ (Никита). */
+export async function moveTask(id: string, targetProjectKey: string): Promise<{ ok?: boolean; to?: string; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Не авторизован" };
+  if (!isSuperAdmin(me)) return { error: "Нет прав" };
+  const res = await moveTaskToProject(id, targetProjectKey);
+  if ("error" in res) return { error: res.error };
+  revalidatePath("/admin");
+  revalidatePath("/admin/tasks");
+  revalidatePath(`/admin/tasks/${res.to}`);
+  return { ok: true, to: res.to };
 }
 
 /** Перевод задачи в «Ревью» с опциональной ссылкой на код. ИИ-ревью запустит поллер. */

@@ -495,6 +495,37 @@ export async function deleteProjectCascade(projectKey: string): Promise<void> {
   });
 }
 
+/**
+ * Перенести задачу в другой проект: меняется project_id/num/readable_id (новый № в целевом проекте).
+ * Комменты/вложения/зависимости висят на tasks.id (int) и следуют за задачей сами. task_reads хранит
+ * readable_id — read-state по старому слагу сбрасываем (безвредно). Транзакция + advisory-лок на № целевого проекта.
+ * Возвращает { from, to } (старый и новый readable_id) — обратный вызов moveTaskToProject(to, исходный проект) откатывает.
+ */
+export async function moveTaskToProject(
+  readableId: string,
+  targetProjectKey: string,
+): Promise<{ from: string; to: string } | { error: string }> {
+  return withTransaction(async (query) => {
+    const task = await query<{ id: number; project_id: number; readable_id: string }>(
+      "SELECT id, project_id, readable_id FROM tasks WHERE readable_id = $1",
+      [readableId],
+    );
+    if (!task[0]) return { error: `Задача ${readableId} не найдена` };
+    const target = await query<{ id: number; key: string }>("SELECT id, key FROM projects WHERE key = $1", [targetProjectKey]);
+    if (!target[0]) return { error: `Проект ${targetProjectKey} не найден` };
+    if (task[0].project_id === target[0].id) return { from: readableId, to: readableId }; // уже в целевом
+    await query("SELECT pg_advisory_xact_lock(hashtext('tasknum'), $1::int)", [target[0].id]);
+    const maxNum = await query<{ n: number | null }>("SELECT max(num) AS n FROM tasks WHERE project_id = $1", [target[0].id]);
+    const num = (maxNum[0]?.n ?? 0) + 1;
+    const newRid = `${target[0].key}-${num}`;
+    await query("UPDATE tasks SET project_id = $2, num = $3, readable_id = $4, updated_at = now() WHERE id = $1", [
+      task[0].id, target[0].id, num, newRid,
+    ]);
+    await query("DELETE FROM task_reads WHERE task_id = $1", [readableId]); // read-state по старому слагу
+    return { from: readableId, to: newRid };
+  });
+}
+
 /** Флаг «показать клиенту онбординг» на проекте. */
 export async function setProjectShowOnboarding(key: string, on: boolean): Promise<void> {
   const p = await getProjectFull(key);

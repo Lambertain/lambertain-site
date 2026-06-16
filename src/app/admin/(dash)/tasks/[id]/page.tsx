@@ -16,6 +16,7 @@ import { DeleteOwnTask } from "./delete-own-task";
 import { DelegateBar } from "./delegate-bar";
 import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
+import { MoveTask } from "./move-task";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
@@ -37,10 +38,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const isAdmin = me.realRole === "admin";
   const backHref = isAdmin ? "/admin/tasks" : "/admin";
 
-  let task, comments, deps, reads, aiStatus, users, tags;
+  let task, comments, deps, reads, aiStatus, users, tags, projects;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    [task, comments, deps, reads, aiStatus, users, tags] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), getTaskAiStatus(id), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id)]);
+    [task, comments, deps, reads, aiStatus, users, tags, projects] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), getTaskAiStatus(id), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), isSuperAdmin(me) ? be.listProjects() : Promise.resolve([])]);
   } catch (e) {
     return (
       <div>
@@ -166,6 +167,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           locale={locale}
           defaultOpen={task.approvalStatus === "pending"}
         />
+      )}
+
+      {/* Перенос задачи в другой проект — только супер-админ (если задача села не в тот проект). */}
+      {isSuperAdmin(me) && projects.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <MoveTask taskId={task.id} projects={projects.filter((p) => p.key !== task.projectKey).map((p) => ({ key: p.key, name: p.name }))} />
+        </div>
       )}
 
       {blockers.length > 0 && (
