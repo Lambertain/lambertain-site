@@ -22,11 +22,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const att = await getDevAttachment(Number(id), projectKey);
   if (!att) return new Response("not found", { status: 404 });
 
-  const filename = (att.name || `file-${id}`).replace(/["\\\r\n]/g, "_");
+  // Content-Disposition — только ASCII (ByteString). Кириллицу/юникод в имени отдаём через filename*=UTF-8'' (RFC 5987).
+  const name = att.name || `file-${id}`;
+  const ascii = name.replace(/[^\x20-\x7E]/g, "_").replace(/["\\\r\n]/g, "_");
+  const utf8 = encodeURIComponent(name);
   return new Response(new Uint8Array(att.data), {
     headers: {
       "Content-Type": att.mime || "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}`,
       "Cache-Control": "private, no-store",
     },
   });
