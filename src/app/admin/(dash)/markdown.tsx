@@ -9,7 +9,15 @@ import { ZoomableImage } from "./zoomable-image";
  * Аннотации размера YouTrack (`{width=..}`) markdown не понимает — срезаем перед рендером.
  */
 function clean(src: string): string {
-  return src.replace(/\{(?:width|height|border)[^}]*\}/gi, "");
+  return src
+    .replace(/\{(?:width|height|border)[^}]*\}/gi, "")
+    // Тела комментов/триажа/итогов хранят HTML-разметку для Telegram (parse_mode=HTML): <b>/<i>/<code>.
+    // На портале рендерим Markdown — конвертируем этот узкий набор тегов, чтобы не показывать <b></b> текстом.
+    // Сырой HTML (rehype-raw) НЕ включаем — переводим только эти теги в Markdown-эквиваленты.
+    .replace(/<\/?(?:b|strong)>/gi, "**")
+    .replace(/<\/?(?:i|em)>/gi, "*")
+    .replace(/<\/?code>/gi, "`")
+    .replace(/<br\s*\/?>/gi, "\n");
 }
 
 const linkStyle: CSSProperties = { color: "var(--accent)", textDecoration: "underline" };
