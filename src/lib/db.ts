@@ -1165,6 +1165,17 @@ export async function saveGuideImage(mime: string, dataB64: string): Promise<num
   const rows = await q<{ id: number }>("INSERT INTO guide_images (mime, data) VALUES ($1, $2) RETURNING id", [mime || "image/png", buf]);
   return rows[0].id;
 }
+/** Вложение задачи для dev-токена — ТОЛЬКО если файл прикреплён к задаче ЭТОГО проекта (иначе null). */
+export async function getDevAttachment(fileId: number, projectKey: string): Promise<{ mime: string | null; name: string | null; data: Buffer } | null> {
+  const rows = await q<{ mime: string | null; name: string | null; data: Buffer }>(
+    `SELECT a.mime, a.name, a.data FROM attachments a
+     JOIN tasks t ON t.id = a.task_id JOIN projects p ON p.id = t.project_id
+     WHERE a.id = $1 AND p.key = $2`,
+    [fileId, projectKey],
+  );
+  return rows[0] ?? null;
+}
+
 export async function getGuideImage(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
   const rows = await q<{ mime: string | null; data: Buffer }>("SELECT mime, data FROM guide_images WHERE id = $1", [id]);
   return rows[0] ?? null;
