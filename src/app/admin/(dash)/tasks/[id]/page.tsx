@@ -17,6 +17,7 @@ import { DelegateBar } from "./delegate-bar";
 import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
 import { MoveTask } from "./move-task";
+import { StatusPicker } from "./status-picker";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
@@ -36,6 +37,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const be = getBackend();
 
   const isAdmin = me.realRole === "admin";
+  const canEditStatus = isAdmin || me.role === "contributor";
   const backHref = isAdmin ? "/admin/tasks" : "/admin";
 
   let task, comments, deps, reads, aiStatus, users, tags, projects;
@@ -98,7 +100,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>
-        {task.state && <span style={ui.monoLabel}>{task.state}</span>}
+        {/* Смена статуса прямо тут — админ/разработчик (не клиент); иначе просто текст статуса. */}
+        {task.state && canEditStatus ? (
+          <StatusPicker taskId={task.id} status={task.state} locale={locale} />
+        ) : (
+          task.state && <span style={ui.monoLabel}>{task.state}</span>
+        )}
         {task.priority && <span style={ui.monoLabel}>· {task.priority}</span>}
       </div>
       <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,32px)", marginTop: 10 }}>{task.summary}</h1>
