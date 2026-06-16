@@ -56,7 +56,7 @@ export default async function HomePage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>{t(locale, "projects.manage")}</Link>
-            <ChatModal projects={chatProjects} locale={locale} isAdmin={isSuperAdmin(me)} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
+            <ChatModal projects={chatProjects} locale={locale} isAdmin={isSuperAdmin(me)} role={me.role} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
           </div>
         </div>
         <DevDashboard projects={dash} devNames={devNames} now={nowMs()} locale={locale} />
@@ -162,7 +162,7 @@ export default async function HomePage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "proj.myProjects")}</h1>
           <span style={{ marginLeft: "auto" }}>
-            <ChatModal projects={projects} locale={locale} isContributor feedbackKey={feedbackKey} />
+            <ChatModal projects={projects} locale={locale} isContributor role={me.role} feedbackKey={feedbackKey} />
           </span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 18 }}>
@@ -217,7 +217,7 @@ export default async function HomePage() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "nav.tasks")}</h1>
         <span style={{ marginLeft: "auto" }}>
-          <ChatModal projects={projects} locale={locale} feedbackKey={feedbackKey} />
+          <ChatModal projects={projects} locale={locale} role={me.role} feedbackKey={feedbackKey} />
         </span>
       </div>
       <TaskTabs
