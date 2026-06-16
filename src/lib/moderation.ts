@@ -126,6 +126,14 @@ export async function deleteCommentAny(commentId: string): Promise<void> {
   await q("DELETE FROM comments WHERE id = $1", [commentId]);
 }
 
+/** Супер-админ редактирует текст ЛЮБОГО коммента (его собственные комменты тоже — у него нет member-логина,
+ *  поэтому «правка своего» по логину ему недоступна). Статус публикации/модерации не трогаем. */
+export async function editCommentAny(commentId: string, body: string): Promise<{ ok: true } | { error: string }> {
+  if (!body.trim()) return { error: "empty" };
+  await q("UPDATE comments SET body = $2 WHERE id = $1", [commentId, body]);
+  return { ok: true };
+}
+
 /** Автор-член удаляет СВОЙ pending-коммент (до модерации). */
 export async function discardOwnPending(commentId: string, authorLogin: string): Promise<{ ok: true } | { error: string }> {
   const rows = await q<{ login: string | null }>(

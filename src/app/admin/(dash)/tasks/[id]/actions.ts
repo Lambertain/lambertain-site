@@ -5,7 +5,7 @@ import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
+import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
@@ -177,6 +177,14 @@ export async function superDeleteComment(commentId: string, taskId: string): Pro
   await deleteCommentAny(commentId);
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
+}
+
+/** Супер-админ редактирует любой коммент (в т.ч. свой — у него нет member-логина для «правки своего»). */
+export async function superEditComment(commentId: string, taskId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
+  if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
+  const r = await editCommentAny(commentId, text);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? { error: r.error } : { ok: true };
 }
 
 /** Модерация (супер-админ): одобрить pending-коммент → публикуется клиенту + пуш. */
