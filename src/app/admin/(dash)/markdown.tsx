@@ -24,8 +24,10 @@ export function Markdown({ children }: { children: string }) {
           img: (props) => <ZoomableImage src={typeof props.src === "string" ? props.src : undefined} alt={props.alt} style={imgStyle} />,
           a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" style={linkStyle} />,
           p: (props) => <p style={{ margin: "8px 0" }}>{props.children}</p>,
-          ul: (props) => <ul style={{ margin: "8px 0", paddingLeft: 20 }}>{props.children}</ul>,
-          ol: (props) => <ol style={{ margin: "8px 0", paddingLeft: 20 }}>{props.children}</ol>,
+          {/* listStyle задаём явно: Tailwind-preflight сбрасывает list-style на none → иначе маркеры/нумерация пропадают. */}
+          ul: (props) => <ul style={{ margin: "8px 0", paddingLeft: 22, listStyleType: "disc", listStylePosition: "outside" }}>{props.children}</ul>,
+          ol: (props) => <ol style={{ margin: "8px 0", paddingLeft: 22, listStyleType: "decimal", listStylePosition: "outside" }}>{props.children}</ol>,
+          li: (props) => <li style={{ margin: "2px 0" }}>{props.children}</li>,
           h1: (props) => <h3 style={{ fontSize: 17, margin: "12px 0 6px" }}>{props.children}</h3>,
           h2: (props) => <h3 style={{ fontSize: 16, margin: "12px 0 6px" }}>{props.children}</h3>,
           h3: (props) => <h4 style={{ fontSize: 15, margin: "10px 0 6px" }}>{props.children}</h4>,
