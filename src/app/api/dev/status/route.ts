@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyAdmin } from "@/lib/notify";
+import { notifyAdmin, notifyLogins } from "@/lib/notify";
 import { submitForModeration } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -51,6 +51,12 @@ export async function POST(req: Request) {
       // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
       if (summary) {
         await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary });
+      }
+      // Постановщик задачи (он же её принимает) — адресное уведомление. Для задач обычного админа (Настя)
+      // это единственный способ узнать, что её задача готова: модерация-итог уходит супер-админу, а ей — вот это.
+      // У супер-админа member-логина нет (reporter null) → notifyLogins его пропустит, дубля не будет.
+      if (task.reporter?.login) {
+        await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${taskId}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
       }
       return NextResponse.json({ ok: true, status: "Review" });
     }

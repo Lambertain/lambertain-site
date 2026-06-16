@@ -1,6 +1,7 @@
 import { getBackend } from "@/lib/tasks";
 import type { TaskFilter } from "@/lib/tasks/types";
-import { getPrincipal } from "@/lib/principal";
+import { getPrincipal, isSuperAdmin } from "@/lib/principal";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -17,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 const STALE_DAYS = 5;
 
-export default async function TasksPage({ searchParams }: { searchParams: Promise<{ project?: string; tab?: string }> }) {
+export default async function TasksPage({ searchParams }: { searchParams: Promise<{ project?: string; tab?: string; mine?: string }> }) {
   const me = await getPrincipal();
   if (!me) redirect("/admin/login");
   const locale = await getLocale();
@@ -26,11 +27,22 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   // —— Админ: задачи попроектно (табы проект → статус), как у разработчика ——
   if (me.role === "admin") {
+    const sp = await searchParams;
+    const superA = isSuperAdmin(me);
+    const mine = sp.mine === "1";
+    // Оба админа (обычный и супер) видят ВСЕ задачи по умолчанию. Тумблер «Мои задачи» — только те, что
+    // поставил текущий пользователь в связке пользователь+роль: супер-админ ставит без member-логина
+    // (reporter IS NULL), обычный админ (напр. Настя) — под своим логином (reporter == он).
+    const taskFilter: TaskFilter = !mine
+      ? { order: "updated_desc", limit: 300 }
+      : superA
+        ? { reporterIsNull: true, order: "updated_desc", limit: 300 }
+        : { reporterLogin: me.youtrackLogin, order: "updated_desc", limit: 300 };
     let projectsList, tasks, reads, projectSeen;
     try {
       [projectsList, tasks, reads, projectSeen] = await Promise.all([
         be.listProjects(),
-        be.listTasks({ order: "updated_desc", limit: 300 }),
+        be.listTasks(taskFilter),
         getReads(readKey),
         getProjectReads(readKey),
       ]);
@@ -42,7 +54,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </div>
       );
     }
-    const projects = projectsList.map((p) => ({ key: p.key, name: p.name }));
+    // В режиме «Мои задачи» показываем только проекты, где есть мои задачи; иначе — все проекты.
+    const visibleKeys = new Set(tasks.map((tk) => tk.projectKey));
+    const projects = (mine ? projectsList.filter((p) => visibleKeys.has(p.key)) : projectsList).map((p) => ({ key: p.key, name: p.name }));
     const depMap = await getDepsFor(tasks.map((tk) => tk.id));
     const board: BoardTask[] = tasks.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
@@ -72,10 +86,20 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       })
       .sort((a, b) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0));
 
+    // Тумблер «Все / Мои задачи». Супер-админ переключает всю массу↔свои; обычный админ — свои+назначенные↔только свои.
+    const pill = (active: boolean): React.CSSProperties => ({
+      ...ui.monoLabel, textDecoration: "none", padding: "6px 12px", borderRadius: 999,
+      border: `1px solid ${active ? "var(--accent-line)" : "var(--border-2)"}`,
+      color: active ? "var(--accent)" : "var(--muted)", background: active ? "rgba(185,255,75,0.06)" : "transparent",
+    });
     return (
       <div>
         <div style={ui.monoLabel}>{t(locale, "tasks.allKicker")}</div>
-        <h1 style={{ ...ui.h1, marginTop: 8 }}>{t(locale, "tasks.allTitle")}</h1>
+        <h1 style={{ ...ui.h1, marginTop: 8 }}>{mine ? t(locale, "tasks.mineTitle") : t(locale, "tasks.allTitle")}</h1>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 4 }}>
+          <Link href="/admin/tasks" style={pill(!mine)}>{t(locale, "tasks.filterAll")}</Link>
+          <Link href="/admin/tasks?mine=1" style={pill(mine)}>{t(locale, "tasks.filterMine")}</Link>
+        </div>
         <TaskTabs
           tasks={board}
           projects={projectsWithNew}

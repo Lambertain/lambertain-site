@@ -249,6 +249,8 @@ export const DICT: Record<string, Entry> = {
   "tasks.clientTitle": { uk: "Мої проєкти", ru: "Мои проекты", en: "My projects" },
   "tasks.clientKicker": { uk: "Мої заявки", ru: "Мои заявки", en: "My requests" },
   "tasks.empty": { uk: "Активних задач немає.", ru: "Активных задач нет.", en: "No active tasks." },
+  "tasks.filterAll": { uk: "Усі", ru: "Все", en: "All" },
+  "tasks.filterMine": { uk: "Мої задачі", ru: "Мои задачи", en: "My tasks" },
   "error.load": { uk: "Помилка завантаження: ", ru: "Ошибка загрузки: ", en: "Load error: " },
 
   // — просрочки —

@@ -134,6 +134,8 @@ export interface TaskFilter {
   projectKey?: string;
   assigneeLogin?: string;
   reporterLogin?: string;
+  /** Постановщик не задан (reporter IS NULL) — «мои задачи» супер-админа (он ставит без member-логина). */
+  reporterIsNull?: boolean;
   /** Только нерешённые (открытые). */
   unresolvedOnly?: boolean;
   order?: "updated_desc" | "updated_asc" | "created_desc";

@@ -111,6 +111,7 @@ export const postgresBackend: TasksBackend = {
     if (filter.projectKey) add("p.key = $$", filter.projectKey);
     if (filter.assigneeLogin) add("a.login = $$", filter.assigneeLogin);
     if (filter.reporterLogin) add("r.login = $$", filter.reporterLogin);
+    if (filter.reporterIsNull) where.push("r.login IS NULL");
     if (filter.unresolvedOnly) where.push("t.resolved_at IS NULL");
     const order =
       filter.order === "updated_asc"
