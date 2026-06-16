@@ -10,6 +10,7 @@ import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { draftClientQuestion } from "@/lib/replies";
 import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
+import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
 import { ESCALATION_MARK, PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
 
   let body: { taskId?: string; question?: string; kind?: string };
   try {
-    body = await req.json();
+    body = await readJsonSmart(req);
   } catch {
     return NextResponse.json({ error: "bad json" }, { status: 400 });
   }

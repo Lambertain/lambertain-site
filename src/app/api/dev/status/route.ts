@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
+import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   if (!projectKey) return NextResponse.json({ error: "invalid token" }, { status: 403 });
 
   let body: { taskId?: string; status?: string; summary?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const taskId = String(body.taskId || "").trim();
   const status = MAP[String(body.status || "")];
   const summary = String(body.summary || "").trim();
