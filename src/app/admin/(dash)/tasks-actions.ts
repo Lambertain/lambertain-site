@@ -35,8 +35,17 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
 export async function deleteTask(id: string): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
-  // Удалять могут админ и клиент.
-  if (me.role !== "admin" && me.role !== "client" && me.realRole !== "admin") return { error: "Нет прав" };
+  const adminOrClient = me.role === "admin" || me.role === "client" || me.realRole === "admin";
+  let allowed = adminOrClient;
+  // Автор (разработчик/сотрудник/клиент) может удалить СВОЮ задачу в окне ДО триажа (ai_status='pending').
+  if (!allowed && me.youtrackLogin) {
+    try {
+      const task = await getBackend().getTask(id);
+      const ai = await getTaskAiStatus(id);
+      if (task.reporter?.login === me.youtrackLogin && ai === "pending") allowed = true;
+    } catch { /* ignore */ }
+  }
+  if (!allowed) return { error: "Нет прав" };
   try {
     await getBackend().deleteTask(id);
     revalidatePath("/admin");

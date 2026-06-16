@@ -361,6 +361,8 @@ export const DICT: Record<string, Entry> = {
   // — страница задачи —
   "task.back": { uk: "← до задач", ru: "← к задачам", en: "← to tasks" },
   "task.description": { uk: "Опис", ru: "Описание", en: "Description" },
+  "task.deleteOwn": { uk: "Видалити задачу", ru: "Удалить задачу", en: "Delete task" },
+  "task.deleteOwnConfirm": { uk: "Видалити задачу? Доступно лише у вікні до тріажу.", ru: "Удалить задачу? Доступно только в окне до триажа.", en: "Delete the task? Only available in the pre-triage window." },
   "task.noDescription": { uk: "Опис відсутній.", ru: "Описание отсутствует.", en: "No description." },
   "task.comments": { uk: "Коментарі", ru: "Комментарии", en: "Comments" },
   "task.noComments": { uk: "Коментарів немає.", ru: "Комментариев нет.", en: "No comments." },
@@ -383,6 +385,7 @@ export const DICT: Record<string, Entry> = {
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
   "comment.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
   "comment.editLocked": { uk: "На коментар вже відповіли — редагування недоступне.", ru: "На комментарий уже ответили — редактирование недоступно.", en: "The comment has been answered — editing is no longer available." },
+  "comment.deleteConfirm": { uk: "Видалити цей коментар?", ru: "Удалить этот комментарий?", en: "Delete this comment?" },
 
   // — ответ клиенту через ИИ (по фидбеку разраба, от лица Lambertain) —
   "creply.open": { uk: "Відповісти клієнту (ІІ)", ru: "Ответить клиенту (ИИ)", en: "Reply to client (AI)" },

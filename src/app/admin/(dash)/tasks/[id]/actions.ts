@@ -5,7 +5,7 @@ import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
-import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
+import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
@@ -122,6 +122,15 @@ export async function editPublishedComment(commentId: string, taskId: string, te
   const me = await getPrincipal();
   if (!me || !me.youtrackLogin) return { error: "Нет прав" };
   const r = await editOwnPublished(commentId, me.youtrackLogin, text);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? { error: r.error } : { ok: true };
+}
+
+/** Автор удаляет СВОЙ опубликованный коммент, пока на него не ответили. */
+export async function deletePublishedComment(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || !me.youtrackLogin) return { error: "Нет прав" };
+  const r = await deleteOwnPublished(commentId, me.youtrackLogin);
   revalidatePath(`/admin/tasks/${taskId}`);
   return "error" in r ? { error: r.error } : { ok: true };
 }

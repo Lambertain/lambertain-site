@@ -101,6 +101,26 @@ export async function editOwnPublished(commentId: string, authorLogin: string, b
   return { ok: true };
 }
 
+/** Автор удаляет СВОЙ опубликованный коммент — пока на него не ответила другая сторона. */
+export async function deleteOwnPublished(commentId: string, authorLogin: string): Promise<{ ok: true } | { error: "not found" | "not your comment" | "answered" }> {
+  if (!authorLogin) return { error: "not your comment" };
+  const rows = await q<{ task_id: number; created_at: string; login: string | null }>(
+    "SELECT c.task_id, c.created_at, m.login FROM comments c LEFT JOIN members m ON m.id = c.author_id WHERE c.id = $1",
+    [commentId],
+  );
+  const r = rows[0];
+  if (!r) return { error: "not found" };
+  if (r.login !== authorLogin) return { error: "not your comment" };
+  const later = await q<{ n: number }>(
+    `SELECT count(*)::int AS n FROM comments c LEFT JOIN members m ON m.id = c.author_id
+     WHERE c.task_id = $1 AND c.created_at > $2 AND (m.login IS DISTINCT FROM $3)`,
+    [r.task_id, r.created_at, authorLogin],
+  );
+  if ((later[0]?.n ?? 0) > 0) return { error: "answered" };
+  await q("DELETE FROM comments WHERE id = $1", [commentId]);
+  return { ok: true };
+}
+
 /** Супер-админ удаляет ЛЮБОЙ коммент (опубликованный или на модерации). */
 export async function deleteCommentAny(commentId: string): Promise<void> {
   await q("DELETE FROM comments WHERE id = $1", [commentId]);

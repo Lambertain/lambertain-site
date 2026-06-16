@@ -12,6 +12,7 @@ import { ReviewActions } from "./review-actions";
 import { CommentsView, type ViewComment } from "./comments-view";
 import { OwnerActionBar } from "./owner-action-bar";
 import { ClientActionBar } from "./client-action-bar";
+import { DeleteOwnTask } from "./delete-own-task";
 import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
 import { Markdown } from "../../markdown";
@@ -127,6 +128,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: aiStatus === "waiting" ? "#e8b339" : "var(--accent)", display: "inline-block", flexShrink: 0 }} />
           <span style={{ fontSize: 14 }}>{t(locale, aiStatus === "waiting" ? "ai.waiting" : "ai.drafting")}</span>
           {isAdmin && <RetryDrafting id={task.id} label={t(locale, "ai.retry")} />}
+        </div>
+      )}
+
+      {/* Автор может удалить свою задачу в окне ДО триажа (пока ai_status=pending). */}
+      {aiStatus === "pending" && !!me.youtrackLogin && task.reporter?.login === me.youtrackLogin && (
+        <div style={{ marginTop: 12 }}>
+          <DeleteOwnTask taskId={task.id} label={t(locale, "task.deleteOwn")} confirmText={t(locale, "task.deleteOwnConfirm")} />
         </div>
       )}
 
