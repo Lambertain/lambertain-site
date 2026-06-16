@@ -58,12 +58,17 @@ export default async function TeamPage() {
     };
   });
 
-  const reqs = requests.map((r) => ({
-    tg_id: r.tg_id,
-    username: r.username,
-    full_name: r.full_name,
-    requested_role: r.requested_role,
-  }));
+  // Заявки от уже присоединившихся (есть tg_link) — не показываем: человек уже в команде
+  // (мог зайти по инвайт-ссылке, а его старая заявка осталась висеть). Иначе дубль и путаница.
+  const linkedTgIds = new Set(links.map((l) => l.tg_id));
+  const reqs = requests
+    .filter((r) => !linkedTgIds.has(r.tg_id))
+    .map((r) => ({
+      tg_id: r.tg_id,
+      username: r.username,
+      full_name: r.full_name,
+      requested_role: r.requested_role,
+    }));
 
   return (
     <div>

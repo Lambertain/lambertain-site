@@ -4,7 +4,7 @@
  * Server-side only.
  */
 import { randomBytes } from "node:crypto";
-import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet } from "./db";
+import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet, deleteAccessRequest } from "./db";
 import { notifyAdmin, notifyLogins } from "./notify";
 import { t, normalizeLocale, DEFAULT_LOCALE } from "./i18n";
 import type { Role } from "./tasks/types";
@@ -62,6 +62,8 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   // Клиент с привязанным набором инструкций — показать его при входе (баннер на /i/<token>).
   if (inv.role === "client" && inv.instruction_set_token && keys[0]) await setProjectOnboardingSet(keys[0], inv.instruction_set_token);
   await markInviteUsed(token, user.id);
+  // Если у человека висела заявка на доступ — он уже вошёл по инвайту, заявку убираем (иначе дубль в «Команде»).
+  await deleteAccessRequest(user.id).catch(() => {});
   await notifyAdmin(
     `✅ <b>${fullName}</b> присоединился по приглашению\n` +
       `Роль: ${ROLE_RU[inv.role] || inv.role}${keys.length ? ` · проекты: ${keys.join(", ")}` : ""}\n` +

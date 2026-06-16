@@ -363,6 +363,7 @@ export async function markInviteUsed(token: string, tgId: number): Promise<void>
 
 /** Привязанные к боту аккаунты (кто присоединился) — для экрана команды. */
 export interface LinkedAccount {
+  tg_id: number;
   login: string;
   role: Role;
   full_name: string | null;
@@ -371,7 +372,7 @@ export interface LinkedAccount {
 }
 export async function listLinks(): Promise<LinkedAccount[]> {
   return q<LinkedAccount>(
-    "SELECT youtrack_login AS login, role, full_name, project_key, linked_at FROM tg_links ORDER BY linked_at DESC",
+    "SELECT tg_id, youtrack_login AS login, role, full_name, project_key, linked_at FROM tg_links ORDER BY linked_at DESC",
   );
 }
 
