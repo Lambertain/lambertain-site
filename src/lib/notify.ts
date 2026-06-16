@@ -1,5 +1,5 @@
 /** Отправка уведомлений в Telegram (адресно по ролям + картинки). Server-side only. */
-import { q, getAttachment } from "./db";
+import { q, getAttachment, logNotification } from "./db";
 import { PUBLIC_SITE } from "./dev-protocol";
 
 /** Кнопка-ссылка под сообщением. */
@@ -16,12 +16,14 @@ function inlineButton(button: LinkButton): Record<string, unknown> {
   return { text: button.text, url: button.url };
 }
 
-/** Отправка текста в произвольный чат Telegram (опц. кнопка). */
+/** Отправка текста в произвольный чат Telegram (опц. кнопка). Пишет результат в notifications_log. */
 export async function sendTo(chatId: number | string, text: string, button?: LinkButton): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token || !chatId) return;
+  let ok = false;
+  let error: string | null = null;
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -32,9 +34,12 @@ export async function sendTo(chatId: number | string, text: string, button?: Lin
         ...(button ? { reply_markup: { inline_keyboard: [[inlineButton(button)]] } } : {}),
       }),
     });
-  } catch {
-    // best-effort
+    ok = r.ok;
+    if (!r.ok) error = (await r.text().catch(() => "")).slice(0, 300); // напр. «bot was blocked by the user»
+  } catch (e) {
+    error = e instanceof Error ? e.message : "fetch error";
   }
+  await logNotification(chatId, text, ok, error);
 }
 
 /** Уведомление админу (Никите). */
@@ -89,10 +94,14 @@ async function tgIdsForLogins(logins: string[]): Promise<number[]> {
   return rows.map((r) => r.tg_id);
 }
 
-/** tg_id участников проекта с указанными ролями (клиент/сотрудник). */
+/** tg_id участников проекта с указанными ролями (клиент/сотрудник). Учитывает и tg_links.project_key,
+ *  и member_projects (сотрудник может вести несколько проектов — иначе рассылка по «не первому» его пропустит). */
 async function tgIdsForProject(projectKey: string, roles: string[]): Promise<number[]> {
   const rows = await q<{ tg_id: number }>(
-    "SELECT DISTINCT tg_id FROM tg_links WHERE project_key = $1 AND role = ANY($2::text[])",
+    `SELECT DISTINCT l.tg_id FROM tg_links l
+      WHERE l.role = ANY($2::text[])
+        AND ( l.project_key = $1
+              OR EXISTS (SELECT 1 FROM member_projects mp WHERE mp.login = l.youtrack_login AND mp.project_key = $1) )`,
     [projectKey, roles],
   );
   return rows.map((r) => r.tg_id);

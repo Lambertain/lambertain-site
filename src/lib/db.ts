@@ -65,6 +65,16 @@ CREATE TABLE IF NOT EXISTS web_login_tokens (
   expires_at  TIMESTAMPTZ NOT NULL,
   used_at     TIMESTAMPTZ
 );
+CREATE TABLE IF NOT EXISTS notifications_log (
+  id         SERIAL PRIMARY KEY,
+  chat_id    TEXT NOT NULL,
+  task_id    TEXT,
+  text       TEXT NOT NULL,
+  ok         BOOLEAN NOT NULL,
+  error      TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_notiflog_chat ON notifications_log (chat_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS project_api_tokens (
   project_key TEXT PRIMARY KEY,
   token       TEXT UNIQUE NOT NULL,
@@ -527,6 +537,31 @@ export async function moveTaskToProject(
   });
 }
 
+/**
+ * Переименовать ключ (слаг) проекта: oldKey → newKey. Меняет readable_id всех задач (LAM-21 → BUK-21),
+ * task_reads (хранит слаг строкой) и project_key во всех связанных таблицах. Транзакция. Токен проекта
+ * НЕ меняется (тот же), дев продолжает работать. Откат — обратный вызов renameProjectKey(newKey, oldKey).
+ */
+export async function renameProjectKey(oldKey: string, newKey: string): Promise<{ tasks: number } | { error: string }> {
+  return withTransaction(async (query) => {
+    const oldP = await query<{ id: number }>("SELECT id FROM projects WHERE key = $1", [oldKey]);
+    if (!oldP[0]) return { error: `проект ${oldKey} не найден` };
+    const clash = await query("SELECT 1 FROM projects WHERE key = $1", [newKey]);
+    if (clash.length) return { error: `ключ ${newKey} уже занят` };
+    const pid = oldP[0].id;
+    await query("UPDATE projects SET key = $2 WHERE id = $1", [pid, newKey]);
+    // readable_id задач: <old>-N → <new>-N
+    const t = await query("UPDATE tasks SET readable_id = $2 || '-' || num WHERE project_id = $1 RETURNING id", [pid, newKey]);
+    // task_reads.task_id хранит слаг строкой ('LAM-21') — переписываем префикс
+    await query("UPDATE task_reads SET task_id = $2 || substring(task_id from position('-' in task_id)) WHERE task_id LIKE $1", [`${oldKey}-%`, newKey]);
+    // все таблицы со столбцом project_key
+    for (const tbl of ["tg_links", "member_projects", "project_api_tokens", "project_guides", "project_reads", "project_secrets", "briefs"]) {
+      await query(`UPDATE ${tbl} SET project_key = $2 WHERE project_key = $1`, [oldKey, newKey]);
+    }
+    return { tasks: t.length };
+  });
+}
+
 /** Флаг «показать клиенту онбординг» на проекте. */
 export async function setProjectShowOnboarding(key: string, on: boolean): Promise<void> {
   const p = await getProjectFull(key);
@@ -752,9 +787,55 @@ export async function assignTask(readableId: string, login: string): Promise<voi
     [readableId, login],
   );
 }
+
+/** Назначить постановщика (reporter) задачи по логину. false — логин/задача не найдены. */
+export async function setTaskReporter(readableId: string, login: string): Promise<boolean> {
+  const rows = await q<{ id: number }>(
+    `UPDATE tasks SET reporter_id = (SELECT id FROM members WHERE login = $2), updated_at = now()
+     WHERE readable_id = $1 AND EXISTS (SELECT 1 FROM members WHERE login = $2) RETURNING id`,
+    [readableId, login],
+  );
+  return rows.length > 0;
+}
 /** Обновить заголовок задачи. */
 export async function setTaskTitle(readableId: string, title: string): Promise<void> {
   await q("UPDATE tasks SET title = $2, updated_at = now() WHERE readable_id = $1", [readableId, title]);
+}
+
+/** Записать факт отправки уведомления в Telegram (для аудита «дошло/не дошло»). Best-effort, не валит отправку. */
+export async function logNotification(chatId: string | number, text: string, ok: boolean, error?: string | null): Promise<void> {
+  const taskId = text.match(/\b[A-Z][A-Z0-9]*-\d+\b/)?.[0] ?? null; // вытащим слаг задачи из текста, если есть
+  await q(
+    "INSERT INTO notifications_log (chat_id, task_id, text, ok, error) VALUES ($1,$2,$3,$4,$5)",
+    [String(chatId), taskId, text.slice(0, 1000), ok, error ?? null],
+  ).catch(() => {});
+}
+
+export interface NotifLogRow {
+  chat_id: string;
+  login: string | null;
+  full_name: string | null;
+  task_id: string | null;
+  text: string;
+  ok: boolean;
+  error: string | null;
+  created_at: string;
+}
+/** Последние уведомления (опц. фильтр по логину получателя или по задаче) — для проверки доставки. */
+export async function getRecentNotifications(filter: { login?: string; taskId?: string; limit?: number }): Promise<NotifLogRow[]> {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (filter.login) { params.push(filter.login); where.push(`l.youtrack_login = $${params.length}`); }
+  if (filter.taskId) { params.push(filter.taskId); where.push(`n.task_id = $${params.length}`); }
+  params.push(Math.min(filter.limit ?? 50, 200));
+  return q<NotifLogRow>(
+    `SELECT n.chat_id, l.youtrack_login AS login, l.full_name, n.task_id, n.text, n.ok, n.error, n.created_at
+       FROM notifications_log n
+       LEFT JOIN tg_links l ON l.tg_id::text = n.chat_id
+      ${where.length ? "WHERE " + where.join(" AND ") : ""}
+      ORDER BY n.created_at DESC LIMIT $${params.length}`,
+    params,
+  );
 }
 
 /** Редактирование полей задачи (заголовок, описание, исполнитель, приоритет) — для админа. */

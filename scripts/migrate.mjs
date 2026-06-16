@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS access_requests (
 CREATE TABLE IF NOT EXISTS web_login_tokens (
   token TEXT PRIMARY KEY, tg_id BIGINT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ);
+CREATE TABLE IF NOT EXISTS notifications_log (
+  id SERIAL PRIMARY KEY, chat_id TEXT NOT NULL, task_id TEXT, text TEXT NOT NULL,
+  ok BOOLEAN NOT NULL, error TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS idx_notiflog_chat ON notifications_log (chat_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS project_api_tokens (
   project_key TEXT PRIMARY KEY, token TEXT UNIQUE NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE TABLE IF NOT EXISTS projects (
