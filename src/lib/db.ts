@@ -797,6 +797,19 @@ export async function setTaskReporter(readableId: string, login: string): Promis
   );
   return rows.length > 0;
 }
+
+/** Массово сменить постановщика: все задачи, где reporter = fromLogin, → toLogin. Возвращает список переназначенных слагов. */
+export async function reassignTasksReporter(fromLogin: string, toLogin: string): Promise<{ tasks: string[] } | { error: string }> {
+  const to = await q<{ id: number }>("SELECT id FROM members WHERE login = $1", [toLogin]);
+  if (!to[0]) return { error: `логин ${toLogin} не найден` };
+  const from = await q<{ id: number }>("SELECT id FROM members WHERE login = $1", [fromLogin]);
+  if (!from[0]) return { error: `логин ${fromLogin} не найден` };
+  const rows = await q<{ readable_id: string }>(
+    "UPDATE tasks SET reporter_id = $2, updated_at = now() WHERE reporter_id = $1 RETURNING readable_id",
+    [from[0].id, to[0].id],
+  );
+  return { tasks: rows.map((r) => r.readable_id) };
+}
 /** Обновить заголовок задачи. */
 export async function setTaskTitle(readableId: string, title: string): Promise<void> {
   await q("UPDATE tasks SET title = $2, updated_at = now() WHERE readable_id = $1", [readableId, title]);
