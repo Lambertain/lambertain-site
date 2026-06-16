@@ -8,7 +8,7 @@ import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask } from "@/lib/db";
-import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
 
@@ -66,14 +66,14 @@ export async function addTaskComment(
       const openBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` };
       if (me.role === "client") {
         // Клиент написал → ответственному разработчику + админу.
-        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
-        await notifyAdmin(`💬 <b>Вопрос клиента</b>\nПроект «${projName}»\n${id}: ${task.summary}`, openBtn);
+        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${projName} · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
+        await notifyAdmin(`💬 <b>Вопрос клиента</b> · ${projName} · ${id}: ${task.summary}`, openBtn);
       } else if (visibility === "client") {
         // Команда ответила клиенту → клиенту/сотруднику проекта.
-        await notifyProjectClients(task.projectKey, `💬 <b>${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
+        await notifyProjectClients(task.projectKey, `💬 <b>${projName} · ${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
       } else if (task.assignee?.login && task.assignee.login !== me.youtrackLogin) {
         // Внутренний коммент → ответственному разработчику.
-        await notifyLogins([task.assignee.login], `📝 <b>${id}</b> (внутр.): ${body.slice(0, 300)}`, imgs, openBtn);
+        await notifyLogins([task.assignee.login], `📝 <b>${projName} · ${id}</b> (внутр.): ${body.slice(0, 300)}`, imgs, openBtn);
       }
     } catch {
       // уведомления не должны валить коммент
@@ -111,8 +111,8 @@ export async function markClientActionDone(taskId: string, data: string): Promis
   await be.addComment(taskId, `✅ <b>Клієнт виконав реєстрацію.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
   // Возвращаем разработчику: уведомляем ответственного, он продолжает (данные — в /api/dev/secrets).
   const dev = proj?.meta.defaultAssignee;
-  if (dev) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${taskId}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});
-  await notifyAdmin(`✅ <b>Клиент выполнил регистрацию</b> · ${taskId}: ${task.summary}`).catch(() => {});
+  if (dev) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${await taskTag(taskId)}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});
+  await notifyAdmin(`✅ <b>Клиент выполнил регистрацию</b> · ${await taskTag(taskId)}: ${task.summary}`).catch(() => {});
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
 }
@@ -128,7 +128,7 @@ export async function delegateTask(taskId: string, employeeLogin: string): Promi
   await assignTask(taskId, employeeLogin);
   const be = getBackend();
   const task = await be.getTask(taskId).catch(() => null);
-  await notifyLogins([employeeLogin], `📋 <b>Вам делеговано задачу</b> · ${taskId}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
+  await notifyLogins([employeeLogin], `📋 <b>Вам делеговано задачу</b> · ${await taskTag(taskId)}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
   await be.addComment(taskId, `➡️ <i>Делеговано співробітнику: ${emp.fullName}.</i>`, "internal").catch(() => {});
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
@@ -217,11 +217,11 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
     if (me.realRole !== "admin" && !isReporter) return { error: "Нет прав" };
     if (accept) {
       await be.updateStatus(id, "Done");
-      if (task.assignee?.login) await notifyLogins([task.assignee.login], `✅ <b>Принято</b> · ${id}: ${task.summary}`).catch(() => {});
+      if (task.assignee?.login) await notifyLogins([task.assignee.login], `✅ <b>Принято</b> · ${await taskTag(id)}: ${task.summary}`).catch(() => {});
     } else {
       await be.updateStatus(id, "Rework");
       if (note?.trim()) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${note.trim()}`, "internal");
-      if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${id}: ${task.summary}${note?.trim() ? `\n${note.trim().slice(0, 300)}` : ""}`).catch(() => {});
+      if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${await taskTag(id)}: ${task.summary}${note?.trim() ? `\n${note.trim().slice(0, 300)}` : ""}`).catch(() => {});
     }
     revalidatePath(`/admin/tasks/${id}`);
     revalidatePath("/admin");

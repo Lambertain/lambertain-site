@@ -6,7 +6,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { listSkills, logUsage, setTaskAiStatus, setTaskTags, assignTask, setTaskTitle, getTaskImages } from "./db";
-import { notifyLogins, notifyProjectClients, notifyAdmin } from "./notify";
+import { notifyLogins, notifyProjectClients, notifyAdmin, taskTag } from "./notify";
 import { getBackend } from "./tasks";
 
 const MODEL = process.env.STRUCTURER_MODEL || "claude-opus-4-8";
@@ -110,7 +110,7 @@ export async function draftTask(taskId: string): Promise<void> {
         const assignee = inp.assigneeLogin || project.meta.defaultAssignee || null;
         if (assignee) {
           await assignTask(taskId, assignee);
-          await notifyLogins([assignee], `🆕 <b>Задача готова</b> · ${taskId}: ${inp.title || task.summary}\n${tagLine}`).catch(() => {});
+          await notifyLogins([assignee], `🆕 <b>Задача готова</b> · ${await taskTag(taskId)}: ${inp.title || task.summary}\n${tagLine}`).catch(() => {});
         }
         await setTaskAiStatus(taskId, "done");
         return;
@@ -124,11 +124,11 @@ export async function draftTask(taskId: string): Promise<void> {
             // Внутренняя задача (админ → разработчику мимо клиента): уточнение идёт АДМИНУ-постановщику,
             // НЕ клиенту — иначе скрытность задачи протечёт. Коммент тоже внутренний.
             await be.addComment(taskId, `🟡 <b>Вопрос:</b> ${question}`, "internal");
-            await notifyAdmin(`🟡 <b>Уточнение по внутренней задаче</b> · ${taskId}: ${task.summary}\n${question}`).catch(() => {});
+            await notifyAdmin(`🟡 <b>Уточнение по внутренней задаче</b> · ${await taskTag(taskId)}: ${task.summary}\n${question}`).catch(() => {});
           } else {
             await be.addComment(taskId, `🟡 <b>Вопрос:</b> ${question}`, "client");
-            await notifyProjectClients(task.projectKey, `🟡 <b>Уточнение по задаче</b> · ${taskId}: ${task.summary}\n${question}\nОтветьте в задаче на портале.`).catch(() => {});
-            if (task.reporter?.login) await notifyLogins([task.reporter.login], `🟡 <b>Уточнение по задаче</b> · ${taskId}: ${question}`).catch(() => {});
+            await notifyProjectClients(task.projectKey, `🟡 <b>Уточнение по задаче</b> · ${await taskTag(taskId)}: ${task.summary}\n${question}\nОтветьте в задаче на портале.`).catch(() => {});
+            if (task.reporter?.login) await notifyLogins([task.reporter.login], `🟡 <b>Уточнение по задаче</b> · ${await taskTag(taskId)}: ${question}`).catch(() => {});
           }
         }
         await setTaskAiStatus(taskId, "waiting");
@@ -144,11 +144,11 @@ export async function draftTask(taskId: string): Promise<void> {
     const assignee = project.meta.defaultAssignee || null;
     if (assignee) {
       await assignTask(taskId, assignee);
-      await notifyLogins([assignee], `🆕 <b>Задача</b> · ${taskId}: ${task.summary}`).catch(() => {});
+      await notifyLogins([assignee], `🆕 <b>Задача</b> · ${await taskTag(taskId)}: ${task.summary}`).catch(() => {});
     }
     await setTaskAiStatus(taskId, "done");
   } catch (e) {
-    await notifyAdmin(`⚠️ Ошибка триажа ${taskId}: ${e instanceof Error ? e.message : "—"}`).catch(() => {});
+    await notifyAdmin(`⚠️ Ошибка триажа ${await taskTag(taskId)}: ${e instanceof Error ? e.message : "—"}`).catch(() => {});
     await setTaskAiStatus(taskId, null).catch(() => {});
   } finally {
     await logUsage(MODEL, "triage", inTok, outTok).catch(() => {});

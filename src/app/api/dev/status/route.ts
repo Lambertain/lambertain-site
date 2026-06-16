@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyAdmin, notifyLogins } from "@/lib/notify";
+import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
 import { submitForModeration } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       if (task.autoDone) {
         await be.updateStatus(taskId, "Done");
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client");
-        await notifyAdmin(`✅ <b>Авто-готово</b> · ${taskId}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+        await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
         return NextResponse.json({ ok: true, status: "Done" });
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       // это единственный способ узнать, что её задача готова: модерация-итог уходит супер-админу, а ей — вот это.
       // У супер-админа member-логина нет (reporter null) → notifyLogins его пропустит, дубля не будет.
       if (task.reporter?.login) {
-        await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${taskId}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+        await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(taskId)}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
       }
       return NextResponse.json({ ok: true, status: "Review" });
     }

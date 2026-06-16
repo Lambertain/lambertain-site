@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyAdmin, notifyProjectClients } from "@/lib/notify";
+import { notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
 import { classifyHandoff, generateGuide } from "@/lib/handoff-classify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       await setClientAction(taskId, full, guideId);
       await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — нижче в задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client").catch(() => {});
       if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
-      await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${taskId}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => {});
+      await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => {});
       return NextResponse.json({ ok: true, handedOff: "client", needGuide: cls.guideId == null, note: "Запрос ушёл клиенту с инструкцией. Бери следующую незаблокированную задачу." });
     }
 
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const ownerText = cls.ownerText || action;
     await setOwnerAction(taskId, ownerText);
     if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
-    await notifyAdmin(`🛠 <b>Нужно действие владельца</b> · ${taskId}: ${task.summary}\n${ownerText.slice(0, 600)}`, taskBtn).catch(() => {});
+    await notifyAdmin(`🛠 <b>Нужно действие владельца</b> · ${await taskTag(taskId)}: ${task.summary}\n${ownerText.slice(0, 600)}`, taskBtn).catch(() => {});
     return NextResponse.json({ ok: true, handedOff: "owner", note: "Клиент видит «в работе». Бери следующую незаблокированную задачу." });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });

@@ -43,6 +43,18 @@ export async function notifyAdmin(text: string, button?: LinkButton): Promise<vo
   if (chat) await sendTo(chat, text, button);
 }
 
+/**
+ * Единый ярлык задачи для ВСЕХ уведомлений (всем ролям): «Название проекта · СЛАГ».
+ * Проектов много, по слагам их не запомнить — поэтому в каждом пуше пишем и имя проекта.
+ * Ключ проекта берём из слага (`ZR-12` → `ZR`); если проект не найден — отдаём просто слаг.
+ */
+export async function taskTag(taskId: string): Promise<string> {
+  const key = String(taskId).split("-")[0];
+  if (!key) return taskId;
+  const rows = await q<{ name: string }>("SELECT name FROM projects WHERE key = $1", [key]);
+  return rows[0]?.name ? `${rows[0].name} · ${taskId}` : taskId;
+}
+
 /** id вложений (/api/files/<id>) из текста — чтобы дослать их картинками. */
 export function attachmentIdsIn(...texts: (string | null | undefined)[]): number[] {
   const ids = new Set<number>();

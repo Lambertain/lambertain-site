@@ -7,7 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { getBackend } from "@/lib/tasks";
-import { notifyLogins, notifyProjectClients } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { revalidatePath } from "next/cache";
@@ -42,9 +42,9 @@ export async function POST(req: Request) {
   // Review → постановщику (reporter) на приёмку: комментарий-итог + пуш.
   if (statusBucket(status) === "review") {
     if (summary) await be.addComment(readableId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання.`, "internal").catch(() => {});
-    if (task.reporter?.login) await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${readableId}: ${task.summary}${summary ? `\n\n${summary}` : ""}`, [], link).catch(() => {});
+    if (task.reporter?.login) await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(readableId)}: ${task.summary}${summary ? `\n\n${summary}` : ""}`, [], link).catch(() => {});
   } else if (statusBucket(status) === "done") {
-    await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${readableId}: ${task.summary}`).catch(() => {});
+    await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${await taskTag(readableId)}: ${task.summary}`).catch(() => {});
   }
   revalidatePath("/admin");
   revalidatePath("/admin/tasks");

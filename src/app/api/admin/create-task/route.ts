@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { getBackend } from "@/lib/tasks";
 import { setTaskAiStatus } from "@/lib/db";
-import { notifyLogins, notifyProjectClients } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         projectKey, summary: title.slice(0, 120), description,
         assigneeLogin: null, reporterLogin: null, approvalStatus: "approved", createdByRole: "admin", internal: false,
       });
-      await notifyProjectClients(projectKey, `❓ <b>Питання по проекту</b> · ${task.id}: ${task.summary}\nВідкрийте задачу на порталі та дайте відповідь у коментарях.`, [], { text: "Відкрити", url: `${PORTAL_BASE}/admin/tasks/${task.id}` }).catch(() => {});
+      await notifyProjectClients(projectKey, `❓ <b>Питання по проекту</b> · ${await taskTag(task.id)}: ${task.summary}\nВідкрийте задачу на порталі та дайте відповідь у коментарях.`, [], { text: "Відкрити", url: `${PORTAL_BASE}/admin/tasks/${task.id}` }).catch(() => {});
       return NextResponse.json({ id: task.id, url: task.url, recipient: "client" });
     }
     if (triage) {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
       assigneeLogin: assignee, reporterLogin: null, approvalStatus: "approved", createdByRole: "admin", internal,
     });
     if (assignee) {
-      await notifyLogins([assignee], `🆕 <b>Нова задача</b> · ${task.id}: ${task.summary}\n${PORTAL_BASE}/admin/tasks/${task.id}`).catch(() => {});
+      await notifyLogins([assignee], `🆕 <b>Нова задача</b> · ${await taskTag(task.id)}: ${task.summary}\n${PORTAL_BASE}/admin/tasks/${task.id}`).catch(() => {});
     }
     return NextResponse.json({ id: task.id, url: task.url, assignee });
   } catch (e) {

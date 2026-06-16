@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { getProjectKeyByToken } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { draftClientQuestion } from "@/lib/replies";
-import { notifyAdmin, notifyLogins } from "@/lib/notify";
+import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
 import { submitForModeration } from "@/lib/moderation";
 import { ESCALATION_MARK, PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       // Постановщик-член (напр. админ Настя) получает уведомление; иначе — супер-админ (Никита).
       const body = `🔧 Вопрос разработчика (нужно решение):\n\n${question}`;
       await be.addComment(taskId, body, "internal");
-      const msg = `🔧 <b>Вопрос разработчика</b> · ${taskId}: ${task.summary}\n${question.slice(0, 400)}`;
+      const msg = `🔧 <b>Вопрос разработчика</b> · ${await taskTag(taskId)}: ${task.summary}\n${question.slice(0, 400)}`;
       if (task.reporter?.login) await notifyLogins([task.reporter.login], msg, [], openBtn);
       else await notifyAdmin(msg, openBtn);
       return NextResponse.json({ ok: true, escalatedTo: task.reporter?.login || "admin" });

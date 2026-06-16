@@ -4,7 +4,7 @@ import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import type { Principal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
-import { notifyLogins, notifyAdmin, notifyProjectClients } from "@/lib/notify";
+import { notifyLogins, notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { projectHasClient, appendRequestBlocks, setTaskAiStatus, type ReqBlock } from "@/lib/db";
 
@@ -31,13 +31,13 @@ async function approvalFor(me: Principal, projectKey: string): Promise<{ approva
 }
 
 async function notifyPendingApproval(approver: "client" | "admin", projectKey: string, taskId: string, summary: string): Promise<void> {
-  if (approver === "client") await notifyProjectClients(projectKey, `🟠 <b>Новая задача — нужно подтверждение</b> · ${taskId}: ${summary}`, [], taskBtn(taskId));
-  else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${taskId}: ${summary}`, taskBtn(taskId));
+  if (approver === "client") await notifyProjectClients(projectKey, `🟠 <b>Новая задача — нужно подтверждение</b> · ${await taskTag(taskId)}: ${summary}`, [], taskBtn(taskId));
+  else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${await taskTag(taskId)}: ${summary}`, taskBtn(taskId));
 }
 /** Уведомить ответственного разработчика о новой задаче (best-effort). */
 async function notifyNewTask(task: { id: string; summary: string; assignee?: { login: string } | null }): Promise<void> {
   try {
-    if (task.assignee?.login) await notifyLogins([task.assignee.login], `🆕 <b>Новая задача</b> · ${task.id}: ${task.summary}`, [], taskBtn(task.id));
+    if (task.assignee?.login) await notifyLogins([task.assignee.login], `🆕 <b>Новая задача</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id));
   } catch {
     // best-effort
   }
@@ -98,9 +98,9 @@ export async function createRequestTask(
       });
       await appendRequestBlocks(task.id, blocks);
       if (recipient === "admin") {
-        await notifyAdmin(`🔧 <b>Запрос разработчика</b> · проект «${project?.name || projectKey}» · ${task.id}: ${task.summary}`, taskBtn(task.id)).catch(() => {});
+        await notifyAdmin(`🔧 <b>Запрос разработчика</b> · ${await taskTag(task.id)}: ${task.summary}`, taskBtn(task.id)).catch(() => {});
       } else {
-        await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${task.id}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
+        await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
       }
       return { id: task.id, url: task.url };
     }
@@ -124,7 +124,7 @@ export async function createRequestTask(
     });
     await appendRequestBlocks(task.id, blocks);
     if (isFeedback) {
-      await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${task.id}: ${task.summary}\nОт: ${me.fullName}`, taskBtn(task.id)).catch(() => {});
+      await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${await taskTag(task.id)}: ${task.summary}\nОт: ${me.fullName}`, taskBtn(task.id)).catch(() => {});
     } else if (appr.pending && appr.approver) {
       // Задача ждёт утверждения; ИИ-проработку запустим только после апрува (можно отредактировать до этого).
       // best-effort: сбой уведомления не должен превращать уже созданную задачу в ошибку для пользователя.

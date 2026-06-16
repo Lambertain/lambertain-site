@@ -5,7 +5,7 @@
  * После апрува/правки коммент публикуется и клиент получает уведомление. Server-side only.
  */
 import { getBackend } from "./tasks";
-import { notifyAdmin, notifyProjectClients, attachmentIdsIn } from "./notify";
+import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag } from "./notify";
 import { q } from "./db";
 import { PORTAL_BASE } from "./dev-protocol";
 
@@ -18,13 +18,13 @@ const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url:
 export async function submitForModeration(taskId: string, body: string, opts?: { authorLogin?: string; taskSummary?: string }): Promise<void> {
   await getBackend().addComment(taskId, body, "client", opts?.authorLogin, false);
   const summary = opts?.taskSummary ?? (await getBackend().getTask(taskId).then((t) => t.summary).catch(() => ""));
-  await notifyAdmin(`🛡 <b>Коммент на модерацию</b> · ${taskId}: ${summary}\n${body.slice(0, 400)}`, taskBtn(taskId)).catch(() => {});
+  await notifyAdmin(`🛡 <b>Коммент на модерацию</b> · ${await taskTag(taskId)}: ${summary}\n${body.slice(0, 400)}`, taskBtn(taskId)).catch(() => {});
 }
 
-type Row = { id: number; body: string; readable_id: string; project_key: string; summary: string };
+type Row = { id: number; body: string; readable_id: string; project_key: string; project_name: string; summary: string };
 async function commentInfo(commentId: string): Promise<Row | null> {
   const rows = await q<Row>(
-    `SELECT c.id, c.body, t.readable_id, p.key AS project_key, t.title AS summary
+    `SELECT c.id, c.body, t.readable_id, p.key AS project_key, p.name AS project_name, t.title AS summary
      FROM comments c JOIN tasks t ON t.id = c.task_id JOIN projects p ON p.id = t.project_id
      WHERE c.id = $1`,
     [commentId],
@@ -39,7 +39,7 @@ export async function approveModeratedComment(commentId: string): Promise<{ task
   await q("UPDATE comments SET approved = true WHERE id = $1", [commentId]);
   await notifyProjectClients(
     r.project_key,
-    `💬 <b>${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
+    `💬 <b>${r.project_name} · ${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
     attachmentIdsIn(r.body),
     taskBtn(r.readable_id),
   ).catch(() => {});

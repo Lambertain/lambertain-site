@@ -6,7 +6,7 @@ import { getBackend } from "@/lib/tasks";
 import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus, moveTaskToProject } from "@/lib/db";
 import { draftTask } from "@/lib/drafter";
 import { statusBucket } from "@/lib/statuses";
-import { notifyProjectClients, notifyLogins } from "@/lib/notify";
+import { notifyProjectClients, notifyLogins, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { revalidatePath } from "next/cache";
 
@@ -21,7 +21,7 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
     if (statusBucket(status) === "done") {
       try {
         const task = await getBackend().getTask(id);
-        await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${id}: ${task.summary}`);
+        await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${await taskTag(id)}: ${task.summary}`);
       } catch {
         // best-effort
       }
@@ -109,7 +109,7 @@ export async function setApproval(id: string, status: "approved" | "rejected"): 
       try {
         const task = await getBackend().getTask(id);
         if (task.reporter?.login) {
-          await notifyLogins([task.reporter.login], `↩️ <b>Возвращено на доработку</b> · ${id}: ${task.summary}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` });
+          await notifyLogins([task.reporter.login], `↩️ <b>Возвращено на доработку</b> · ${await taskTag(id)}: ${task.summary}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` });
         }
       } catch { /* уведомление не критично */ }
     }
