@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide, guideText } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide, guideText, getProjectEmployees } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -13,6 +13,7 @@ import { CommentsView, type ViewComment } from "./comments-view";
 import { OwnerActionBar } from "./owner-action-bar";
 import { ClientActionBar } from "./client-action-bar";
 import { DeleteOwnTask } from "./delete-own-task";
+import { DelegateBar } from "./delegate-bar";
 import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
 import { Markdown } from "../../markdown";
@@ -58,6 +59,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   // Гайд-инструкция к действию клиента (как зарегистрировать) — если привязан, на локали пользователя.
   const cg = task.clientActionGuide ? await getGuide(task.clientActionGuide) : null;
   const clientGuide = cg ? guideText(cg, locale) : null;
+  // Клиент может делегировать задачу сотруднику своего проекта (если такие есть).
+  const employees = me.role === "client" ? await getProjectEmployees(id.split("-")[0]) : [];
 
   // Новые комменты — появившиеся после последнего открытия задачи.
   const prevRead = reads.get(id) ?? 0;
@@ -110,6 +113,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       {/* Нужно действие КЛИЕНТА (зарегистрировать/дать доступ) — клиенту и админу: инструкция + поле + «Готово» */}
       {task.clientAction && (me.role === "client" || isAdmin) && (
         <ClientActionBar taskId={task.id} action={task.clientAction} guide={clientGuide} />
+      )}
+
+      {/* Клиент делегирует задачу своему сотруднику (если в проекте есть сотрудники) */}
+      {me.role === "client" && employees.length > 0 && !task.internal && (
+        <DelegateBar taskId={task.id} employees={employees} locale={locale} />
       )}
 
       {/* Теги триажа (тип/сложность/скилы) — команде, не клиенту */}

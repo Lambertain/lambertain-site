@@ -750,6 +750,15 @@ export async function commentTimesByTasks(readableIds: string[]): Promise<Map<st
   }
   return out;
 }
+/** Сотрудники проекта (для делегирования клиентом). */
+export async function getProjectEmployees(projectKey: string): Promise<{ login: string; fullName: string }[]> {
+  const rows = await q<{ login: string; full_name: string | null }>(
+    `SELECT m.login, m.full_name FROM member_projects mp JOIN members m ON m.login = mp.login
+     WHERE mp.project_key = $1 AND m.role = 'employee' ORDER BY m.full_name`,
+    [projectKey],
+  );
+  return rows.map((r) => ({ login: r.login, fullName: r.full_name || r.login }));
+}
 /** Назначить исполнителя по логину. Статус НЕ меняем — «В работе» ставит сам разработчик, коли реально взяв задачу. */
 export async function assignTask(readableId: string, login: string): Promise<void> {
   await q(

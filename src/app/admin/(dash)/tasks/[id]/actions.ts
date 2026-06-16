@@ -7,7 +7,7 @@ import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull } from "@/lib/db";
+import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
@@ -113,6 +113,23 @@ export async function markClientActionDone(taskId: string, data: string): Promis
   const dev = proj?.meta.defaultAssignee;
   if (dev) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${taskId}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});
   await notifyAdmin(`✅ <b>Клиент выполнил регистрацию</b> · ${taskId}: ${task.summary}`).catch(() => {});
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return { ok: true };
+}
+
+/** Клиент делегирует задачу одному из сотрудников своего проекта (assignee + уведомление). */
+export async function delegateTask(taskId: string, employeeLogin: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.role !== "client") return { error: "Нет прав" };
+  const projectKey = taskId.split("-")[0];
+  const emps = await getProjectEmployees(projectKey);
+  const emp = emps.find((e) => e.login === employeeLogin);
+  if (!emp) return { error: "Сотрудник не найден в проекте" };
+  await assignTask(taskId, employeeLogin);
+  const be = getBackend();
+  const task = await be.getTask(taskId).catch(() => null);
+  await notifyLogins([employeeLogin], `📋 <b>Вам делеговано задачу</b> · ${taskId}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
+  await be.addComment(taskId, `➡️ <i>Делеговано співробітнику: ${emp.fullName}.</i>`, "internal").catch(() => {});
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
 }
