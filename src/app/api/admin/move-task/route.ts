@@ -5,6 +5,7 @@
  * Откат: вызвать повторно с { readableId: <новый>, targetProjectKey: <исходный проект> }.
  */
 import { NextResponse } from "next/server";
+import { readJsonSmart } from "@/lib/req-body";
 import { moveTaskToProject } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   if (!token || token !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   let body: { readableId?: string; targetProjectKey?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const readableId = String(body.readableId || "").trim();
   const targetProjectKey = String(body.targetProjectKey || "").trim();
   if (!readableId || !targetProjectKey) return NextResponse.json({ error: "readableId и targetProjectKey обязательны" }, { status: 400 });

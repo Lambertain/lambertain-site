@@ -7,6 +7,7 @@
 import { NextResponse, after } from "next/server";
 import { claimTaskForTriage } from "@/lib/db";
 import { draftTask } from "@/lib/drafter";
+import { readJsonSmart } from "@/lib/req-body";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   if (!token || token !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   let body: { taskId?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const taskId = String(body.taskId || "").trim();
   if (!taskId) return NextResponse.json({ error: "taskId required" }, { status: 400 });
 

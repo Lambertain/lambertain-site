@@ -7,6 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { getProjectFull, setProjectMeta } from "@/lib/db";
+import { readJsonSmart } from "@/lib/req-body";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -22,7 +23,7 @@ function auth(req: Request): NextResponse | null {
 export async function POST(req: Request) {
   const bad = auth(req); if (bad) return bad;
   let body: { projectKey?: string; spec?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   if (!projectKey) return NextResponse.json({ error: "projectKey required" }, { status: 400 });
   const proj = await getProjectFull(projectKey);

@@ -9,6 +9,7 @@ import { NextResponse, after } from "next/server";
 import { randomBytes } from "node:crypto";
 import { getProjectFull, setProjectMeta, getProjectTokens, setProjectToken } from "@/lib/db";
 import { layProtocol } from "@/lib/protocol-deploy";
+import { readJsonSmart } from "@/lib/req-body";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
   if (bearer(req) !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   let body: { projectKey?: string; devGit?: string; clientGit?: string; defaultAssignee?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   if (!projectKey) return NextResponse.json({ error: "projectKey required" }, { status: 400 });
 

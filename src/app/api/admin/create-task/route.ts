@@ -8,6 +8,7 @@
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN> (переменная окружения портала).
  */
 import { NextResponse } from "next/server";
+import { readJsonSmart } from "@/lib/req-body";
 import { getBackend } from "@/lib/tasks";
 import { setTaskAiStatus } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
   if (!token || token !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   let body: { projectKey?: string; title?: string; description?: string; assigneeLogin?: string; internal?: boolean; triage?: boolean; recipient?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   const title = String(body.title || "").trim();
   const description = String(body.description || "");

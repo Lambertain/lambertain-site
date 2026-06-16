@@ -6,6 +6,7 @@
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse } from "next/server";
+import { readJsonSmart } from "@/lib/req-body";
 import { getBackend } from "@/lib/tasks";
 import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
   if (!token || token !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
   let body: { readableId?: string; status?: string; summary?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const readableId = String(body.readableId || "").trim();
   const raw = String(body.status || "").trim();
   const status = ALIAS[raw.toLowerCase()] || raw;
