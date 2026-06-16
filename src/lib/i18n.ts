@@ -157,6 +157,7 @@ export const DICT: Record<string, Entry> = {
   // — новая задача —
   "newtask.kicker": { uk: "Постановка", ru: "Постановка", en: "New" },
   "newtask.title": { uk: "Нова задача", ru: "Новая задача", en: "New task" },
+  "newtask.pickProject": { uk: "Оберіть проєкт для задачі", ru: "Выберите проект для задачи", en: "Choose a project for the task" },
   "newtask.self": { uk: "Собі (особиста)", ru: "Себе (личная)", en: "To myself (personal)" },
   "newtask.selfHint": { uk: "Внутрішня задача — без розробника, клієнт не бачить.", ru: "Внутренняя задача — без разработчика, клиент не видит.", en: "Internal task — no developer, client can't see it." },
   "newtask.internal": { uk: "Внутрішня — клієнт не бачить", ru: "Внутренняя — клиент не видит", en: "Internal — hidden from client" },

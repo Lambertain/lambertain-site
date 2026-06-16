@@ -41,9 +41,9 @@ function buildBlocks(text: string, atts: Att[]): Block[] {
   return blocks;
 }
 
-export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, feedbackKey }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; isAdmin?: boolean; feedbackKey?: string }) {
-  // Дефолт — первый НЕ-фидбек проект (Lamb.dev не должен быть выбран по умолчанию).
-  const [projectKey, setProjectKey] = useState((projects.find((p) => p.key !== feedbackKey) ?? projects[0])?.key ?? "");
+export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, feedbackKey, lockedProject }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; isAdmin?: boolean; feedbackKey?: string; lockedProject?: string }) {
+  // lockedProject — проект уже выбран явным шагом до формы; иначе дефолт — первый НЕ-фидбек проект.
+  const [projectKey, setProjectKey] = useState(lockedProject ?? (projects.find((p) => p.key !== feedbackKey) ?? projects[0])?.key ?? "");
   const [recipient, setRecipient] = useState<"admin" | "client">("admin");
   const [selfTask, setSelfTask] = useState(false);
   const [internalTask, setInternalTask] = useState(false); // админ: задача разработчику мимо клиента
@@ -233,12 +233,12 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
       {/* проект */}
       <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={ui.monoLabel}>{t(locale, "field.project")}:</span>
-        {projects.length > 1 ? (
+        {lockedProject || projects.length <= 1 ? (
+          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projects.find((p) => p.key === projectKey)?.name || projects[0]?.name || "—"}</span>
+        ) : (
           <select value={projectKey} onChange={(e) => setProjectKey(e.target.value)} style={{ ...ui.input, width: "auto", flex: 1, padding: "6px 10px" }}>
             {projects.map((p) => (<option key={p.key} value={p.key}>{p.name}</option>))}
           </select>
-        ) : (
-          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projects[0] ? projects[0].name : "—"}</span>
         )}
       </div>
 
