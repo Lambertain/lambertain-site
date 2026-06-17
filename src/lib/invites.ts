@@ -6,6 +6,7 @@
 import { randomBytes } from "node:crypto";
 import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet, deleteAccessRequest } from "./db";
 import { notifyAdmin, notifyLogins } from "./notify";
+import { notifyProjectOnboarding } from "./onboarding-notify";
 import { t, normalizeLocale, DEFAULT_LOCALE } from "./i18n";
 import type { Role } from "./tasks/types";
 import type { TgUser } from "./telegram-auth";
@@ -72,5 +73,8 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   // Приветствие новому участнику — любой роли, на локали его устройства.
   const loc = normalizeLocale(user.languageCode) || DEFAULT_LOCALE;
   await notifyLogins([login], t(loc, "welcome.joined", { role: t(loc, `role.${inv.role}`) })).catch(() => {});
+  // Онбординг по проектам: разработчику — сколько задач в работе; клиенту/сотруднику — что уже выполнено
+  // (если задачи закрыли до его добавления — иначе он этого не увидит).
+  if (keys.length) await notifyProjectOnboarding(login, inv.role, keys).catch(() => {});
   return true;
 }

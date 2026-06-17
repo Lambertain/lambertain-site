@@ -2,9 +2,10 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember, getUserProjectKeys } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { sendTo, notifyLogins } from "@/lib/notify";
+import { sendTo } from "@/lib/notify";
+import { notifyProjectOnboarding } from "@/lib/onboarding-notify";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
 
@@ -68,6 +69,8 @@ export async function approveAccess(
     if (role === "contributor" && projectKey) await setDevProjects(login, [projectKey]);
     await deleteAccessRequest(tgId);
     await sendTo(tgId, "✅ Доступ открыт. Откройте PM-портал через меню бота — теперь вы авторизованы.");
+    // Онбординг по проекту: разработчику — задачи в работе; клиенту/сотруднику — что уже выполнено.
+    if (projectKey) await notifyProjectOnboarding(login, role, [projectKey]).catch(() => {});
     revalidatePath("/admin/team");
     return { ok: true };
   } catch (e) {
@@ -82,6 +85,8 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
     if (!login) return { error: "no login" };
     const be = getBackend();
     const user = (await be.listUsers()).find((u) => u.login === login);
+    // Проекты ДО изменения — чтобы уведомлять только о НОВЫХ (добавленных), а не о всех при каждом сохранении.
+    const before = await getUserProjectKeys(login).catch(() => [] as string[]);
     if (user?.role === "client") {
       await setLinkProject(login, keys[0] ?? null);
     } else if (user?.role === "employee") {
@@ -89,12 +94,9 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
     } else {
       await setDevProjects(login, keys);
     }
-    // Уведомить разработчика/сотрудника о назначении на проект(ы).
-    if ((user?.role === "contributor" || user?.role === "employee") && keys.length) {
-      const projects = await be.listProjects().catch(() => []);
-      const names = keys.map((k) => projects.find((p) => p.key === k)?.name || k).join(", ");
-      await notifyLogins([login], `📋 <b>Вас назначили на проект(ы):</b> ${names}\nОткройте портал — детали и задачи там.`).catch(() => {});
-    }
+    // Онбординг ТОЛЬКО по добавленным проектам: разработчику — задачи в работе; клиенту/сотруднику — что уже выполнено.
+    const added = keys.filter((k) => !before.includes(k));
+    if (user?.role && added.length) await notifyProjectOnboarding(login, user.role, added).catch(() => {});
     revalidatePath("/admin/team");
     revalidatePath("/admin");
     return { ok: true };

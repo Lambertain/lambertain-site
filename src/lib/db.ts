@@ -965,6 +965,23 @@ export async function getAttachment(id: number): Promise<{ mime: string | null; 
   return rows[0] ?? null;
 }
 
+/**
+ * Все ключи проектов пользователя (объединение): для разработчика — где он defaultAssignee;
+ * для клиента/сотрудника — member_projects ∪ tg_links.project_key. Нужно, чтобы при назначении на проекты
+ * слать онбординг-уведомление только по НОВЫМ (добавленным) проектам, а не по всем при каждом сохранении.
+ */
+export async function getUserProjectKeys(login: string): Promise<string[]> {
+  const rows = await q<{ key: string }>(
+    `SELECT p.key FROM projects p WHERE p.meta->>'defaultAssignee' = $1
+       UNION
+     SELECT project_key AS key FROM member_projects WHERE login = $1
+       UNION
+     SELECT project_key AS key FROM tg_links WHERE youtrack_login = $1 AND project_key IS NOT NULL`,
+    [login],
+  );
+  return rows.map((r) => r.key);
+}
+
 // ---- Правка/удаление комментов Клода (dev-API + вебинтерфейс разработчика) ----
 /** Коммент создан через dev-API (dev_authored) и относится к задаче проекта? Для авторизации правок. */
 export async function getDevCommentMeta(commentId: number, projectKey: string): Promise<{ approved: boolean; visibility: string } | null> {
