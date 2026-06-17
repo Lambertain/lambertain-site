@@ -22,6 +22,12 @@ function clean(src: string): string {
 
 const linkStyle: CSSProperties = { color: "var(--accent)", textDecoration: "underline" };
 const imgStyle: CSSProperties = { maxWidth: "100%", height: "auto", borderRadius: 8, border: "1px solid var(--border-2)", margin: "8px 0", display: "block" };
+// Карточка-файл (вложение-документ: .apk/.pdf/.docx и т.п.) — иконка + имя + «скачать», вместо голой ссылки.
+const fileChipStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 8, margin: "6px 0", padding: "8px 12px", border: "1px solid var(--border-2)", borderRadius: 8, background: "var(--surface-2)", color: "var(--text)", textDecoration: "none", maxWidth: "100%" };
+/** Ссылка на самохостинговое вложение (файл задачи/коммента). */
+function isAttachmentHref(href: string): boolean {
+  return /\/api\/(?:files|dev\/files|guide-files|onboarding-media)\/\d+/.test(href);
+}
 
 export function Markdown({ children }: { children: string }) {
   return (
@@ -30,7 +36,20 @@ export function Markdown({ children }: { children: string }) {
         remarkPlugins={[remarkGfm]}
         components={{
           img: (props) => <ZoomableImage src={typeof props.src === "string" ? props.src : undefined} alt={props.alt} style={imgStyle} />,
-          a: (props) => <a {...props} target="_blank" rel="noopener noreferrer" style={linkStyle} />,
+          a: (props) => {
+            const href = typeof props.href === "string" ? props.href : "";
+            // Вложение-файл → карточка с иконкой и «скачать»; обычная ссылка — как было.
+            if (href && isAttachmentHref(href)) {
+              return (
+                <a href={href} target="_blank" rel="noopener noreferrer" download style={fileChipStyle}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{props.children}</span>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                </a>
+              );
+            }
+            return <a {...props} target="_blank" rel="noopener noreferrer" style={linkStyle} />;
+          },
           p: (props) => <p style={{ margin: "8px 0" }}>{props.children}</p>,
           // listStyle задаём явно: Tailwind-preflight сбрасывает list-style на none → иначе маркеры/нумерация пропадают.
           ul: (props) => <ul style={{ margin: "8px 0", paddingLeft: 22, listStyleType: "disc", listStylePosition: "outside" }}>{props.children}</ul>,

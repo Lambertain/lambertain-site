@@ -37,7 +37,9 @@ export function CommentBox({ id, locale, canChooseVisibility }: { id: string; lo
         const localId = `a${++seq.current}`;
         const name = f.name || (image ? "image.png" : "file");
         setAtts((p) => [...p, { localId, mime, data, name, image }]);
-        insertAtCursor(image ? `\n![${name}](att:${localId})\n` : `\n[${name}](att:${localId})\n`);
+        // Картинку встраиваем маркером по месту курсора; файл-документ НЕ суём сырым текстом в поле
+        // (выглядело как «символы») — он представлен чипом ниже, а ссылка добавится при отправке.
+        if (image) insertAtCursor(`\n![${name}](att:${localId})\n`);
       };
       reader.readAsDataURL(f);
     });
@@ -61,8 +63,13 @@ export function CommentBox({ id, locale, canChooseVisibility }: { id: string; lo
   function send() {
     if (!text.trim() && atts.length === 0) return;
     setError(null);
+    // Файлы-документы (не картинки) добавляем ссылками в конец тела, если их там ещё нет (картинки уже встроены по месту).
+    let body = text;
+    for (const a of atts) {
+      if (!a.image && !body.includes(`att:${a.localId}`)) body += `${body && !body.endsWith("\n") ? "\n\n" : ""}[${a.name}](att:${a.localId})`;
+    }
     start(async () => {
-      const r = await addTaskComment(id, text, canChooseVisibility ? visibleToClient : true, atts);
+      const r = await addTaskComment(id, body, canChooseVisibility ? visibleToClient : true, atts);
       if (r.error) setError(r.error);
       else { setText(""); setAtts([]); }
     });
