@@ -957,9 +957,9 @@ export async function saveAttachment(readableId: string, mime: string, base64: s
 }
 
 // ---- Вложения (картинки задач, скачанные из YouTrack) ----
-export async function getAttachment(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
-  const rows = await q<{ mime: string | null; data: Buffer }>(
-    "SELECT mime, data FROM attachments WHERE id = $1",
+export async function getAttachment(id: number): Promise<{ mime: string | null; data: Buffer; name: string | null } | null> {
+  const rows = await q<{ mime: string | null; data: Buffer; name: string | null }>(
+    "SELECT mime, data, name FROM attachments WHERE id = $1",
     [id],
   );
   return rows[0] ?? null;
