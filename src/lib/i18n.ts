@@ -381,6 +381,7 @@ export const DICT: Record<string, Entry> = {
 
   // — страница задачи —
   "task.back": { uk: "← до задач", ru: "← к задачам", en: "← to tasks" },
+  "task.backPrev": { uk: "← Назад", ru: "← Назад", en: "← Back" },
   "task.description": { uk: "Опис", ru: "Описание", en: "Description" },
   "task.deleteOwn": { uk: "Видалити задачу", ru: "Удалить задачу", en: "Delete task" },
   "task.deleteOwnConfirm": { uk: "Видалити задачу? Доступно лише у вікні до тріажу.", ru: "Удалить задачу? Доступно только в окне до триажа.", en: "Delete the task? Only available in the pre-triage window." },

@@ -18,6 +18,7 @@ import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
 import { MoveTask } from "./move-task";
 import { StatusPicker } from "./status-picker";
+import { BackButton } from "./back-button";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
@@ -93,12 +94,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     <div>
       {/* «← к задачам» липкая (DEV-3): остаётся видимой при прокрутке длинной задачи — пилюля с фоном поверх контента. */}
       <div style={{ position: "sticky", top: 0, zIndex: 20, marginBottom: 4, display: "flex" }}>
-        <Link
-          href={backHref}
-          style={{ ...ui.monoLabel, display: "inline-flex", alignItems: "center", color: "var(--muted)", textDecoration: "none", background: "rgba(8,8,8,0.85)", backdropFilter: "blur(8px)", border: "1px solid var(--border-2)", borderRadius: 999, padding: "6px 12px" }}
-        >
-          {t(locale, "task.back")}
-        </Link>
+        <BackButton
+          fallbackHref={backHref}
+          label={t(locale, "task.backPrev")}
+          style={{ ...ui.monoLabel, display: "inline-flex", alignItems: "center", color: "var(--muted)", textDecoration: "none", background: "rgba(8,8,8,0.85)", backdropFilter: "blur(8px)", border: "1px solid var(--border-2)", borderRadius: 999, padding: "6px 12px", cursor: "pointer" }}
+        />
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
