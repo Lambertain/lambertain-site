@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   const role = String(body.role || "").trim() as Role;
   const projectKeys = Array.isArray(body.projectKeys) ? body.projectKeys.map((k) => String(k).trim().toUpperCase()).filter(Boolean) : [];
   const count = Math.max(1, Math.min(20, Number(body.count) || 1));
-  const ttlHours = Number(body.ttlHours) > 0 ? Number(body.ttlHours) : 72;
+  const ttlHours = Number(body.ttlHours) > 0 ? Number(body.ttlHours) : 24 * 30; // по умолчанию месяц
   if (!PERSON_ROLES.includes(role)) return NextResponse.json({ error: "role: client|contributor|employee|admin" }, { status: 400 });
   if (role !== "admin" && !projectKeys.length) return NextResponse.json({ error: "projectKeys обязательны для этой роли" }, { status: 400 });
 

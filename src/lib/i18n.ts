@@ -546,6 +546,17 @@ export const DICT: Record<string, Entry> = {
   "users.deleteConfirm": { uk: "Видалити безповоротно? Доступ і привʼязки зникнуть (історія задач збережеться).", ru: "Удалить безвозвратно? Доступ и привязки исчезнут (история задач сохранится).", en: "Delete permanently? Access and links will be removed (task history is kept)." },
   "users.deleteYes": { uk: "Так, видалити", ru: "Да, удалить", en: "Yes, delete" },
 
+  // — пользователи проекта (на странице проекта) —
+  "projUsers.kicker": { uk: "Хто в проєкті", ru: "Кто в проекте", en: "Who is in the project" },
+  "projUsers.title": { uk: "Користувачі проєкту", ru: "Пользователи проекта", en: "Project users" },
+  "projUsers.empty": { uk: "У проєкті поки нікого немає.", ru: "В проекте пока никого нет.", en: "No users in the project yet." },
+  "projUsers.removeFromProject": { uk: "Прибрати з проєкту", ru: "Убрать из проекта", en: "Remove from project" },
+  "projUsers.removeConfirm": { uk: "Прибрати з цього проєкту?", ru: "Убрать из этого проекта?", en: "Remove from this project?" },
+  "projUsers.addExisting": { uk: "Додати наявного користувача", ru: "Добавить существующего пользователя", en: "Add existing user" },
+  "projUsers.addExistingNone": { uk: "Усі вже в проєкті.", ru: "Все уже в проекте.", en: "Everyone is already in the project." },
+  "projUsers.add": { uk: "Додати", ru: "Добавить", en: "Add" },
+  "projUsers.inviteNew": { uk: "Запросити нового", ru: "Пригласить нового", en: "Invite new" },
+
   // — поля проекта: экономика —
   "field.cost": { uk: "Вартість", ru: "Стоимость", en: "Cost" },
   "field.currency": { uk: "Валюта", ru: "Валюта", en: "Currency" },

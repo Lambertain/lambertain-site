@@ -12,7 +12,7 @@ import type { TgUser } from "./telegram-auth";
 
 const ROLE_RU: Record<string, string> = { client: "клиент", contributor: "разработчик", employee: "сотрудник", admin: "админ", unknown: "—" };
 
-const DEFAULT_TTL_HOURS = 72;
+const DEFAULT_TTL_HOURS = 24 * 30; // месяц — чтобы приглашённые успевали принять
 
 /** Логин участника из Telegram-личности. */
 export function memberLogin(user: TgUser): string {

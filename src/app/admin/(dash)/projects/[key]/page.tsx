@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/principal";
-import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds, listSecrets } from "@/lib/db";
+import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds, listSecrets, listLinks, memberProjectsMap, listProjectsWithMeta } from "@/lib/db";
 import { ProjectGuides } from "./project-guides";
+import { ProjectUsersPanel } from "./project-users";
+import type { PanelUser } from "../../team/users-panel";
 import { SecretsPanel } from "./secrets-panel";
 import { DeleteProject } from "./delete-project";
 import { getBackend } from "@/lib/tasks";
@@ -19,12 +21,29 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
   await requireAdmin();
   const { key } = await params;
   const locale = await getLocale();
-  const [proj, tokens, users, brief, guides, enabledGuides, secrets] = await Promise.all([
-    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), getProjectGuideIds(key), listSecrets(key),
+  const [proj, tokens, users, brief, guides, enabledGuides, secrets, links, memberProj, allProjects] = await Promise.all([
+    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), getProjectGuideIds(key), listSecrets(key), listLinks(), memberProjectsMap(), listProjectsWithMeta(),
   ]);
   const contributors = users
     .filter((u) => u.role === "contributor" || u.role === "admin")
     .map((u) => ({ login: u.login, fullName: u.alias || u.fullName }));
+
+  // Все присоединившиеся пользователи (tg_links), обогащённые проектами — как на странице «Команда».
+  const userByLogin = new Map(users.map((u) => [u.login, u]));
+  const activeProjects = allProjects.filter((p) => !p.archived);
+  const panelUsers: PanelUser[] = links.map((l) => {
+    const m = userByLogin.get(l.login);
+    const projectKeys =
+      l.role === "contributor"
+        ? activeProjects.filter((p) => p.meta.defaultAssignee === l.login).map((p) => p.key)
+        : Array.from(new Set([...(memberProj.get(l.login) ?? []), ...(l.project_key ? [l.project_key] : [])]));
+    return { login: l.login, fullName: m?.fullName || l.full_name || l.login, alias: m?.alias ?? null, role: l.role, projectKeys, joinedAt: l.linked_at };
+  });
+  // Разработчик проекта (meta.defaultAssignee) тоже должен числиться в проекте.
+  const devLogin = proj?.meta.defaultAssignee || null;
+  const projectUsers = panelUsers.filter((u) => u.projectKeys.includes(key) || u.login === devLogin);
+  const projectLogins = new Set(projectUsers.map((u) => u.login));
+  const candidates = panelUsers.filter((u) => !projectLogins.has(u.login));
 
   if (!proj) {
     return (
@@ -48,6 +67,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
       </div>
 
       <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
+
+      <ProjectUsersPanel projectKey={key} users={projectUsers} candidates={candidates} locale={locale} />
 
       {brief && (
         <div style={{ ...ui.card, marginTop: 16 }}>
