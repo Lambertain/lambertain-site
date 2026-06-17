@@ -251,6 +251,39 @@ function cdOk(cd: ClientDeploy | undefined): cd is Required<Pick<ClientDeploy, "
   return !!(cd?.railwayToken && cd.projectId && cd.environmentId && cd.serviceId);
 }
 
+// ───── Vercel (клиентский деплой на Vercel: апрув не нужен, мониторим статус) ─────
+export interface ClientVercel {
+  token?: string;
+  projectId?: string;
+  teamId?: string;
+}
+function cvOk(cv: ClientVercel | undefined): cv is Required<Pick<ClientVercel, "token" | "projectId">> & ClientVercel {
+  return !!(cv?.token && cv.projectId);
+}
+async function vercelLatest(cv: ClientVercel): Promise<{ state: string; meta?: { githubCommitSha?: string }; url?: string } | null> {
+  const u = new URL("https://api.vercel.com/v6/deployments");
+  u.searchParams.set("projectId", cv.projectId!);
+  u.searchParams.set("limit", "1");
+  if (cv.teamId) u.searchParams.set("teamId", cv.teamId);
+  const r = await fetch(u, { headers: { Authorization: `Bearer ${cv.token}` }, cache: "no-store" });
+  const j = (await r.json()) as { deployments?: { state: string; readyState?: string; meta?: { githubCommitSha?: string }; url?: string }[] };
+  const d = j.deployments?.[0];
+  return d ? { state: d.state || d.readyState || "?", meta: d.meta, url: d.url } : null;
+}
+/** Текущий статус последнего деплоя клиента на Vercel (с мониторингом до терминального состояния). */
+export async function vercelDeployStatus(cv: ClientVercel, waitMs = 120000): Promise<DeployStatus | null> {
+  if (!cvOk(cv)) return null;
+  let dep = await vercelLatest(cv);
+  if (!dep) return null;
+  const terminal = ["READY", "ERROR", "CANCELED"];
+  const deadline = Date.now() + waitMs;
+  while (!terminal.includes(dep.state) && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 8000));
+    dep = (await vercelLatest(cv)) ?? dep;
+  }
+  return { status: dep.state, commit: (dep.meta?.githubCommitSha || "").slice(0, 8), approved: true };
+}
+
 /** Текущий деплой клиентского сервиса (без изменений). */
 export async function clientDeployStatus(cd: ClientDeploy): Promise<DeployStatus | null> {
   if (!cdOk(cd)) return null;

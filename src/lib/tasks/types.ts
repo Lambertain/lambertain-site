@@ -72,6 +72,13 @@ export interface ProjectMeta {
     /** Postgres-сервис (из него берём внешний URL БД для миграции). */
     pgServiceId?: string;
   };
+  /** Клиентский деплой на Vercel (вместо Railway): Vercel катит сам при пуше — апрув не нужен, портал лишь мониторит статус. */
+  clientVercel?: {
+    token?: string;
+    projectId?: string;
+    /** teamId — если проект под Vercel-командой/орг (нужен в API). */
+    teamId?: string;
+  };
 }
 
 export interface Task {

@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { getProjectFull } from "@/lib/db";
-import { previewDelivery, deliverDevToClient, approveClientDeploy, clientDeployStatus, type DeliveryPreview, type DeployStatus } from "@/lib/deliver";
+import { previewDelivery, deliverDevToClient, approveClientDeploy, clientDeployStatus, vercelDeployStatus, type DeliveryPreview, type DeployStatus } from "@/lib/deliver";
 
 /** Превью доставки: число файлов + изменения схемы БД + дефолтная ветка клиента. */
 export async function previewDeliver(key: string): Promise<{ preview?: DeliveryPreview; error?: string }> {
@@ -54,10 +54,16 @@ export async function runDeliver(
     });
 
     let deploy: DeployStatus | null = null;
-    if (res.toDefault && proj.meta.clientDeploy?.railwayToken) {
-      // Дать Railway секунду создать деплой из пуша, затем апрув + мониторинг.
-      await new Promise((r) => setTimeout(r, 4000));
-      deploy = await approveClientDeploy(proj.meta.clientDeploy).catch(() => null);
+    if (res.toDefault) {
+      if (proj.meta.clientDeploy?.railwayToken) {
+        // Railway: дать секунду создать деплой из пуша, затем апрув + мониторинг.
+        await new Promise((r) => setTimeout(r, 4000));
+        deploy = await approveClientDeploy(proj.meta.clientDeploy).catch(() => null);
+      } else if (proj.meta.clientVercel?.token) {
+        // Vercel сам катит из пуша (апрув не нужен) — ждём создания деплоя и мониторим статус.
+        await new Promise((r) => setTimeout(r, 6000));
+        deploy = await vercelDeployStatus(proj.meta.clientVercel).catch(() => null);
+      }
     }
 
     return { result: { ...res, deploy } };
@@ -71,7 +77,8 @@ export async function checkClientDeploy(key: string): Promise<{ deploy?: DeployS
   try {
     await requireAdmin();
     const proj = await getProjectFull(key);
-    if (!proj?.meta.clientDeploy) return { error: "Клиентский Railway не настроен" };
+    if (proj?.meta.clientVercel?.token) return { deploy: await vercelDeployStatus(proj.meta.clientVercel, 0) };
+    if (!proj?.meta.clientDeploy) return { error: "Клиентский деплой не настроен (Railway/Vercel)" };
     return { deploy: await clientDeployStatus(proj.meta.clientDeploy) };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };

@@ -41,6 +41,10 @@ export function MetaForm({
   const [cdEnv, setCdEnv] = useState(cd.environmentId ?? "");
   const [cdService, setCdService] = useState(cd.serviceId ?? "");
   const [cdPg, setCdPg] = useState(cd.pgServiceId ?? "");
+  const cv = m.clientVercel ?? {};
+  const [cvToken, setCvToken] = useState(cv.token ?? "");
+  const [cvProject, setCvProject] = useState(cv.projectId ?? "");
+  const [cvTeam, setCvTeam] = useState(cv.teamId ?? "");
   const [clientGit, setClientGit] = useState(m.clientGit ?? "");
   const [devGit, setDevGit] = useState(m.devGit ?? "");
   const [localPath, setLocalPath] = useState(m.localPath ?? "");
@@ -82,6 +86,10 @@ export function MetaForm({
               serviceId: cdService || undefined,
               pgServiceId: cdPg || undefined,
             }
+          : undefined,
+      clientVercel:
+        cvToken || cvProject || cvTeam
+          ? { token: cvToken || undefined, projectId: cvProject || undefined, teamId: cvTeam || undefined }
           : undefined,
       credentials: m.credentials, // секреты теперь редактируются в «Секрети та доступи» (project_secrets)
     };
@@ -172,6 +180,16 @@ export function MetaForm({
           <Field label={t(locale, "projects.cdEnv")} value={cdEnv} onChange={setCdEnv} />
           <Field label={t(locale, "projects.cdService")} value={cdService} onChange={setCdService} />
           <Field label={t(locale, "projects.cdPg")} value={cdPg} onChange={setCdPg} />
+        </div>
+      </div>
+
+      <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.vercel")}</div>
+      <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 10 }}>{t(locale, "projects.vercelHint")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <Field label={t(locale, "projects.vercelToken")} value={cvToken} onChange={setCvToken} />
+        <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label={t(locale, "projects.vercelProject")} value={cvProject} onChange={setCvProject} />
+          <Field label={t(locale, "projects.vercelTeam")} value={cvTeam} onChange={setCvTeam} />
         </div>
       </div>
 
