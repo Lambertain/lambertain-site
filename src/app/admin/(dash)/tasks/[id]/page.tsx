@@ -89,8 +89,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     canEditOwn: c.approved === false && me.role !== "client" && !!myLogin && c.author.login === myLogin,
     // …или пока опубликованный коммент ещё без ответа другой стороны (доступно и клиенту).
     canEdit: c.approved !== false && !!myLogin && c.author.login === myLogin && c.created > lastOtherCreated,
+    devAuthored: c.devAuthored === true,
     isNew: c.created > prevRead,
   }));
+  // DEV-7: коммент Клода (dev_authored) разработчик/админ может править/удалять из UI (супер-админ — через модерацию).
+  const canManageDev = isAdmin || me.role === "contributor";
   const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal" && c.approved).length : viewComments.length;
 
   return (
@@ -229,7 +232,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <div style={ui.monoLabel}>
           {t(locale, "task.comments")} · {shownCount}
         </div>
-        <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} locale={locale} />
+        <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} canManageDev={canManageDev} locale={locale} />
         <CommentBox id={task.id} locale={locale} canChooseVisibility={!clientSide} />
       </div>
     </div>

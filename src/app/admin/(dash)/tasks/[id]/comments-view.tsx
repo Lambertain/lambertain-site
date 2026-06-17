@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { markTaskRead } from "../../tasks-actions";
-import { moderateApprove, moderateEdit, moderateReject, editPendingComment, editPublishedComment, deletePublishedComment, discardPendingComment, superDeleteComment, superEditComment } from "./actions";
+import { moderateApprove, moderateEdit, moderateReject, editPendingComment, editPublishedComment, deletePublishedComment, discardPendingComment, superDeleteComment, superEditComment, devEditComment, devDeleteComment } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
@@ -17,6 +17,7 @@ export type ViewComment = {
   approved: boolean;
   canEditOwn?: boolean;
   canEdit?: boolean;
+  devAuthored?: boolean;
   isNew: boolean;
 };
 
@@ -31,12 +32,14 @@ export function CommentsView({
   comments,
   isClient,
   canModerate,
+  canManageDev = false,
   locale,
 }: {
   taskId: string;
   comments: ViewComment[];
   isClient: boolean;
   canModerate: boolean;
+  canManageDev?: boolean;
   locale: Locale;
 }) {
   const newRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -108,6 +111,8 @@ export function CommentsView({
                 <span style={{ marginLeft: "auto" }}>{fmt(c.created, locale)}</span>
                 {/* Удаление любого коммента — только супер-админу (pending удаляется через «Відхилити» в панели модерации). */}
                 {canModerate && <SuperDelete taskId={taskId} commentId={c.id} locale={locale} />}
+                {/* DEV-7: разработчик/админ может удалить коммент Клода (dev_authored) из UI. */}
+                {!canModerate && canManageDev && c.devAuthored && <DevManageDelete taskId={taskId} commentId={c.id} locale={locale} />}
               </div>
               <Markdown>{c.text}</Markdown>
               {pending && canModerate
@@ -118,7 +123,9 @@ export function CommentsView({
                     ? <OwnPublishedEdit taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
                     : !pending && canModerate
                       ? <SuperEdit taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
-                      : null}
+                      : c.devAuthored && canManageDev
+                        ? <DevManageEdit taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
+                        : null}
             </div>
           );
         })}
@@ -248,6 +255,53 @@ function SuperEdit({ taskId, commentId, text, locale }: { taskId: string; commen
         {t(locale, "comment.edit")}
       </button>
     </div>
+  );
+}
+
+/** DEV-7: разработчик/админ правит коммент Клода (dev_authored) из UI. */
+function DevManageEdit({ taskId, commentId, text, locale }: { taskId: string; commentId: string; text: string; locale: Locale }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  if (editing) {
+    return (
+      <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-2)", display: "flex", flexDirection: "column", gap: 8 }}>
+        <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} style={{ ...ui.input, resize: "vertical", fontFamily: "inherit", width: "100%" }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button onClick={() => start(async () => { const r = await devEditComment(commentId, taskId, draft); if (r?.error) setErr(r.error); else setEditing(false); })} disabled={pending || !draft.trim()} style={{ ...ui.btnAccent, opacity: pending || !draft.trim() ? 0.5 : 1 }}>{t(locale, "mod.save")}</button>
+          <button onClick={() => { setDraft(text); setEditing(false); setErr(null); }} style={ui.btn}>{t(locale, "common.cancel")}</button>
+          {err && <span style={{ ...ui.monoLabel, textTransform: "none", color: "#ff5b5b" }}>{err}</span>}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button onClick={() => { setDraft(text); setEditing(true); }} style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", background: "transparent", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" /></svg>
+        {t(locale, "comment.edit")}
+      </button>
+    </div>
+  );
+}
+
+/** DEV-7: разработчик/админ удаляет коммент Клода (dev_authored) из UI (иконка → подтверждение). */
+function DevManageDelete({ taskId, commentId, locale }: { taskId: string; commentId: string; locale: Locale }) {
+  const [confirm, setConfirm] = useState(false);
+  const [pending, start] = useTransition();
+  if (confirm) {
+    return (
+      <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+        <button onClick={() => start(async () => { await devDeleteComment(commentId, taskId); })} disabled={pending} style={{ ...ui.monoLabel, color: "#ff5b5b", background: "transparent", border: "1px solid #ff5b5b", padding: "1px 7px", cursor: "pointer", borderRadius: 2 }}>{t(locale, "common.delete")}?</button>
+        <button onClick={() => setConfirm(false)} style={{ background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: 0 }}>×</button>
+      </span>
+    );
+  }
+  return (
+    <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 2 }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+    </button>
   );
 }
 

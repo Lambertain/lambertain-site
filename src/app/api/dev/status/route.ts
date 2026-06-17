@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
       if (task.autoDone || proj?.meta.autoApprove) {
         await be.updateStatus(taskId, "Done");
-        if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client");
+        if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
         return NextResponse.json({ ok: true, status: "Done" });
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       await be.updateStatus(taskId, "Review");
       // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
       if (summary) {
-        await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary });
+        await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary, devAuthored: true });
       }
       // Постановщик задачи (он же её принимает) — адресное уведомление. Для задач обычного админа (Настя)
       // это единственный способ узнать, что её задача готова: модерация-итог уходит супер-админу, а ей — вот это.

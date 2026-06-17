@@ -179,8 +179,9 @@ export const postgresBackend: TasksBackend = {
       orig_author_role: Role | null;
       visibility: string;
       approved: boolean;
+      dev_authored: boolean;
     }>(
-      `SELECT c.id, c.body, c.created_at, c.visibility, c.approved, c.orig_author_login, c.orig_author_role,
+      `SELECT c.id, c.body, c.created_at, c.visibility, c.approved, c.orig_author_login, c.orig_author_role, c.dev_authored,
               m.login AS author_login, m.full_name AS author_name, m.role AS author_role
        FROM comments c
        JOIN tasks t ON t.id = c.task_id
@@ -200,6 +201,7 @@ export const postgresBackend: TasksBackend = {
         author: { login, fullName, role },
         visibility: c.visibility === "internal" ? "internal" : "client",
         approved: c.approved,
+        devAuthored: c.dev_authored === true,
       };
     });
   },
@@ -215,7 +217,7 @@ export const postgresBackend: TasksBackend = {
     await q("DELETE FROM tasks WHERE id = $1", [rows[0].id]);
   },
 
-  async addComment(id: string, text: string, visibility: "client" | "internal" = "client", authorLogin?: string, approved: boolean = true): Promise<Comment> {
+  async addComment(id: string, text: string, visibility: "client" | "internal" = "client", authorLogin?: string, approved: boolean = true, devAuthored: boolean = false): Promise<Comment> {
     const task = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [id]);
     if (!task[0]) throw new Error(`Задача ${id} не найдена`);
     // Автор: член по логину (клиент/разработчик/сотрудник/админ-член). Без логина (бот/супер-админ) — Lambertain.
@@ -228,9 +230,9 @@ export const postgresBackend: TasksBackend = {
       author = m[0] ?? null;
     }
     const rows = await q<{ id: number; created_at: string }>(
-      `INSERT INTO comments (task_id, author_id, body, visibility, approved, created_at)
-       VALUES ($1, $2, $3, $4, $5, now()) RETURNING id, created_at`,
-      [task[0].id, author?.id ?? null, text, visibility, approved],
+      `INSERT INTO comments (task_id, author_id, body, visibility, approved, dev_authored, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, now()) RETURNING id, created_at`,
+      [task[0].id, author?.id ?? null, text, visibility, approved, devAuthored],
     );
     return {
       id: String(rows[0].id),
@@ -241,6 +243,7 @@ export const postgresBackend: TasksBackend = {
         : { login: "lambertain", fullName: "Lambertain", role: "admin" },
       visibility,
       approved,
+      devAuthored,
     };
   },
 };

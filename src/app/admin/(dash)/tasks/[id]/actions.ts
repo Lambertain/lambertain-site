@@ -7,7 +7,7 @@ import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient } from "@/lib/db";
+import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
@@ -188,6 +188,42 @@ export async function superEditComment(commentId: string, taskId: string, text: 
   const r = await editCommentAny(commentId, text);
   revalidatePath(`/admin/tasks/${taskId}`);
   return "error" in r ? { error: r.error } : { ok: true };
+}
+
+/**
+ * DEV-7: правка/удаление комментов Клода (dev_authored) разработчиком/админом из вебинтерфейса.
+ * Доступ: супер-админ, админ или контрибутор-ответственный этого проекта (defaultAssignee).
+ */
+async function canManageDevComment(me: NonNullable<Awaited<ReturnType<typeof getPrincipal>>>, projectKey: string): Promise<boolean> {
+  if (isSuperAdmin(me) || me.role === "admin") return true;
+  if (me.role === "contributor" && me.youtrackLogin) {
+    const proj = await getProjectFull(projectKey).catch(() => null);
+    return proj?.meta.defaultAssignee === me.youtrackLogin;
+  }
+  return false;
+}
+
+export async function devEditComment(commentId: string, taskId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Нет прав" };
+  if (!text.trim()) return { error: "Пусто" };
+  const meta = await getDevCommentForTask(Number(commentId), taskId);
+  if (!meta) return { error: "Это не коммент Клода" };
+  if (!(await canManageDevComment(me, meta.projectKey))) return { error: "Нет прав" };
+  const r = await editCommentAny(commentId, text);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return "error" in r ? { error: r.error } : { ok: true };
+}
+
+export async function devDeleteComment(commentId: string, taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Нет прав" };
+  const meta = await getDevCommentForTask(Number(commentId), taskId);
+  if (!meta) return { error: "Это не коммент Клода" };
+  if (!(await canManageDevComment(me, meta.projectKey))) return { error: "Нет прав" };
+  await deleteCommentAny(commentId);
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return { ok: true };
 }
 
 /** Модерация (супер-админ): одобрить pending-коммент → публикуется клиенту + пуш. */

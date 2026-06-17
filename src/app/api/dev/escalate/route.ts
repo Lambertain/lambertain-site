@@ -47,7 +47,7 @@ export async function POST(req: Request) {
       // Вопрос/решение — ПОСТАНОВЩИКУ задачи (кто её создал), а не глобально супер-админу.
       // Постановщик-член (напр. админ Настя) получает уведомление; иначе — супер-админ (Никита).
       const body = `🔧 Вопрос разработчика (нужно решение):\n\n${question}`;
-      await be.addComment(taskId, body, "internal");
+      await be.addComment(taskId, body, "internal", undefined, true, true);
       const msg = `🔧 <b>Вопрос разработчика</b> · ${await taskTag(taskId)}: ${task.summary}\n${question.slice(0, 400)}`;
       if (task.reporter?.login) await notifyLogins([task.reporter.login], msg, [], openBtn);
       else await notifyAdmin(msg, openBtn);
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
     // client: оформляем вопрос от лица агентства → на МОДЕРАЦИЮ супер-админу (клиент увидит после апрува). Задача блокируется до ответа.
     const polished = await draftClientQuestion(task, question, comments);
-    await submitForModeration(taskId, `${ESCALATION_MARK}\n\n${polished}`, { taskSummary: task.summary });
+    await submitForModeration(taskId, `${ESCALATION_MARK}\n\n${polished}`, { taskSummary: task.summary, devAuthored: true });
     await be.updateStatus(taskId, "Blocked").catch(() => {});
     return NextResponse.json({ ok: true, escalatedTo: "client (на модерации)", posted: polished });
   } catch (e) {

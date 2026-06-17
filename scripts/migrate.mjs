@@ -146,6 +146,10 @@ CREATE INDEX IF NOT EXISTS idx_attachments_task ON attachments(task_id);
 -- член может быть удалён (ник YouTrack), а коммент/задачу потом привяжем к новому tg-пользователю.
 ALTER TABLE comments ADD COLUMN IF NOT EXISTS orig_author_login TEXT;
 ALTER TABLE comments ADD COLUMN IF NOT EXISTS orig_author_role TEXT;
+-- dev_authored — коммент создан через dev-API (Claude разработчика). Маркер «свой коммент Клода»:
+-- по нему Claude (dev-API) и разработчик (вебинтерфейс) могут править/удалять именно эти комменты,
+-- не трогая комменты клиента/админа/супер-админа (у тех тоже author_id может быть NULL).
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS dev_authored BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS orig_assignee_login TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS orig_reporter_login TEXT;
 -- Штамп исходного автора по существующим строкам (идемпотентно: только где ещё не проставлено).

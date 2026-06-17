@@ -16,17 +16,18 @@ const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url:
  * Создаёт pending-коммент (клиент не видит, без пуша) и уведомляет супер-админа.
  * Исключение — проект с autoApprove (доверенный разработчик): публикуем сразу клиенту, без модерации.
  */
-export async function submitForModeration(taskId: string, body: string, opts?: { authorLogin?: string; taskSummary?: string }): Promise<void> {
+export async function submitForModeration(taskId: string, body: string, opts?: { authorLogin?: string; taskSummary?: string; devAuthored?: boolean }): Promise<void> {
   const task = await getBackend().getTask(taskId).catch(() => null);
   const summary = opts?.taskSummary ?? task?.summary ?? "";
   const proj = task ? await getProjectFull(task.projectKey).catch(() => null) : null;
+  const dev = opts?.devAuthored === true;
   if (proj?.meta.autoApprove) {
     // Доверенный разработчик — без модерации: публикуем клиенту сразу.
-    await getBackend().addComment(taskId, body, "client", opts?.authorLogin, true);
+    await getBackend().addComment(taskId, body, "client", opts?.authorLogin, true, dev);
     if (task) await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(taskId)}</b>: ${summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), taskBtn(taskId)).catch(() => {});
     return;
   }
-  await getBackend().addComment(taskId, body, "client", opts?.authorLogin, false);
+  await getBackend().addComment(taskId, body, "client", opts?.authorLogin, false, dev);
   await notifyAdmin(`🛡 <b>Коммент на модерацию</b> · ${await taskTag(taskId)}: ${summary}\n${body.slice(0, 400)}`, taskBtn(taskId)).catch(() => {});
 }
 

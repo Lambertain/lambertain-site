@@ -965,6 +965,52 @@ export async function getAttachment(id: number): Promise<{ mime: string | null; 
   return rows[0] ?? null;
 }
 
+// ---- Правка/удаление комментов Клода (dev-API + вебинтерфейс разработчика) ----
+/** Коммент создан через dev-API (dev_authored) и относится к задаче проекта? Для авторизации правок. */
+export async function getDevCommentMeta(commentId: number, projectKey: string): Promise<{ approved: boolean; visibility: string } | null> {
+  const rows = await q<{ approved: boolean; visibility: string }>(
+    `SELECT c.approved, c.visibility FROM comments c
+       JOIN tasks t ON t.id = c.task_id JOIN projects p ON p.id = t.project_id
+     WHERE c.id = $1 AND p.key = $2 AND c.dev_authored = true`,
+    [commentId, projectKey],
+  );
+  return rows[0] ?? null;
+}
+
+/** Правка коммента Клода (dev_authored) в рамках проекта. Возвращает обновлённое состояние или null. */
+export async function editDevComment(commentId: number, projectKey: string, text: string): Promise<{ id: number; approved: boolean; visibility: string } | null> {
+  const rows = await q<{ id: number; approved: boolean; visibility: string }>(
+    `UPDATE comments c SET body = $3
+       FROM tasks t, projects p
+     WHERE c.id = $1 AND c.task_id = t.id AND t.project_id = p.id AND p.key = $2 AND c.dev_authored = true
+     RETURNING c.id, c.approved, c.visibility`,
+    [commentId, projectKey, text],
+  );
+  return rows[0] ?? null;
+}
+
+/** Удаление коммента Клода (dev_authored) в рамках проекта — только пока на модерации (approved=false). */
+export async function deleteDevComment(commentId: number, projectKey: string): Promise<boolean> {
+  const rows = await q<{ id: number }>(
+    `DELETE FROM comments c USING tasks t, projects p
+     WHERE c.id = $1 AND c.task_id = t.id AND t.project_id = p.id AND p.key = $2 AND c.dev_authored = true AND c.approved = false
+     RETURNING c.id`,
+    [commentId, projectKey],
+  );
+  return rows.length > 0;
+}
+
+/** Для вебинтерфейса: коммент dev_authored и относится к задаче (по readable_id)? Возвращает проект и approved. */
+export async function getDevCommentForTask(commentId: number, taskReadableId: string): Promise<{ projectKey: string; approved: boolean } | null> {
+  const rows = await q<{ project_key: string; approved: boolean }>(
+    `SELECT p.key AS project_key, c.approved FROM comments c
+       JOIN tasks t ON t.id = c.task_id JOIN projects p ON p.id = t.project_id
+     WHERE c.id = $1 AND t.readable_id = $2 AND c.dev_authored = true`,
+    [commentId, taskReadableId],
+  );
+  return rows[0] ? { projectKey: rows[0].project_key, approved: rows[0].approved } : null;
+}
+
 // ---- Зависимости задач (блокеры) ----
 export interface DepInfo {
   id: string; // readable_id блокера

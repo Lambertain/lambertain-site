@@ -126,6 +126,8 @@ export interface Comment {
   visibility?: "client" | "internal";
   /** false — на модерации (клиент не видит, без пуша) до апрува супер-админом. По умолчанию true. */
   approved?: boolean;
+  /** true — коммент создан через dev-API (Claude разработчика); его можно править/удалять (dev-API и разработчик в UI). */
+  devAuthored?: boolean;
 }
 
 /** Структурированная задача из произвольного текста (результат Claude API). */
@@ -172,7 +174,7 @@ export interface TasksBackend {
     autoDone?: boolean;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
-  addComment(id: string, text: string, visibility?: "client" | "internal", authorLogin?: string, approved?: boolean): Promise<Comment>;
+  addComment(id: string, text: string, visibility?: "client" | "internal", authorLogin?: string, approved?: boolean, devAuthored?: boolean): Promise<Comment>;
   updateStatus(id: string, status: string): Promise<void>;
   deleteTask(id: string): Promise<void>;
 }
