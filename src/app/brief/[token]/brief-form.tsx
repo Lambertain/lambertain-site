@@ -2,112 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { submitBriefAction } from "./actions";
+import { TYPES, COMMON, BRANCH, TXT, type Field, type Lang } from "./brief-schema";
 import { ui } from "../../admin/ui-styles";
-
-type Lang = "uk" | "ru";
-type Field = { key: string; uk: string; ru: string; kind: "text" | "area" | "yesno" | "multi"; opts?: { key: string; uk: string; ru: string }[]; required?: boolean };
-
-const TYPES: { key: string; uk: string; ru: string }[] = [
-  { key: "visitka", uk: "Сайт-візитівка", ru: "Сайт-визитка" },
-  { key: "landing", uk: "Лендинг послуги", ru: "Лендинг услуги" },
-  { key: "shop", uk: "Інтернет-магазин", ru: "Интернет-магазин" },
-  { key: "saas", uk: "SaaS / платформа", ru: "SaaS / платформа" },
-  { key: "automation", uk: "Автоматизація / CRM / інтеграції", ru: "Автоматизация / CRM / интеграции" },
-  { key: "portfolio", uk: "Портфоліо", ru: "Портфолио" },
-  { key: "other", uk: "Інше", ru: "Другое" },
-];
-
-const COMMON: Field[] = [
-  // Контакт лида не спрашиваем — он определяется по Telegram (авторизация в боте).
-  { key: "companyName", uk: "Назва компанії / проєкту", ru: "Название компании / проекта", kind: "text", required: true },
-  { key: "what", uk: "Що за продукт/послуга і для кого?", ru: "Что за продукт/услуга и для кого?", kind: "area", required: true },
-  { key: "budget", uk: "Орієнтовний бюджет (якщо є розуміння)", ru: "Ориентировочный бюджет (если есть понимание)", kind: "text" },
-  { key: "deadline", uk: "Бажані строки / дедлайн", ru: "Желаемые сроки / дедлайн", kind: "text" },
-  { key: "brand", uk: "Є готовий бренд? (кольори / лого / шрифти — або «ні»)", ru: "Есть готовый бренд? (цвета / лого / шрифты — или «нет»)", kind: "text" },
-  { key: "refLike", uk: "Сайти, які подобаються (посилання)", ru: "Сайты, которые нравятся (ссылки)", kind: "area" },
-  { key: "refDislike", uk: "Сайти, які НЕ подобаються (посилання)", ru: "Сайты, которые НЕ нравятся (ссылки)", kind: "area" },
-  { key: "mood", uk: "Настрій трьома словами (напр. «суворо, дорого, спокійно»)", ru: "Настроение тремя словами (напр. «строго, дорого, спокойно»)", kind: "text" },
-  { key: "langs", uk: "Мови сайту", ru: "Языки сайта", kind: "multi", opts: [
-    { key: "uk", uk: "Українська", ru: "Украинский" }, { key: "ru", uk: "Російська", ru: "Русский" }, { key: "en", uk: "Англійська", ru: "Английский" },
-  ] },
-];
-
-const BRANCH: Record<string, Field[]> = {
-  visitka: [
-    { key: "blocks", uk: "Які блоки потрібні", ru: "Какие блоки нужны", kind: "multi", opts: [
-      { key: "about", uk: "Про мене", ru: "Обо мне" }, { key: "services", uk: "Послуги", ru: "Услуги" },
-      { key: "portfolio", uk: "Портфоліо/кейси", ru: "Портфолио/кейсы" }, { key: "contacts", uk: "Контакти", ru: "Контакты" },
-    ] },
-    { key: "leadForm", uk: "Потрібна форма заявки?", ru: "Нужна форма заявки?", kind: "yesno" },
-  ],
-  landing: [
-    { key: "offer", uk: "Головна пропозиція (оффер)", ru: "Главное предложение (оффер)", kind: "area" },
-    { key: "cta", uk: "Цільова дія (заявка / дзвінок / купівля)", ru: "Целевое действие (заявка / звонок / покупка)", kind: "text" },
-    { key: "trust", uk: "Елементи довіри", ru: "Элементы доверия", kind: "multi", opts: [
-      { key: "reviews", uk: "Відгуки", ru: "Отзывы" }, { key: "cases", uk: "Кейси", ru: "Кейсы" }, { key: "certs", uk: "Сертифікати/нагороди", ru: "Сертификаты/награды" },
-    ] },
-    { key: "pricing", uk: "Показувати ціни?", ru: "Показывать цены?", kind: "yesno" },
-  ],
-  shop: [
-    { key: "categories", uk: "Категорії товарів", ru: "Категории товаров", kind: "area" },
-    { key: "payment", uk: "Оплата (картка / накладений платіж / ...)", ru: "Оплата (карта / наложенный платёж / ...)", kind: "text" },
-    { key: "delivery", uk: "Доставка (Нова Пошта / ...)", ru: "Доставка (Новая Почта / ...)", kind: "text" },
-    { key: "crm", uk: "Облік/CRM (SalesDrive, 1С, немає)", ru: "Учёт/CRM (SalesDrive, 1С, нет)", kind: "text" },
-  ],
-  saas: [
-    { key: "roles", uk: "Ролі користувачів", ru: "Роли пользователей", kind: "text" },
-    { key: "scenarios", uk: "3–5 ключових сценаріїв", ru: "3–5 ключевых сценариев", kind: "area" },
-    { key: "pricing", uk: "Тарифи / монетизація", ru: "Тарифы / монетизация", kind: "text" },
-    { key: "integrations", uk: "Інтеграції (оплата, пошта, API)", ru: "Интеграции (оплата, почта, API)", kind: "text" },
-    { key: "auth", uk: "Авторизація (email, Google, Telegram)", ru: "Авторизация (email, Google, Telegram)", kind: "text" },
-  ],
-  automation: [
-    { key: "channels", uk: "Канали зв'язку, які підключити", ru: "Каналы связи для подключения", kind: "multi", opts: [
-      { key: "telegram", uk: "Telegram", ru: "Telegram" }, { key: "viber", uk: "Viber", ru: "Viber" },
-      { key: "whatsapp", uk: "WhatsApp", ru: "WhatsApp" }, { key: "email", uk: "Email", ru: "Email" },
-      { key: "instagram", uk: "Instagram Direct", ru: "Instagram Direct" }, { key: "calls", uk: "Телефонія / дзвінки", ru: "Телефония / звонки" },
-    ] },
-    { key: "ai", uk: "AI-функції", ru: "AI-функции", kind: "multi", opts: [
-      { key: "transcribe", uk: "Транскрибація дзвінків", ru: "Транскрибация звонков" }, { key: "callAnalysis", uk: "Аналіз / підсумок дзвінків", ru: "Анализ / резюме звонков" },
-      { key: "autotag", uk: "Авто-категоризація / теги", ru: "Авто-категоризация / теги" }, { key: "chatbot", uk: "Чат-бот / автовідповіді", ru: "Чат-бот / автоответы" },
-      { key: "chatSummary", uk: "Резюме переписки", ru: "Резюме переписки" },
-    ] },
-    { key: "crm", uk: "Модулі CRM", ru: "Модули CRM", kind: "multi", opts: [
-      { key: "contacts", uk: "Контакти / клієнти", ru: "Контакты / клиенты" }, { key: "pipeline", uk: "Воронка / угоди", ru: "Воронка / сделки" },
-      { key: "tasks", uk: "Задачі / нагадування", ru: "Задачи / напоминания" }, { key: "reports", uk: "Звіти / аналітика", ru: "Отчёты / аналитика" },
-      { key: "integrateCrm", uk: "Інтеграція з наявною CRM", ru: "Интеграция с существующей CRM" },
-    ] },
-    { key: "callScoring", uk: "Оцінювати якість роботи операторів за дзвінками (скоринг / бали)", ru: "Оценивать качество работы операторов по звонкам (скоринг / баллы)", kind: "yesno" },
-    { key: "callChecklist", uk: "Що перевіряти у дзвінку (привітання, виявлення потреби, пропозиція доп. продукту, названа ціна…)", ru: "Что проверять в звонке (приветствие, выявление потребности, предложение доп. продукта, названная цена…)", kind: "area" },
-    { key: "autoTask", uk: "Авто-створення наступної задачі/зустрічі після дзвінка", ru: "Авто-создание следующей задачи/встречи после звонка", kind: "yesno" },
-    { key: "omnichannel", uk: "Об'єднувати листування з усіх каналів по одному контакту (історія)", ru: "Объединять переписку со всех каналов по одному контакту (история)", kind: "yesno" },
-    { key: "current", uk: "Що вже використовуєте (CRM, телефонія: Binotel/Ringostat/Asterisk…)", ru: "Что уже используете (CRM, телефония: Binotel/Ringostat/Asterisk…)", kind: "text" },
-    { key: "importHistory", uk: "Перенести історію з поточної системи? (записи, коментарі)", ru: "Перенести историю из текущей системы? (записи, комментарии)", kind: "text" },
-    { key: "volume", uk: "Обсяги (дзвінків на день / користувачів-операторів)", ru: "Объёмы (звонков в день / пользователей-операторов)", kind: "text" },
-    { key: "scenarios", uk: "Ключові сценарії роботи", ru: "Ключевые сценарии работы", kind: "area" },
-    { key: "integrations", uk: "Інші інтеграції (оплата, API, 1С/BAS...)", ru: "Другие интеграции (оплата, API, 1С/BAS...)", kind: "text" },
-  ],
-  portfolio: [
-    { key: "works", uk: "Що показуємо (роботи / проєкти)", ru: "Что показываем (работы / проекты)", kind: "area" },
-    { key: "style", uk: "Бажаний стиль/настрій", ru: "Желаемый стиль/настроение", kind: "text" },
-  ],
-  other: [
-    { key: "free", uk: "Опишіть, що потрібно", ru: "Опишите, что нужно", kind: "area" },
-  ],
-};
-
-const TXT = {
-  title: { uk: "Бриф проєкту", ru: "Бриф проекта" },
-  intro: { uk: "Кілька питань, щоб зрозуміти задачу. Чим конкретніше — тим точніше результат.", ru: "Несколько вопросов, чтобы понять задачу. Чем конкретнее — тем точнее результат." },
-  typeQ: { uk: "Що потрібно зробити?", ru: "Что нужно сделать?" },
-  submit: { uk: "Надіслати бриф", ru: "Отправить бриф" },
-  sent: { uk: "Дякую! Бриф надіслано — я зв'яжуся з вами.", ru: "Спасибо! Бриф отправлен — я свяжусь с вами." },
-  required: { uk: "Заповніть обов'язкові поля.", ru: "Заполните обязательные поля." },
-  yes: { uk: "Так", ru: "Да" }, no: { uk: "Ні", ru: "Нет" },
-  other: { uk: "Інше / своє (впишіть, якщо немає серед варіантів)", ru: "Другое / своё (впишите, если нет среди вариантов)" },
-  note: { uk: "Уточнення (необов'язково)", ru: "Уточнение (необязательно)" },
-  extra: { uk: "Що ще важливо? Додаткова інформація", ru: "Что ещё важно? Дополнительная информация" },
-};
 
 export function BriefForm({ token }: { token: string }) {
   const [lang, setLang] = useState<Lang>("uk");
@@ -135,7 +31,7 @@ export function BriefForm({ token }: { token: string }) {
       initData = typeof window !== "undefined" ? window.Telegram?.WebApp?.initData || undefined : undefined;
     } catch { /* ignore */ }
     start(async () => {
-      const r = await submitBriefAction(token, type, data, initData);
+      const r = await submitBriefAction(token, type, data, initData, "form");
       if (r.error) setError(r.error);
       else setSent(true);
     });

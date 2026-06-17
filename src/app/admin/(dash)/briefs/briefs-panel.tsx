@@ -25,6 +25,7 @@ function Row({ b, projects }: { b: BriefRow; projects: Proj[] }) {
   const [pending, start] = useTransition();
   const url = b.link;
   const submitted = b.status === "submitted";
+  const mode = (b.payload?._mode as string | undefined) || null; // как заполнили: form | chat (A/B)
   return (
     <div style={{ ...ui.card, padding: 14, marginTop: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -32,6 +33,7 @@ function Row({ b, projects }: { b: BriefRow; projects: Proj[] }) {
         {b.tg && <span style={{ ...ui.monoLabel, textTransform: "none", color: "#e8b339" }}>✈ {b.tg}</span>}
         <span style={{ ...ui.monoLabel, color: submitted ? "var(--accent)" : "var(--muted)" }}>{submitted ? "заполнен" : "ожидает"}</span>
         {b.type && <span style={{ ...ui.monoLabel, textTransform: "none", padding: "1px 8px", border: "1px solid var(--border-2)", borderRadius: 3 }}>{b.type}</span>}
+        {mode && <span style={{ ...ui.monoLabel, textTransform: "none", padding: "1px 8px", border: "1px solid var(--accent-line)", color: "var(--accent)", borderRadius: 3 }}>{mode === "chat" ? "чат" : "форма"}</span>}
         <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <CopyLink url={url} />
           {submitted && b.payload && <button onClick={() => setOpen((v) => !v)} style={ui.btn}>{open ? "Скрыть" : "Показать ответы"}</button>}
@@ -91,6 +93,17 @@ export function BriefsPanel({ briefs, projects }: { briefs: BriefRow[]; projects
       </div>
 
       <div style={{ marginTop: 24 }}>
+        {(() => {
+          // A/B: сколько заполненных брифов пришло через форму vs чат.
+          const done = briefs.filter((b) => b.status === "submitted");
+          const chat = done.filter((b) => (b.payload?._mode as string) === "chat").length;
+          const form = done.filter((b) => (b.payload?._mode as string) === "form").length;
+          return (chat + form) > 0 ? (
+            <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginBottom: 8 }}>
+              A/B заполнений: форма <span style={{ color: "var(--accent)" }}>{form}</span> · чат <span style={{ color: "var(--accent)" }}>{chat}</span>
+            </div>
+          ) : null;
+        })()}
         <div style={ui.monoLabel}>Все брифы · {briefs.length}</div>
         {briefs.length === 0 ? (
           <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 10 }}>Пока нет.</p>

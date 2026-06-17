@@ -1,6 +1,6 @@
 import Script from "next/script";
 import { getBriefByToken } from "@/lib/db";
-import { BriefForm } from "./brief-form";
+import { BriefIntake } from "./brief-intake";
 import { ui } from "../../admin/ui-styles";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export default async function BriefPage({ params }: { params: Promise<{ token: s
   return (
     <div style={{ ...ui.page, minHeight: "100dvh" }}>
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
-      <BriefForm token={token} />
+      <BriefIntake token={token} />
     </div>
   );
 }
