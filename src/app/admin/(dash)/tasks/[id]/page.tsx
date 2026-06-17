@@ -70,6 +70,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const myLogin = me.youtrackLogin;
   // Время последнего коммента от ДРУГОГО автора (ответа) — свой коммент правим, только пока ответа нет.
   const lastOtherCreated = comments.reduce((max, c) => (myLogin && c.author.login !== myLogin ? Math.max(max, c.created) : max), 0);
+  // Итог разраба ещё на модерации (клиент-facing коммент approved=false): результат клиенту НЕ показан.
+  // Пока так — клиент-постановщик НЕ должен видеть блок приёмки (разраб ставит Review сразу, но итог ждёт апрува).
+  const pendingClientResult = comments.some((c) => c.visibility === "client" && c.approved === false);
   const viewComments: ViewComment[] = comments.map((c) => ({
     id: c.id,
     text: c.text,
@@ -179,8 +182,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <ApprovalBar id={task.id} canApprove={isSuperAdmin(me) || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />
       )}
 
-      {/* Постановщик (или админ) проверяет результат в «Ревью» → принять/на доработку. */}
-      {statusBucket(task.state) === "review" && (isAdmin || (!!me.youtrackLogin && task.reporter?.login === me.youtrackLogin)) && (
+      {/* Постановщик (или админ) проверяет результат в «Ревью» → принять/на доработку.
+          Клиенту-постановщику показываем ТОЛЬКО когда итог уже одобрен (не висит на модерации) —
+          иначе его зовут принимать до того, как агентство опубликовало результат. Админ-модератор видит всегда. */}
+      {statusBucket(task.state) === "review" && (isAdmin || (!!me.youtrackLogin && task.reporter?.login === me.youtrackLogin && !pendingClientResult)) && (
         <ReviewActions id={task.id} locale={locale} />
       )}
 
