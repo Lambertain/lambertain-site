@@ -73,7 +73,9 @@ export async function draftTask(taskId: string): Promise<void> {
     const project = projects.find((p) => p.key === task.projectKey);
     if (!project) return;
 
-    const userList = users.filter((u) => !u.banned && (u.role === "contributor" || u.role === "admin")).map((u) => `${u.login} (${u.fullName})`).join(", ");
+    // Исполнители — только разработчики (contributor). Админов в кандидаты НЕ берём: задачу выполняет дев,
+    // иначе ИИ может назначить на «admin», и реальный дев не увидит её в своих задачах (фильтр по исполнителю).
+    const userList = users.filter((u) => !u.banned && u.role === "contributor").map((u) => `${u.login} (${u.fullName})`).join(", ");
     const system = systemPrompt(project.name, new Date().toISOString().slice(0, 10), userList, skills.map((s) => `- ${s.slug}: ${s.title} [${s.triggers}]`).join("\n"));
 
     const first: Anthropic.ContentBlockParam[] = [
