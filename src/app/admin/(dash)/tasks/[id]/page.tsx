@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide, guideText, getProjectEmployees } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide, guideText, getProjectEmployees, projectHasClient } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -65,6 +65,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const clientGuide = cg ? guideText(cg, locale) : null;
   // Клиент может делегировать задачу сотруднику своего проекта (если такие есть).
   const employees = me.role === "client" ? await getProjectEmployees(id.split("-")[0]) : [];
+  // Сотрудник в проекте БЕЗ клиента приравнивается к клиенту (пользователь/постановщик): пишет клиент-видимые
+  // комменты без выбора видимости и без гендер-предупреждения — как клиент.
+  const clientSide = me.role === "client" || (me.role === "employee" && !(await projectHasClient(id.split("-")[0])));
 
   // Новые комменты — появившиеся после последнего открытия задачи.
   const prevRead = reads.get(id) ?? 0;
@@ -227,7 +230,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           {t(locale, "task.comments")} · {shownCount}
         </div>
         <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} locale={locale} />
-        <CommentBox id={task.id} locale={locale} canChooseVisibility={me.role !== "client"} />
+        <CommentBox id={task.id} locale={locale} canChooseVisibility={!clientSide} />
       </div>
     </div>
   );

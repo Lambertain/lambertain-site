@@ -7,7 +7,7 @@ import { draftClientMessage } from "@/lib/replies";
 import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask } from "@/lib/db";
+import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
@@ -21,8 +21,11 @@ export async function addTaskComment(
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
   if (!text.trim() && !attachments?.length) return { error: "Пустой комментарий" };
-  // Клиент всегда пишет клиенту видимый коммент. Команда выбирает: по умолчанию внутренний.
-  const visibility: "client" | "internal" = me.role === "client" ? "client" : visibleToClient ? "client" : "internal";
+  // Клиент всегда пишет клиент-видимый коммент. Сотрудник в проекте БЕЗ клиента приравнивается к клиенту
+  // (он — пользователь/постановщик, фидбечит; не на стороне разраба) → его коммент тоже клиент-видимый, без модерации.
+  // Остальная команда (разраб/админ) выбирает: по умолчанию внутренний.
+  const clientSide = me.role === "client" || (me.role === "employee" && !(await projectHasClient(id.split("-")[0])));
+  const visibility: "client" | "internal" = clientSide ? "client" : visibleToClient ? "client" : "internal";
   try {
     // Сохраняем вложения и подставляем реальные ссылки вместо маркеров att:<localId>.
     let body = text;
@@ -32,7 +35,7 @@ export async function addTaskComment(
     }
     // Модерация: клиент-видимый коммент от команды (кроме супер-админа) → полиш в агентский голос + pending,
     // клиент не видит и без пуша до апрува Никиты.
-    if (me.role !== "client" && visibility === "client" && !isSuperAdmin(me)) {
+    if (!clientSide && visibility === "client" && !isSuperAdmin(me)) {
       try {
         const [task, history] = await Promise.all([getBackend().getTask(id), getBackend().getComments(id)]);
         const polished = (await draftClientMessage(task, body, history)) || body;
@@ -46,8 +49,8 @@ export async function addTaskComment(
     // Автор коммента = текущий член (по логину); супер-админ без логина → Lambertain. Клиент видит команду как «Lambertain» (маскируется при выводе).
     await getBackend().addComment(id, body, visibility, me.youtrackLogin);
     revalidatePath(`/admin/tasks/${id}`);
-    // Клиент ответил: возобновить ИИ-триаж (если ждал) и разблокировать задачу (если была Blocked из-за эскалации).
-    if (me.role === "client") {
+    // Клиент (или сотрудник-как-клиент) ответил: возобновить ИИ-триаж (если ждал) и разблокировать задачу (если была Blocked из-за эскалации).
+    if (clientSide) {
       const ai = await getTaskAiStatus(id).catch(() => null);
       if (ai === "waiting") {
         await setTaskAiStatus(id, "pending").catch(() => {});
@@ -64,8 +67,8 @@ export async function addTaskComment(
       const imgs = attachmentIdsIn(body, task.description);
       const projName = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey)?.name || task.projectKey;
       const openBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` };
-      if (me.role === "client") {
-        // Клиент написал → ответственному разработчику + админу.
+      if (clientSide) {
+        // Клиент (или сотрудник-как-клиент) написал → ответственному разработчику + админу.
         await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${projName} · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
         await notifyAdmin(`💬 <b>Вопрос клиента</b> · ${projName} · ${id}: ${task.summary}`, openBtn);
       } else if (visibility === "client") {
