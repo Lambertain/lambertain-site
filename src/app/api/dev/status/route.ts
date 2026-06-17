@@ -8,9 +8,9 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken } from "@/lib/db";
+import { getProjectKeyByToken, getProjectFull } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
+import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
@@ -40,10 +40,12 @@ export async function POST(req: Request) {
   try {
     if (status === "Review") {
       const task = await be.getTask(taskId);
-      // Задачи по спеке супер-админа (autoDone) — на готовности сразу Done, без ручной приёмки.
-      if (task.autoDone) {
+      const proj = await getProjectFull(projectKey).catch(() => null);
+      // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
+      if (task.autoDone || proj?.meta.autoApprove) {
         await be.updateStatus(taskId, "Done");
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client");
+        if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
         return NextResponse.json({ ok: true, status: "Done" });
       }

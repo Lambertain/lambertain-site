@@ -54,6 +54,8 @@ export function MetaForm({
   const [devBranch, setDevBranch] = useState(m.deploy?.devBranch ?? "");
   const [design, setDesign] = useState(m.design ?? "");
   const [spec, setSpec] = useState(m.spec ?? "");
+  const [devInfo, setDevInfo] = useState(m.devInfo ?? "");
+  const [autoApprove, setAutoApprove] = useState(!!m.autoApprove);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -69,6 +71,8 @@ export function MetaForm({
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
       design: design || undefined,
       spec: spec || undefined,
+      devInfo: devInfo || undefined,
+      autoApprove: autoApprove || undefined,
       conventions: m.conventions || undefined, // поле убрано из формы; сохранённое значение не теряем
       defaultAssignee: defaultAssignee || undefined,
       cost: cost.trim() !== "" && Number.isFinite(Number(cost)) ? Number(cost) : undefined,
@@ -198,6 +202,20 @@ export function MetaForm({
         <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.specHint")}</div>
         <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={10} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
       </div>
+
+      <div style={{ marginTop: 18 }}>
+        <label style={ui.fieldLabel}>{t(locale, "projects.devInfo")}</label>
+        <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.devInfoHint")}</div>
+        <textarea value={devInfo} onChange={(e) => setDevInfo(e.target.value)} rows={6} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
+      </div>
+
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 18, cursor: "pointer" }}>
+        <input type="checkbox" checked={autoApprove} onChange={(e) => setAutoApprove(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />
+        <span>
+          <span style={{ fontSize: 14 }}>{t(locale, "projects.autoApprove")}</span>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "projects.autoApproveHint")}</span>
+        </span>
+      </label>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 18 }}>
         <button onClick={save} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>

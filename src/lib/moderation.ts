@@ -6,7 +6,7 @@
  */
 import { getBackend } from "./tasks";
 import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag } from "./notify";
-import { q } from "./db";
+import { q, getProjectFull } from "./db";
 import { PORTAL_BASE } from "./dev-protocol";
 
 const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
@@ -14,10 +14,19 @@ const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url:
 /**
  * Клиент-видимый коммент от команды → на модерацию супер-админу.
  * Создаёт pending-коммент (клиент не видит, без пуша) и уведомляет супер-админа.
+ * Исключение — проект с autoApprove (доверенный разработчик): публикуем сразу клиенту, без модерации.
  */
 export async function submitForModeration(taskId: string, body: string, opts?: { authorLogin?: string; taskSummary?: string }): Promise<void> {
+  const task = await getBackend().getTask(taskId).catch(() => null);
+  const summary = opts?.taskSummary ?? task?.summary ?? "";
+  const proj = task ? await getProjectFull(task.projectKey).catch(() => null) : null;
+  if (proj?.meta.autoApprove) {
+    // Доверенный разработчик — без модерации: публикуем клиенту сразу.
+    await getBackend().addComment(taskId, body, "client", opts?.authorLogin, true);
+    if (task) await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(taskId)}</b>: ${summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), taskBtn(taskId)).catch(() => {});
+    return;
+  }
   await getBackend().addComment(taskId, body, "client", opts?.authorLogin, false);
-  const summary = opts?.taskSummary ?? (await getBackend().getTask(taskId).then((t) => t.summary).catch(() => ""));
   await notifyAdmin(`🛡 <b>Коммент на модерацию</b> · ${await taskTag(taskId)}: ${summary}\n${body.slice(0, 400)}`, taskBtn(taskId)).catch(() => {});
 }
 

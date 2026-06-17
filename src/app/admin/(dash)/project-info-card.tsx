@@ -5,6 +5,7 @@ import { saveCredentials } from "./project-actions";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { t, type Locale } from "@/lib/i18n";
+import { Markdown } from "./markdown";
 import { ui } from "../ui-styles";
 
 type Cred = { role?: string; env?: string; login?: string; pass?: string };
@@ -47,6 +48,7 @@ export function ProjectInfoCard({
 }) {
   const m = project.meta;
   const [open, setOpen] = useState(false);
+  const [specOpen, setSpecOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [creds, setCreds] = useState<Cred[]>(m.credentials?.length ? m.credentials : []);
   const [saved, setSaved] = useState(false);
@@ -120,6 +122,23 @@ export function ProjectInfoCard({
             {prodUrl && <ExtLink href={prodUrl} label={`${t(locale, "proj.prodApp")}: ${prodUrl}`} />}
             {figma && <ExtLink href={figma} label={`${t(locale, "proj.figma")}: ${figma}`} />}
           </div>
+
+          {/* Инфо от клиента + полная спека — только разработчику (showDevLink), клиент эту секцию не видит. */}
+          {showDevLink && m.devInfo && (
+            <div style={{ border: "1px solid var(--border-2)", borderRadius: 6, padding: 12, background: "var(--surface-2)" }}>
+              <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 6 }}>{t(locale, "proj.devInfo")}</div>
+              <Markdown>{m.devInfo}</Markdown>
+            </div>
+          )}
+          {showDevLink && m.spec && (
+            <div style={{ border: "1px solid var(--border-2)", borderRadius: 6 }}>
+              <button onClick={() => setSpecOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+                <span style={ui.monoLabel}>{t(locale, "proj.fullSpec")}</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" style={{ transform: specOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}><polyline points="6 9 12 15 18 9" /></svg>
+              </button>
+              {specOpen && <div style={{ padding: "0 12px 12px", maxHeight: 420, overflowY: "auto" }}><Markdown>{m.spec}</Markdown></div>}
+            </div>
+          )}
 
           {/* аккаунты входа */}
           <div>

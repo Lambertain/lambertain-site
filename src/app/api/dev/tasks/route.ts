@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     const lastClientAnswer = clientAfter.length ? clientAfter[clientAfter.length - 1].text : null;
     // projectSpec — ПОЛНАЯ спека проекта (общий контекст; читай ДО эскалаций — там почти всё).
     // tags: { type, complexity (small|feature), skills:[slug] } — по skills тяни плейбуки из /api/dev/skills.
-    return NextResponse.json({ task, tags, projectSpec: proj?.meta.spec || null, comments, awaitingClient, lastClientAnswer });
+    return NextResponse.json({ task, tags, projectSpec: proj?.meta.spec || null, projectInfo: proj?.meta.devInfo || null, comments, awaitingClient, lastClientAnswer });
   }
 
   // Список задач проекта.
