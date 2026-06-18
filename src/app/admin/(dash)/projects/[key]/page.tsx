@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/principal";
-import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds, listSecrets, listLinks, memberProjectsMap, listProjectsWithMeta } from "@/lib/db";
+import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds, listLinks, memberProjectsMap, listProjectsWithMeta } from "@/lib/db";
 import { ProjectGuides } from "./project-guides";
 import { ProjectUsersPanel } from "./project-users";
 import type { PanelUser } from "../../team/users-panel";
-import { SecretsPanel } from "./secrets-panel";
 import { DeleteProject } from "./delete-project";
 import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
@@ -21,8 +20,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
   await requireAdmin();
   const { key } = await params;
   const locale = await getLocale();
-  const [proj, tokens, users, brief, guides, enabledGuides, secrets, links, memberProj, allProjects] = await Promise.all([
-    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), getProjectGuideIds(key), listSecrets(key), listLinks(), memberProjectsMap(), listProjectsWithMeta(),
+  const [proj, tokens, users, brief, guides, enabledGuides, links, memberProj, allProjects] = await Promise.all([
+    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), getProjectGuideIds(key), listLinks(), memberProjectsMap(), listProjectsWithMeta(),
   ]);
   const contributors = users
     .filter((u) => u.role === "contributor" || u.role === "admin")
@@ -87,8 +86,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
           )}
         </div>
       )}
-
-      <SecretsPanel projectKey={key} secrets={secrets.map((s) => ({ id: s.id, name: s.name, value: s.value, note: s.note, env: s.env, filledBy: s.filled_by }))} />
 
       <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title }))} enabled={enabledGuides} />
 

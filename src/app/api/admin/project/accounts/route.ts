@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (!expected) return NextResponse.json({ error: "ADMIN_API_TOKEN not configured" }, { status: 503 });
   if (bearer(req) !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
-  let body: { projectKey?: string; env?: string; accounts?: Account[]; mode?: string; deleteSecretIds?: number[] };
+  let body: { projectKey?: string; env?: string; accounts?: Account[]; mode?: string; deleteSecretIds?: number[]; clearCredentials?: boolean };
   try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   const env = body.env === "prod" ? "prod" : body.env === "dev" ? "dev" : null;
@@ -38,7 +38,9 @@ export async function POST(req: Request) {
   const field = env === "prod" ? "prodAccounts" : "devAccounts";
   const existing = (env === "prod" ? proj.meta.prodAccounts : proj.meta.devAccounts) ?? [];
   const next = body.mode === "replace" ? incoming : [...existing, ...incoming];
-  await setProjectMeta(projectKey, proj.name, { ...proj.meta, [field]: next.length ? next : undefined });
+  const metaUpd = { ...proj.meta, [field]: next.length ? next : undefined };
+  if (body.clearCredentials) metaUpd.credentials = undefined; // legacy m.credentials больше не используется
+  await setProjectMeta(projectKey, proj.name, metaUpd);
 
   // Удалить перенесённые секреты — только принадлежащие этому проекту.
   let deleted = 0;
