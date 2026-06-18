@@ -195,6 +195,8 @@ export function TaskTabs({
   feedbackKey,
   initialProject,
   initialBucket,
+  activeProject: controlledProject,
+  onProjectChange,
 }: {
   tasks: BoardTask[];
   projects: Proj[];
@@ -207,16 +209,21 @@ export function TaskTabs({
   /** Начальные проект/корзина из URL (?project=&tab=) — для дип-линка из карточки проекта. */
   initialProject?: string;
   initialBucket?: Bucket;
+  /** Контролируемый режим: выбранный проект задаёт родитель (чтобы синхронить с карточкой проекта сверху). */
+  activeProject?: string;
+  onProjectChange?: (key: string) => void;
 }) {
   const projectKeys = projects.map((p) => p.key);
-  const [activeProject, setActiveProject] = useState<string>(
+  const [internalProject, setInternalProject] = useState<string>(
     initialProject && projectKeys.includes(initialProject) ? initialProject : projectKeys[0] ?? "",
   );
+  // Контролируемый проект (от родителя) приоритетнее внутреннего — так карточка сверху и табы синхронны.
+  const activeProject = controlledProject !== undefined ? controlledProject : internalProject;
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [, startSeen] = useTransition();
 
   function openProject(key: string) {
-    setActiveProject(key);
+    if (onProjectChange) onProjectChange(key); else setInternalProject(key);
     setBucket(null);
     if (!opened.has(key)) {
       setOpened((s) => new Set(s).add(key));

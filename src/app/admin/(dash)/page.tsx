@@ -13,7 +13,8 @@ import { nowMs } from "@/lib/now";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { ChatModal } from "./chat-modal";
-import { TaskTabs, type BoardTask } from "./task-tabs";
+import { type BoardTask } from "./task-tabs";
+import { ClientBoard } from "./client-board";
 import { DevDashboard, type DashProject } from "./dev-dashboard";
 import { ui } from "../ui-styles";
 
@@ -191,7 +192,11 @@ export default async function HomePage() {
   const myProject = me.role === "client" ? visible.find((p) => p.key === me.projectKey) : undefined;
   const showOnboarding = me.role === "client" && !!myProject?.meta.showOnboarding;
   const instructionSetToken = me.role === "client" ? myProject?.meta.onboardingSetToken : undefined;
-  const clientProject = me.role === "client" ? visible.find((p) => !p.meta.feedback) : null;
+  // Карточки всех клиентских проектов (кроме feedback) — по ключу; ClientBoard покажет карточку ВЫБРАННОГО проекта.
+  const clientProjects = me.role === "client" ? visible.filter((p) => !p.meta.feedback) : [];
+  const projectCards: Record<string, React.ReactNode> = Object.fromEntries(
+    clientProjects.map((p) => [p.key, <ProjectInfoCard key={p.key} project={p} now={now} locale={locale} />]),
+  );
   const clientGuides = me.role === "client" && me.projectKey ? await getEnabledGuides(me.projectKey) : [];
 
   return (
@@ -211,18 +216,16 @@ export default async function HomePage() {
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "onb.bannerCta")}</span>
         </a>
       )}
-      {clientProject && (
-        <div style={{ marginBottom: 18 }}>
-          <ProjectInfoCard project={clientProject} now={now} locale={locale} />
-        </div>
-      )}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "nav.tasks")}</h1>
-        <span style={{ marginLeft: "auto" }}>
-          <ChatModal projects={projects} locale={locale} role={me.role} feedbackKey={feedbackKey} />
-        </span>
-      </div>
-      <TaskTabs
+      <ClientBoard
+        projectCards={projectCards}
+        header={
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <h1 style={{ ...ui.h1, fontSize: "clamp(22px,5vw,30px)" }}>{t(locale, "nav.tasks")}</h1>
+            <span style={{ marginLeft: "auto" }}>
+              <ChatModal projects={projects} locale={locale} role={me.role} feedbackKey={feedbackKey} />
+            </span>
+          </div>
+        }
         tasks={board}
         projects={projectsWithNew}
         locale={locale}
