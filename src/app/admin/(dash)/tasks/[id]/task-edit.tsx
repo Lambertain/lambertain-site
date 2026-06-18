@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { editTask } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
+import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
 type Assignee = { login: string; fullName: string };
@@ -63,6 +64,15 @@ export function TaskEdit({
 
       <label style={{ ...ui.fieldLabel, marginTop: 12 }}>{t(locale, "taskedit.description")}</label>
       <textarea value={d} onChange={(e) => { setD(e.target.value); setSaved(false); }} rows={Math.min(20, Math.max(6, d.split("\n").length + 1))} style={{ ...ui.input, width: "100%", resize: "vertical", lineHeight: 1.5, fontFamily: "var(--font-mono)", fontSize: 13 }} />
+      {/* Живой предпросмотр: картинки/форматирование на своём месте (в поле — сырой markdown). */}
+      {d.trim() && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ ...ui.monoLabel, color: "var(--muted)" }}>{t(locale, "common.preview")}</div>
+          <div style={{ border: "1px solid var(--border-2)", borderRadius: 6, padding: 12, marginTop: 6, maxHeight: 340, overflowY: "auto" }}>
+            <Markdown>{d}</Markdown>
+          </div>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12 }}>
         <div>

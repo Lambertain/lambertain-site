@@ -550,6 +550,7 @@ export const DICT: Record<string, Entry> = {
   "vis.hint": { uk: "Видимість у картці «Деталі та доступи»:", ru: "Видимость в карточке «Детали и доступы»:", en: "Visibility in the “Details & access” card:" },
   "vis.client": { uk: "клієнту/співробітнику", ru: "клиенту/сотруднику", en: "client/employee" },
   "vis.dev": { uk: "розробнику", ru: "разработчику", en: "developer" },
+  "common.preview": { uk: "Попередній перегляд", ru: "Предпросмотр", en: "Preview" },
 
   // — пользователи проекта (на странице проекта) —
   "projUsers.kicker": { uk: "Хто в проєкті", ru: "Кто в проекте", en: "Who is in the project" },
