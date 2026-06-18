@@ -34,7 +34,11 @@ export function LocaleSwitch({ current }: { current: Locale }) {
         aria-label="Мова"
         style={{
           ...ui.monoLabel,
-          padding: "6px 10px",
+          height: 34,
+          boxSizing: "border-box",
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "0 10px",
           lineHeight: 1,
           background: "transparent",
           color: "var(--text)",
