@@ -7,12 +7,13 @@
  * (Done/Rework ставит постановщик в портале; Blocked — портал при эскалации.)
  * Авторизация: Authorization: Bearer <project_token>
  */
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getProjectKeyByToken, getProjectFull } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
+import { autoDeliverIfConfigured } from "@/lib/deliver";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -47,6 +48,25 @@ export async function POST(req: Request) {
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+        // Авто-доставка на репо клиента (squash-пуш + апрув деплоя/мониторинг; миграция — через preDeploy
+        // клиентского деплоя), если настроены ВСЕ креды. Фоном (after) — не блокируем ответ дев-Клоду.
+        if (proj?.meta) {
+          const meta = proj.meta;
+          after(async () => {
+            try {
+              const d = await autoDeliverIfConfigured(meta);
+              if (d) {
+                await notifyAdmin(
+                  `🚀 <b>Авто-доставка</b> · ${await taskTag(taskId)}\nКлієнт: ${d.clientRepo} (${d.branch}), файлів: ${d.files}` +
+                    (d.deploy ? `\nДеплой: ${d.deploy.status}${d.deploy.commit ? ` · ${d.deploy.commit}` : ""}` : ""),
+                  { text: "Коммит", url: d.commitUrl },
+                ).catch(() => {});
+              }
+            } catch (e) {
+              await notifyAdmin(`⚠️ <b>Авто-доставка не вдалася</b> · ${await taskTag(taskId)}: ${e instanceof Error ? e.message : "помилка"}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+            }
+          });
+        }
         return NextResponse.json({ ok: true, status: "Done" });
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
