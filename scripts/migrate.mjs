@@ -429,30 +429,8 @@ async function main() {
     [SEED_CONTRACTOR.name, SEED_CONTRACTOR.address, SEED_CONTRACTOR.ipn, SEED_CONTRACTOR.iban,
      SEED_CONTRACTOR.bank_name, SEED_CONTRACTOR.bank_mfo, SEED_CONTRACTOR.bank_edrpou, SEED_CONTRACTOR.phone],
   );
-  // Одноразовый перенос существующих секретов проектов (meta.credentials + clientDeploy.railwayToken) на страницу секретов.
-  const projs = await pool.query("SELECT key, meta FROM projects WHERE meta IS NOT NULL");
-  for (const p of projs.rows) {
-    const meta = p.meta || {};
-    const creds = Array.isArray(meta.credentials) ? meta.credentials : [];
-    for (const cr of creds) {
-      if (!cr || (!cr.login && !cr.pass)) continue;
-      const name = `${cr.role || "доступ"}${cr.login ? ` (${cr.login})` : ""}`;
-      const val = [cr.login ? `логін: ${cr.login}` : "", cr.pass ? `пароль: ${cr.pass}` : ""].filter(Boolean).join("\n");
-      await pool.query(
-        `INSERT INTO project_secrets (project_key, name, value, env, filled_by) VALUES ($1,$2,$3,$4,'migrated')
-         ON CONFLICT (project_key, name, coalesce(env,'')) DO NOTHING`,
-        [p.key, name, val, cr.env || null],
-      );
-    }
-    const rt = meta.clientDeploy?.railwayToken;
-    if (rt) {
-      await pool.query(
-        `INSERT INTO project_secrets (project_key, name, value, note, filled_by) VALUES ($1,'Railway token',$2,'клієнтський Railway для деплою','migrated')
-         ON CONFLICT (project_key, name, coalesce(env,'')) DO NOTHING`,
-        [p.key, rt],
-      );
-    }
-  }
+  // (Убрано: авто-перенос meta.credentials/railwayToken → project_secrets. Выполнялся на каждом деплое и
+  //  воскрешал удалённые секреты. Доступы теперь — поля реестра проекта, отдаются дев-Клоду через /api/dev/secrets.)
   const c = await pool.query("SELECT count(*)::int AS n FROM role_overrides");
   const s = await pool.query("SELECT count(*)::int AS n FROM skills");
   console.log(`Миграция ок. role_overrides: ${c.rows[0].n}, skills: ${s.rows[0].n}.`);
