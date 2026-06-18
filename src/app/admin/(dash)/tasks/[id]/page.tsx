@@ -143,8 +143,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
 
-      {/* Нужно действие владельца (деплой/регистрация/токен) — команде, не клиенту (клиент видит «в работе») */}
-      {me.role !== "client" && task.ownerAction && (
+      {/* Нужно действие владельца (деплой/регистрация/токен) — только команде (агентство).
+          НЕ показываем стороне клиента: ни клиенту-владельцу, ни его сотруднику (оба — пользователи продукта). */}
+      {me.role !== "client" && me.role !== "employee" && task.ownerAction && (
         <OwnerActionBar taskId={task.id} action={task.ownerAction} canResolve={isSuperAdmin(me)} locale={locale} />
       )}
 
