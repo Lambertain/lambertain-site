@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { saveCredentials } from "./project-actions";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { fieldVisible } from "@/lib/field-visibility";
+import { getFieldDef } from "@/lib/project-fields";
 import { BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "./markdown";
@@ -31,6 +32,45 @@ function Bar({ pct, label, danger }: { pct: number; label: string; danger?: bool
       </div>
       <div style={{ height: 6, background: "var(--surface-2)", border: "1px solid var(--border-2)", overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color }} />
+      </div>
+    </div>
+  );
+}
+
+/** Список аккаунтов входа (логин/пароль/примечание) в карточке. */
+function AccountsView({ title, rows }: { title: string; rows: Array<{ login?: string; pass?: string; note?: string }> }) {
+  return (
+    <div>
+      <div style={{ ...ui.monoLabel, marginBottom: 6 }}>{title}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {rows.map((c, i) => (
+          <div key={i} style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13, padding: "6px 10px", border: "1px solid var(--border-2)", borderRadius: 3, background: "var(--surface-2)" }}>
+            {c.login && <span style={{ fontFamily: "var(--font-mono)" }}>{c.login}</span>}
+            {c.pass && <span style={{ fontFamily: "var(--font-mono)" }}>{c.pass}</span>}
+            {c.note && <span style={{ color: "var(--muted)" }}>{c.note}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Кастомное поле из реестра в карточке: заголовок + значения подполей (url → ссылка). */
+function CustomFieldView({ fieldKey, values, locale }: { fieldKey: string; values: Record<string, string> | undefined; locale: Locale }) {
+  const def = getFieldDef(fieldKey);
+  if (!def) return null;
+  const rows = def.subs.map((s) => ({ label: s.label[locale], val: (values?.[s.key] ?? "").trim(), kind: s.kind })).filter((r) => r.val);
+  if (!rows.length) return null;
+  return (
+    <div style={{ border: "1px solid var(--border-2)", borderRadius: 6, padding: 12, background: "var(--surface-2)" }}>
+      <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 6 }}>{def.label[locale]}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {rows.map((r, i) => (
+          <div key={i} style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 13 }}>
+            <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", minWidth: 90 }}>{r.label}</span>
+            {r.kind === "url" ? <a href={r.val} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", wordBreak: "break-all" }}>{r.val}</a> : <span style={{ fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{r.val}</span>}
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -126,6 +166,15 @@ export function ProjectInfoCard({
             {see("prodUrl") && prodUrl && <ExtLink href={prodUrl} label={`${t(locale, "proj.prodApp")}: ${prodUrl}`} />}
             {see("design") && figma && <ExtLink href={figma} label={`${t(locale, "proj.figma")}: ${figma}`} />}
           </div>
+
+          {/* Аккаунты входа prod/dev (под соответствующими URL) — по видимости. */}
+          {see("prodAccounts") && (m.prodAccounts?.length ?? 0) > 0 && <AccountsView title={t(locale, "proj.accountsProd")} rows={m.prodAccounts!} />}
+          {see("devAccounts") && (m.devAccounts?.length ?? 0) > 0 && <AccountsView title={t(locale, "proj.accountsDev")} rows={m.devAccounts!} />}
+
+          {/* Кастомные поля из реестра (соцсети/мессенджеры/доступы) — каждое по своей видимости. */}
+          {(m.enabledFields ?? []).filter((k) => see(k)).map((k) => (
+            <CustomFieldView key={k} fieldKey={k} values={m.customFields?.[k]} locale={locale} />
+          ))}
 
           {/* Инфо от клиента + полная спека — видимость по настройке (дефолт: только разработчику). */}
           {see("devInfo") && m.devInfo && (

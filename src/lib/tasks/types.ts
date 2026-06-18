@@ -89,6 +89,14 @@ export interface ProjectMeta {
     /** teamId — если проект под Vercel-командой/орг (нужен в API). */
     teamId?: string;
   };
+  /** Аккаунты входа prod-окружения (логин/пароль/примечание; добавляемые строки) — под Prod URL. */
+  prodAccounts?: Array<{ login?: string; pass?: string; note?: string }>;
+  /** Аккаунты входа dev-окружения — под Dev URL. */
+  devAccounts?: Array<{ login?: string; pass?: string; note?: string }>;
+  /** Включённые в проекте кастомные поля из реестра (project-fields.ts), напр. ["facebook","whatsapp"]. */
+  enabledFields?: string[];
+  /** Значения кастомных полей: ключ поля → { подполе → значение }. */
+  customFields?: Record<string, Record<string, string>>;
 }
 
 export interface Task {

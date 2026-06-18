@@ -12,6 +12,8 @@ export const FIELD_VIS_DEFAULTS: Record<string, { client: boolean; dev: boolean 
   devInfo: { client: false, dev: true },
   spec: { client: false, dev: true },
   accounts: { client: true, dev: true },
+  prodAccounts: { client: true, dev: true },
+  devAccounts: { client: false, dev: true },
 };
 
 export const FIELD_VIS_ORDER = ["prodUrl", "devUrl", "design", "devInfo", "spec", "accounts"] as const;
