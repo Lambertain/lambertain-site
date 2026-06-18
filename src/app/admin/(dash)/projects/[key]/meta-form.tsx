@@ -6,6 +6,7 @@ import { uploadProjectFile } from "../../project-actions";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { FIELD_VIS_DEFAULTS, type FieldVis } from "@/lib/field-visibility";
 import { PROJECT_FIELD_DEFS, getFieldDef } from "@/lib/project-fields";
+import { DateField } from "../../date-field";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
@@ -234,11 +235,11 @@ export function MetaForm({
         </div>
         <div>
           <label style={ui.fieldLabel}>{t(locale, "field.startedAt")}</label>
-          <input type="date" value={startedAt} onChange={(e) => setStartedAt(e.target.value)} style={ui.input} />
+          <DateField value={startedAt} onChange={setStartedAt} locale={locale} />
         </div>
         <div>
           <label style={ui.fieldLabel}>{t(locale, "field.deadline")}</label>
-          <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={ui.input} />
+          <DateField value={deadline} onChange={setDeadline} locale={locale} />
         </div>
       </div>
 

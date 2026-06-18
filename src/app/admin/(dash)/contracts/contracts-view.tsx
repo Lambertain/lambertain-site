@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ui } from "../../ui-styles";
+import { DateField } from "../date-field";
 import {
   extractPlaceholders, dynamicPlaceholders, fieldLabel, MULTILINE_KEYS,
   buildPaymentsText, paymentsSum, type PaymentItem,
@@ -153,7 +154,7 @@ function CreateContract({ contractors, templates, today }: { contractors: Contra
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {has("number") && <Field label="Номер договору" w={160}><input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="01/2026" style={ui.input} /></Field>}
-        {has("date") && <Field label="Дата" w={160}><input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={ui.input} /></Field>}
+        {has("date") && <Field label="Дата" w={160}><DateField value={date} onChange={setDate} /></Field>}
         {has("city") && <Field label="Місто" w={160}><input value={city} onChange={(e) => setCity(e.target.value)} style={ui.input} /></Field>}
       </div>
 

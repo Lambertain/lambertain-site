@@ -126,6 +126,68 @@ async function remindAssignees() {
   await setState("last_remind_assignee", String(Date.now()));
 }
 
+const NOT_ON_MODERATION = `NOT EXISTS (SELECT 1 FROM comments c WHERE c.task_id = t.id AND c.visibility = 'client' AND c.approved = false)`;
+
+/**
+ * Каждые 15 мин: напоминание про приёмку/апрув, висящие больше СУТОК — ВСЕМ, от кого ждут действие:
+ *  - задача на ревью (Review, итог опубликован) → ПОСТАНОВЩИКУ (кто создал: клиент / сотрудник / админ)
+ *    И делегату-сотруднику (assignee = employee), если делегирована;
+ *  - на утверждении (approval_status = pending) → КЛИЕНТУ проекта.
+ * Так ни одна задача не застрянет на чьём-то апруве — долбим ответственного, пока не сдвинет.
+ */
+async function remindReviewApprovals() {
+  if (!TG_TOKEN) return;
+  const last = Number((await getState("last_remind_review")) || 0);
+  if (Date.now() - last < REMIND_MS) return;
+
+  // A) Review → постановщику (reporter любой роли — кто принимает результат).
+  const reporterRows = (await pool.query(
+    `SELECT t.readable_id, t.title, lr.tg_id
+       FROM tasks t
+       JOIN members mr ON mr.id = t.reporter_id
+       JOIN tg_links lr ON lr.youtrack_login = mr.login
+      WHERE t.status = 'Review' AND t.resolved_at IS NULL
+        AND t.updated_at < now() - interval '24 hours' AND ${NOT_ON_MODERATION}`,
+  )).rows;
+
+  // B) Review → делегату-сотруднику (assignee = employee), если задача делегирована.
+  const empRows = (await pool.query(
+    `SELECT t.readable_id, t.title, l.tg_id
+       FROM tasks t
+       JOIN members m ON m.id = t.assignee_id AND m.role = 'employee'
+       JOIN tg_links l ON l.youtrack_login = m.login
+      WHERE t.status = 'Review' AND t.resolved_at IS NULL
+        AND t.updated_at < now() - interval '24 hours' AND ${NOT_ON_MODERATION}`,
+  )).rows;
+
+  // C) На утверждении (approval pending) → клиенту проекта.
+  const cliRows = (await pool.query(
+    `SELECT DISTINCT t.readable_id, t.title, l.tg_id
+       FROM tasks t JOIN projects p ON p.id = t.project_id
+       JOIN tg_links l ON l.project_key = p.key AND l.role = 'client'
+      WHERE t.resolved_at IS NULL AND t.internal = false
+        AND t.approval_status = 'pending' AND t.updated_at < now() - interval '24 hours'`,
+  )).rows;
+
+  const byTg = new Map();
+  const seen = new Set();
+  for (const r of [...reporterRows, ...empRows, ...cliRows]) {
+    const k = `${r.tg_id}:${r.readable_id}`;
+    if (seen.has(k)) continue; // дедуп: постановщик может совпасть с делегатом
+    seen.add(k);
+    if (!byTg.has(r.tg_id)) byTg.set(r.tg_id, []);
+    byTg.get(r.tg_id).push(r);
+  }
+  if (!byTg.size) { await setState("last_remind_review", String(Date.now())); return; }
+  for (const [tgId, tasks] of byTg) {
+    const lines = [`⏰ <b>Нагадування</b>: ${tasks.length} задач(і) очікують на ваше підтвердження понад добу:`];
+    for (const tk of tasks.slice(0, 10)) lines.push(`• <b>${tk.readable_id}</b>: ${String(tk.title || "").slice(0, 60)}`);
+    const buttons = tasks.slice(0, 8).map((tk) => ({ text: `→ ${tk.readable_id}`, web_app: { url: `${PUBLIC_SITE}/tma?task=${encodeURIComponent(tk.readable_id)}` } }));
+    await sendButtonsTo(tgId, lines.join("\n"), buttons);
+  }
+  await setState("last_remind_review", String(Date.now()));
+}
+
 /** Каждые 15 мин: напомнить супер-админу про несделанное — комменты на модерации и задачи на апрув (с кнопками-диплинками). */
 async function remindSuperAdmin() {
   if (!TG_TOKEN || !TG_CHAT) return;
@@ -201,6 +263,7 @@ async function cycle() {
   if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
   if (flag("REMIND_APPROVALS")) await remindSuperAdmin().catch((e) => console.error("remind:", e.message));
   if (flag("REMIND_ASSIGNEES")) await remindAssignees().catch((e) => console.error("remind-assignees:", e.message));
+  if (flag("REMIND_REVIEW")) await remindReviewApprovals().catch((e) => console.error("remind-review:", e.message));
   console.log(new Date().toISOString(), `цикл завершён, событий: ${total}`);
 }
 
