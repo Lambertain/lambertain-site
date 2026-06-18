@@ -55,10 +55,11 @@ export async function POST(req: Request) {
       if (summary) {
         await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary, devAuthored: true });
       }
-      // Постановщик задачи (он же её принимает) — адресное уведомление. Для задач обычного админа (Настя)
-      // это единственный способ узнать, что её задача готова: модерация-итог уходит супер-админу, а ей — вот это.
-      // У супер-админа member-логина нет (reporter null) → notifyLogins его пропустит, дубля не будет.
-      if (task.reporter?.login) {
+      // Постановщик-член команды (админ, напр. Настя) — адресное уведомление: для неё это единственный способ
+      // узнать, что задача готова (модерация-итог уходит супер-админу). НО постановщику-КЛИЕНТУ/СОТРУДНИКУ это
+      // уведомление НЕ шлём: он не должен знать о готовности, пока супер-админ не одобрил итог-коммент на модерации
+      // (иначе клиент идёт «проверять» до публикации результата). Он узнает после апрува — через notifyProjectClients.
+      if (task.reporter?.login && task.reporter.role !== "client" && task.reporter.role !== "employee") {
         await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(taskId)}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
       }
       return NextResponse.json({ ok: true, status: "Review" });
