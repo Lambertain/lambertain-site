@@ -54,9 +54,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </div>
       );
     }
-    // В режиме «Мои задачи» показываем только проекты, где есть мои задачи; иначе — все проекты.
-    const visibleKeys = new Set(tasks.map((tk) => tk.projectKey));
-    const projects = (mine ? projectsList.filter((p) => visibleKeys.has(p.key)) : projectsList).map((p) => ({ key: p.key, name: p.name }));
+    // В режиме «Мои задачи» показываем только проекты, где есть мои АКТИВНЫЕ (не выполненные) задачи; на «Все» — все проекты.
+    const activeKeys = new Set(tasks.filter((tk) => statusBucket(tk.state) !== "done").map((tk) => tk.projectKey));
+    const projects = (mine ? projectsList.filter((p) => activeKeys.has(p.key)) : projectsList).map((p) => ({ key: p.key, name: p.name }));
     const depMap = await getDepsFor(tasks.map((tk) => tk.id));
     const board: BoardTask[] = tasks.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
