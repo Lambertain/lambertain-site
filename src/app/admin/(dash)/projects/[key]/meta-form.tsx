@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { saveMeta } from "../actions";
+import { uploadProjectFile } from "../../project-actions";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { FIELD_VIS_DEFAULTS, type FieldVis } from "@/lib/field-visibility";
 import { PROJECT_FIELD_DEFS, getFieldDef } from "@/lib/project-fields";
@@ -117,6 +118,29 @@ export function MetaForm({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const diFileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Загрузка любых файлов в «Інфо для розробника»: файл → проектное вложение → markdown-ссылка в текст (как в задаче/комменте).
+  function addDevInfoFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setUploading(true);
+    Array.from(files).forEach((f) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const [meta, data] = String(reader.result).split(",");
+        const mime = meta.slice(5, meta.indexOf(";"));
+        const r = await uploadProjectFile(projectKey, { mime, data, name: f.name || "file" });
+        setUploading(false);
+        if (r.url) {
+          const isImg = mime.startsWith("image/");
+          const md = isImg ? `![${f.name}](${r.url})` : `[${f.name}](${r.url})`;
+          setDevInfo((d) => d + (d && !d.endsWith("\n") ? "\n" : "") + md + "\n");
+        } else if (r.error) setError(r.error);
+      };
+      reader.readAsDataURL(f);
+    });
+  }
 
   function save() {
     setSaved(false);
@@ -271,6 +295,13 @@ export function MetaForm({
         <label style={ui.fieldLabel}>{t(locale, "projects.devInfo")}</label>
         <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.devInfoHint")}</div>
         <textarea value={devInfo} onChange={(e) => setDevInfo(e.target.value)} rows={6} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
+        <div style={{ marginTop: 6 }}>
+          <input ref={diFileRef} type="file" multiple hidden onChange={(e) => { addDevInfoFiles(e.target.files); e.target.value = ""; }} />
+          <button onClick={() => diFileRef.current?.click()} disabled={uploading} style={{ ...ui.monoLabel, display: "inline-flex", alignItems: "center", gap: 6, color: "var(--muted)", background: "transparent", border: "1px solid var(--border-2)", padding: "6px 12px", cursor: "pointer", borderRadius: 2, opacity: uploading ? 0.5 : 1 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+            {uploading ? "…" : t(locale, "chat.attachFile")}
+          </button>
+        </div>
         <VisToggles field="devInfo" vis={vis} setVis={setVis} locale={locale} />
       </div>
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins } from "@/lib/notify";
@@ -28,6 +28,16 @@ export async function saveCredentials(projectKey: string, credentials: Cred[]): 
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }
+}
+
+/** Загрузить файл в «Інфо для розробника» (проектное вложение, не привязано к задаче). Возвращает url для markdown. Admin. */
+export async function uploadProjectFile(projectKey: string, file: { mime: string; data: string; name: string }): Promise<{ url?: string; name?: string; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  if (!file?.data) return { error: "Пустой файл" };
+  const id = await saveProjectAttachment(projectKey, file.mime || "application/octet-stream", file.data, file.name || "file");
+  if (id == null) return { error: "Проект не найден" };
+  return { url: `/api/files/${id}`, name: file.name || "file" };
 }
 
 /** Включить клиенту набор гайдов на проекте. Admin. */

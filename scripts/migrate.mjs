@@ -96,6 +96,9 @@ CREATE TABLE IF NOT EXISTS attachments (
   data       BYTEA NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (task_id, name));
+-- Вложение может быть проектным (не привязано к задаче) — напр. файлы в «Інфо для розробника». Тогда task_id NULL, project_id задан.
+ALTER TABLE attachments ALTER COLUMN task_id DROP NOT NULL;
+ALTER TABLE attachments ADD COLUMN IF NOT EXISTS project_id INT REFERENCES projects(id) ON DELETE CASCADE;
 -- Бриф лида (до клиента/проекта): открывается по публичной ссылке /brief/<token>, заполняется, привязывается к проекту позже.
 CREATE TABLE IF NOT EXISTS briefs (
   id           SERIAL PRIMARY KEY,

@@ -1402,13 +1402,28 @@ export async function saveGuideImage(mime: string, dataB64: string): Promise<num
 }
 /** Вложение задачи для dev-токена — ТОЛЬКО если файл прикреплён к задаче ЭТОГО проекта (иначе null). */
 export async function getDevAttachment(fileId: number, projectKey: string): Promise<{ mime: string | null; name: string | null; data: Buffer } | null> {
+  // Вложение проекта: либо через задачу (task_id), либо проектное (project_id) — напр. файл из «Інфо для розробника».
   const rows = await q<{ mime: string | null; name: string | null; data: Buffer }>(
     `SELECT a.mime, a.name, a.data FROM attachments a
-     JOIN tasks t ON t.id = a.task_id JOIN projects p ON p.id = t.project_id
+       LEFT JOIN tasks t ON t.id = a.task_id
+       JOIN projects p ON p.id = COALESCE(t.project_id, a.project_id)
      WHERE a.id = $1 AND p.key = $2`,
     [fileId, projectKey],
   );
   return rows[0] ?? null;
+}
+
+/** Сохранить ПРОЕКТНОЕ вложение (не привязано к задаче) — напр. файл в «Інфо для розробника». Возвращает id. */
+export async function saveProjectAttachment(projectKey: string, mime: string, base64: string, name: string): Promise<number | null> {
+  const proj = await q<{ id: number }>("SELECT id FROM projects WHERE key = $1", [projectKey]);
+  if (!proj[0]) return null;
+  const buf = Buffer.from(base64, "base64");
+  const uniq = `${(name || "file").slice(0, 40)}-${randomBytes(4).toString("hex")}`;
+  const ins = await q<{ id: number }>(
+    "INSERT INTO attachments (project_id, name, mime, data) VALUES ($1,$2,$3,$4) RETURNING id",
+    [proj[0].id, uniq, mime, buf],
+  );
+  return ins[0].id;
 }
 
 export async function getGuideImage(id: number): Promise<{ mime: string | null; data: Buffer } | null> {
