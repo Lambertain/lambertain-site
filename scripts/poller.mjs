@@ -3,6 +3,7 @@
  * Уведомления о событиях задач шлёт само приложение (src/lib/notify.ts). Здесь — фоновые шаги по БД:
  *   TRIAGE            — отложенный ИИ-триаж задач (через ~TRIAGE_DELAY_MIN минут после создания)
  *   REMIND_APPROVALS  — напоминание супер-админу про модерацию/апрув/ops-шаги
+ *   REMIND_ASSIGNEES  — каждые 15 мин долбить исполнителя по задачам старше суток (пока не выполнит)
  *   NOTIFY_TOKENS     — суточный дайджест расхода токенов
  * Любой шаг отключается флагом env = "0".
  *
@@ -73,6 +74,57 @@ async function tgButtons(text, buttons) {
 
 const REMIND_MS = 15 * 60 * 1000;
 const PUBLIC_SITE = "https://www.lambertain.site";
+
+/** Кнопки конкретному chat_id (а не только супер-админу). */
+async function sendButtonsTo(chatId, text, buttons) {
+  if (DRY) { console.log(`[DRY] →${chatId}`, text.replace(/\n/g, " ⏎ ")); return; }
+  const kb = [];
+  for (let i = 0; i < buttons.length; i += 2) kb.push(buttons.slice(i, i + 2));
+  const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: kb } }),
+  });
+  if (!r.ok) console.error("TG error:", await r.text());
+}
+
+/**
+ * Каждые 15 мин: долбить ИСПОЛНИТЕЛЯ по задачам, которые висят больше СУТОК и ещё не выполнены.
+ * Не трогаем: сданные на ревью (Review), заблокированные (Blocked) и ждущие внешнего действия
+ * (ops-шаг владельца / действие клиента) — это не вина исполнителя. Done (resolved) исключены.
+ */
+async function remindAssignees() {
+  if (!TG_TOKEN) return;
+  const last = Number((await getState("last_remind_assignee")) || 0);
+  if (Date.now() - last < REMIND_MS) return; // не чаще раза в 15 мин
+  const rows = (await pool.query(
+    `SELECT t.readable_id, t.title, l.tg_id
+       FROM tasks t
+       JOIN members m ON m.id = t.assignee_id
+       JOIN tg_links l ON l.youtrack_login = m.login
+      WHERE t.resolved_at IS NULL
+        AND t.status NOT IN ('Review', 'Blocked', 'Done')
+        AND t.owner_action IS NULL AND t.client_action IS NULL
+        AND t.created_at < now() - interval '24 hours'
+        -- не долбим за задачи, заблокированные невыполненной зависимостью (исполнитель не может их начать)
+        AND NOT EXISTS (
+          SELECT 1 FROM task_deps d JOIN tasks bt ON bt.id = d.depends_on_id
+           WHERE d.task_id = t.id AND bt.resolved_at IS NULL AND bt.status <> 'Done'
+        )
+      ORDER BY l.tg_id, t.created_at`,
+  )).rows;
+  if (!rows.length) { await setState("last_remind_assignee", String(Date.now())); return; }
+  // Группируем по исполнителю — один пуш со списком его просроченных задач.
+  const byTg = new Map();
+  for (const r of rows) { if (!byTg.has(r.tg_id)) byTg.set(r.tg_id, []); byTg.get(r.tg_id).push(r); }
+  for (const [tgId, tasks] of byTg) {
+    const lines = [`⏰ <b>Нагадування</b>: ${tasks.length} задач(і) висять понад добу — час завершити:`];
+    for (const tk of tasks.slice(0, 10)) lines.push(`• <b>${tk.readable_id}</b>: ${String(tk.title || "").slice(0, 60)}`);
+    const buttons = tasks.slice(0, 8).map((tk) => ({ text: `→ ${tk.readable_id}`, web_app: { url: `${PUBLIC_SITE}/tma?task=${encodeURIComponent(tk.readable_id)}` } }));
+    await sendButtonsTo(tgId, lines.join("\n"), buttons);
+  }
+  await setState("last_remind_assignee", String(Date.now()));
+}
 
 /** Каждые 15 мин: напомнить супер-админу про несделанное — комменты на модерации и задачи на апрув (с кнопками-диплинками). */
 async function remindSuperAdmin() {
@@ -148,6 +200,7 @@ async function cycle() {
   if (flag("TRIAGE")) total += await runDueTriage().catch((e) => (console.error("triage:", e.message), 0));
   if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
   if (flag("REMIND_APPROVALS")) await remindSuperAdmin().catch((e) => console.error("remind:", e.message));
+  if (flag("REMIND_ASSIGNEES")) await remindAssignees().catch((e) => console.error("remind-assignees:", e.message));
   console.log(new Date().toISOString(), `цикл завершён, событий: ${total}`);
 }
 
