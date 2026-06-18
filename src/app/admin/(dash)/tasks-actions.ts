@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus, moveTaskToProject } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus, moveTaskToProject, markTaskNotificationsRead } from "@/lib/db";
 import { draftTask } from "@/lib/drafter";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients, notifyLogins, taskTag } from "@/lib/notify";
@@ -125,6 +125,8 @@ export async function markTaskRead(id: string): Promise<void> {
   const me = await getPrincipal();
   if (!me) return;
   await markRead(me.youtrackLogin || me.fullName || "admin", id);
+  // Открыл задачу → её уведомления в колокольчике прочитаны.
+  if (me.tgId) await markTaskNotificationsRead(me.tgId, id).catch(() => {});
 }
 
 /** Отметить проект просмотренным (снимает метку New с проекта). */

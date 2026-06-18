@@ -984,6 +984,59 @@ export async function getUserProjectKeys(login: string): Promise<string[]> {
   return rows.map((r) => r.key);
 }
 
+// ---- Уведомления (колокольчик) ----
+export interface Notification {
+  id: number;
+  task_id: string | null;
+  project_key: string | null;
+  title: string;
+  link: string | null;
+  count: number;
+  created_at: string;
+}
+
+/** Создать/обновить уведомление получателю. Для задачи — схлопываем в одну непрочитанную запись (title=последнее, count++). */
+export async function createNotification(recipientTgId: number, opts: { taskId?: string | null; projectKey?: string | null; title: string; link?: string | null }): Promise<void> {
+  const { taskId = null, projectKey = null, title, link = null } = opts;
+  if (taskId) {
+    const upd = await q<{ id: number }>(
+      `UPDATE notifications SET title = $3, link = $4, project_key = COALESCE($5, project_key), count = count + 1, created_at = now()
+       WHERE recipient_tg_id = $1 AND task_id = $2 AND read_at IS NULL RETURNING id`,
+      [recipientTgId, taskId, title, link, projectKey],
+    );
+    if (upd.length) return;
+  }
+  await q(
+    `INSERT INTO notifications (recipient_tg_id, task_id, project_key, title, link) VALUES ($1,$2,$3,$4,$5)`,
+    [recipientTgId, taskId, projectKey, title, link],
+  );
+}
+
+export async function listUnreadNotifications(recipientTgId: number): Promise<Notification[]> {
+  return q<Notification>(
+    `SELECT id, task_id, project_key, title, link, count, created_at FROM notifications
+     WHERE recipient_tg_id = $1 AND read_at IS NULL ORDER BY created_at DESC LIMIT 100`,
+    [recipientTgId],
+  );
+}
+
+export async function countUnreadNotifications(recipientTgId: number): Promise<number> {
+  const r = await q<{ n: number }>("SELECT count(*)::int AS n FROM notifications WHERE recipient_tg_id = $1 AND read_at IS NULL", [recipientTgId]);
+  return r[0]?.n ?? 0;
+}
+
+export async function markNotificationRead(recipientTgId: number, id: number): Promise<void> {
+  await q("UPDATE notifications SET read_at = now() WHERE id = $1 AND recipient_tg_id = $2 AND read_at IS NULL", [id, recipientTgId]);
+}
+
+export async function markTaskNotificationsRead(recipientTgId: number, taskId: string): Promise<void> {
+  await q("UPDATE notifications SET read_at = now() WHERE recipient_tg_id = $1 AND task_id = $2 AND read_at IS NULL", [recipientTgId, taskId]);
+}
+
+export async function markAllNotificationsRead(recipientTgId: number): Promise<void> {
+  await q("UPDATE notifications SET read_at = now() WHERE recipient_tg_id = $1 AND read_at IS NULL", [recipientTgId]);
+}
+
 // ---- Правка/удаление комментов Клода (dev-API + вебинтерфейс разработчика) ----
 /** Коммент создан через dev-API (dev_authored) и относится к задаче проекта? Для авторизации правок. */
 export async function getDevCommentMeta(commentId: number, projectKey: string): Promise<{ approved: boolean; visibility: string } | null> {

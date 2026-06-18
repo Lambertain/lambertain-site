@@ -187,6 +187,19 @@ CREATE TABLE IF NOT EXISTS project_secrets (
   id SERIAL PRIMARY KEY, project_key TEXT NOT NULL, name TEXT NOT NULL, value TEXT, note TEXT, env TEXT,
   filled_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX IF NOT EXISTS project_secrets_uniq ON project_secrets (project_key, name, coalesce(env, ''));
+-- Уведомления (колокольчик в хедере): все события портала по получателю, попроектно-позадачно, с пометкой прочтения.
+CREATE TABLE IF NOT EXISTS notifications (
+  id              SERIAL PRIMARY KEY,
+  recipient_tg_id BIGINT NOT NULL,
+  task_id         TEXT,                                   -- readable_id задачи (напр. SAD-12); NULL для общих событий
+  project_key     TEXT,
+  title           TEXT NOT NULL,                          -- текст последнего события
+  link            TEXT,                                   -- куда вести по клику (URL задачи)
+  count           INTEGER NOT NULL DEFAULT 1,             -- сколько событий схлопнуто в эту запись
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),     -- время последнего события
+  read_at         TIMESTAMPTZ);
+CREATE INDEX IF NOT EXISTS notifications_recipient_unread ON notifications (recipient_tg_id) WHERE read_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_unread_task ON notifications (recipient_tg_id, task_id) WHERE read_at IS NULL AND task_id IS NOT NULL;
 -- Страховка от дублей номеров задач (основная защита — advisory-lock в createTask).
 -- best-effort: если в проде уже есть дубль (project_id, num) — индекс не создастся, но миграция не упадёт.
 DO $$ BEGIN

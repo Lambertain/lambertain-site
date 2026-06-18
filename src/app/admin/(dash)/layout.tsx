@@ -9,6 +9,8 @@ import { OpenInBrowser } from "./open-in-browser";
 import { ViewAs } from "./view-as";
 import { DevHelp } from "./dev-help";
 import { LocaleSwitch } from "./locale-switch";
+import { NotificationBell } from "./notification-bell";
+import { listUnreadNotifications, listProjectsWithMeta } from "@/lib/db";
 import { ui } from "../ui-styles";
 
 const NAV: Record<Role, { href: string; key: string }[]> = {
@@ -34,6 +36,12 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   const locale = await getLocale();
   const nav = NAV[principal.role] ?? [];
 
+  // Колокольчик: непрочитанные уведомления текущего пользователя + имена проектов для группировки.
+  const [unread, allProjects] = principal.tgId
+    ? await Promise.all([listUnreadNotifications(principal.tgId).catch(() => []), listProjectsWithMeta().catch(() => [])])
+    : [[], []];
+  const projectNames: Record<string, string> = Object.fromEntries(allProjects.map((p) => [p.key, p.name]));
+
   return (
     <div style={{ ...ui.page, height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <nav
@@ -55,6 +63,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
         {/* «В браузере» + «Выйти» — в правом верхнем углу */}
         <div style={{ position: "absolute", top: 12, right: 12, zIndex: 60, display: "flex", alignItems: "center", gap: 8 }}>
           {principal.role === "contributor" && <DevHelp locale={locale} />}
+          <NotificationBell initial={unread} projectNames={projectNames} locale={locale} />
           <LocaleSwitch current={locale} />
           <OpenInBrowser label={t(locale, "common.inBrowser")} />
           <form action={logout}>

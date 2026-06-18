@@ -1,5 +1,5 @@
 /** Отправка уведомлений в Telegram (адресно по ролям + картинки). Server-side only. */
-import { q, getAttachment, logNotification } from "./db";
+import { q, getAttachment, logNotification, createNotification } from "./db";
 import { PUBLIC_SITE } from "./dev-protocol";
 
 /** Кнопка-ссылка под сообщением. */
@@ -46,7 +46,10 @@ export async function sendTo(chatId: number | string, text: string, button?: Lin
 export async function notifyAdmin(text: string, button?: LinkButton, excludeTgId?: number): Promise<void> {
   const chat = process.env.TELEGRAM_CHAT_ID;
   // Не слать автору действия (он сам это сделал) — напр. супер-админ написал коммент.
-  if (chat && (excludeTgId == null || Number(chat) !== excludeTgId)) await sendTo(chat, text, button);
+  if (chat && (excludeTgId == null || Number(chat) !== excludeTgId)) {
+    await recordNotifications([Number(chat)], text, button);
+    await sendTo(chat, text, button);
+  }
 }
 
 /**
@@ -108,10 +111,30 @@ async function tgIdsForProject(projectKey: string, roles: string[]): Promise<num
   return rows.map((r) => r.tg_id);
 }
 
+/** Метаданные уведомления (колокольчик) из текста+кнопки: id задачи (из URL), проект, заголовок. */
+const TASK_URL_RE = /\/admin\/tasks\/([A-Za-z0-9]+-\d+)/;
+function notifMeta(text: string, button?: LinkButton): { taskId: string | null; projectKey: string | null; title: string; link: string | null } {
+  const url = button?.url ?? null;
+  const m = url ? url.match(TASK_URL_RE) : null;
+  const taskId = m ? m[1] : null;
+  const title = text.replace(/<[^>]+>/g, "").split("\n").map((s) => s.trim()).filter(Boolean).join(" — ").slice(0, 180);
+  return { taskId, projectKey: taskId ? taskId.split("-")[0] : null, title, link: url };
+}
+
+/** Записать уведомление в колокольчик каждому получателю (best-effort, не валит отправку). */
+async function recordNotifications(targets: number[], text: string, button?: LinkButton): Promise<void> {
+  const meta = notifMeta(text, button);
+  if (!meta.title) return;
+  for (const tg of targets) {
+    await createNotification(tg, meta).catch(() => {});
+  }
+}
+
 async function sendWithImages(chatIds: number[], text: string, attachmentIds: number[], button?: LinkButton, excludeTgId?: number): Promise<void> {
-  // Исключаем автора действия — он не должен получать пуш о собственном комменте/задаче.
+  // Исключаем автора действия — он не должен получать пуш/уведомление о собственном комменте/задаче.
   const targets = excludeTgId != null ? chatIds.filter((id) => id !== excludeTgId) : chatIds;
   if (!targets.length) return;
+  await recordNotifications(targets, text, button);
   // Картинки грузим один раз, шлём каждому.
   const photos = (await Promise.all(attachmentIds.map((id) => getAttachment(id)))).filter(Boolean) as { mime: string | null; data: Buffer }[];
   for (const chatId of targets) {

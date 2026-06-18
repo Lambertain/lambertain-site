@@ -563,6 +563,9 @@ export const DICT: Record<string, Entry> = {
   "vis.client": { uk: "клієнту/співробітнику", ru: "клиенту/сотруднику", en: "client/employee" },
   "vis.dev": { uk: "розробнику", ru: "разработчику", en: "developer" },
   "common.preview": { uk: "Попередній перегляд", ru: "Предпросмотр", en: "Preview" },
+  "notif.title": { uk: "Сповіщення", ru: "Уведомления", en: "Notifications" },
+  "notif.readAll": { uk: "Прочитати все", ru: "Прочитать всё", en: "Read all" },
+  "notif.empty": { uk: "Нових сповіщень немає", ru: "Новых уведомлений нет", en: "No new notifications" },
 
   // — пользователи проекта (на странице проекта) —
   "projUsers.kicker": { uk: "Хто в проєкті", ru: "Кто в проекте", en: "Who is in the project" },
