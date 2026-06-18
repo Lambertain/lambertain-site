@@ -292,6 +292,8 @@ export async function deleteMember(login: string): Promise<void> {
   await q("DELETE FROM member_projects WHERE login = $1", [login]);
   await q("DELETE FROM tg_links WHERE youtrack_login = $1", [login]);
   await q("DELETE FROM role_overrides WHERE login = $1", [login]);
+  // Снять разработчика с проектов, где он ответственный (defaultAssignee) → проект уходит в «Без відповідального».
+  await q("UPDATE projects SET meta = meta - 'defaultAssignee' WHERE meta->>'defaultAssignee' = $1", [login]);
   await q("DELETE FROM members WHERE id = $1", [id]);
 }
 

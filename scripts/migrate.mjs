@@ -157,6 +157,9 @@ UPDATE comments c SET orig_author_login=m.login, orig_author_role=m.role
   FROM members m WHERE c.author_id=m.id AND c.orig_author_login IS NULL;
 UPDATE tasks t SET orig_assignee_login=m.login FROM members m WHERE t.assignee_id=m.id AND t.orig_assignee_login IS NULL;
 UPDATE tasks t SET orig_reporter_login=m.login FROM members m WHERE t.reporter_id=m.id AND t.orig_reporter_login IS NULL;
+-- Осиротевший ответственный: defaultAssignee указывает на удалённого участника → снять (проект уходит в «Без відповідального»).
+UPDATE projects SET meta = meta - 'defaultAssignee'
+  WHERE meta ? 'defaultAssignee' AND meta->>'defaultAssignee' NOT IN (SELECT login FROM members);
 -- Настройки портала (JSON по ключу) и медиа онбординг-инструкции (публичные картинки шагов).
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY, value JSONB NOT NULL DEFAULT '{}'::jsonb, updated_at TIMESTAMPTZ NOT NULL DEFAULT now());
