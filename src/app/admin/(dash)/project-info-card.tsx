@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { saveCredentials } from "./project-actions";
 import type { ProjectMeta } from "@/lib/tasks/types";
+import { fieldVisible } from "@/lib/field-visibility";
 import { BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "./markdown";
@@ -64,6 +65,9 @@ export function ProjectInfoCard({
   const prodUrl = m.apps?.prod?.url;
   const figma = m.design;
   const accounts = m.credentials || [];
+  // Видимость полей по роли смотрящего: showDevLink=true → разработчик/админ, иначе клиент/сотрудник.
+  const viewerDev = !!showDevLink;
+  const see = (field: string) => fieldVisible(m.fieldVisibility, field, viewerDev);
 
   function addRow() { setCreds((c) => [...c, { role: "", env: "", login: "", pass: "" }]); setSaved(false); }
   function setRow(i: number, k: keyof Cred, v: string) { setCreds((c) => c.map((r, j) => (j === i ? { ...r, [k]: v } : r))); setSaved(false); }
@@ -118,19 +122,19 @@ export function ProjectInfoCard({
       {open && (
         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {showDevLink && devUrl && <ExtLink href={devUrl} label={`${t(locale, "proj.devApp")}: ${devUrl}`} />}
-            {prodUrl && <ExtLink href={prodUrl} label={`${t(locale, "proj.prodApp")}: ${prodUrl}`} />}
-            {figma && <ExtLink href={figma} label={`${t(locale, "proj.figma")}: ${figma}`} />}
+            {see("devUrl") && devUrl && <ExtLink href={devUrl} label={`${t(locale, "proj.devApp")}: ${devUrl}`} />}
+            {see("prodUrl") && prodUrl && <ExtLink href={prodUrl} label={`${t(locale, "proj.prodApp")}: ${prodUrl}`} />}
+            {see("design") && figma && <ExtLink href={figma} label={`${t(locale, "proj.figma")}: ${figma}`} />}
           </div>
 
-          {/* Инфо от клиента + полная спека — только разработчику (showDevLink), клиент эту секцию не видит. */}
-          {showDevLink && m.devInfo && (
+          {/* Инфо от клиента + полная спека — видимость по настройке (дефолт: только разработчику). */}
+          {see("devInfo") && m.devInfo && (
             <div style={{ border: "1px solid var(--border-2)", borderRadius: 6, padding: 12, background: "var(--surface-2)" }}>
               <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 6 }}>{t(locale, "proj.devInfo")}</div>
               <Markdown>{m.devInfo}</Markdown>
             </div>
           )}
-          {showDevLink && m.spec && (
+          {see("spec") && m.spec && (
             <div style={{ border: "1px solid var(--border-2)", borderRadius: 6 }}>
               <button onClick={() => setSpecOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
                 <span style={ui.monoLabel}>{t(locale, "proj.fullSpec")}</span>
@@ -140,7 +144,8 @@ export function ProjectInfoCard({
             </div>
           )}
 
-          {/* аккаунты входа */}
+          {/* аккаунты входа (видимость по настройке; дефолт — видны всем) */}
+          {see("accounts") && (
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <span style={ui.monoLabel}>{t(locale, "proj.accounts")}</span>
@@ -184,6 +189,7 @@ export function ProjectInfoCard({
             )}
             {saved && <span style={{ ...ui.monoLabel, color: "var(--accent)", marginTop: 6, display: "inline-block" }}>{t(locale, "projects.saved")}</span>}
           </div>
+          )}
         </div>
       )}
     </div>

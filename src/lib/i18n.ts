@@ -546,6 +546,11 @@ export const DICT: Record<string, Entry> = {
   "users.deleteConfirm": { uk: "Видалити безповоротно? Доступ і привʼязки зникнуть (історія задач збережеться).", ru: "Удалить безвозвратно? Доступ и привязки исчезнут (история задач сохранится).", en: "Delete permanently? Access and links will be removed (task history is kept)." },
   "users.deleteYes": { uk: "Так, видалити", ru: "Да, удалить", en: "Yes, delete" },
 
+  // — видимость полей в карточке «Детали и доступы» —
+  "vis.hint": { uk: "Видимість у картці «Деталі та доступи»:", ru: "Видимость в карточке «Детали и доступы»:", en: "Visibility in the “Details & access” card:" },
+  "vis.client": { uk: "клієнту/співробітнику", ru: "клиенту/сотруднику", en: "client/employee" },
+  "vis.dev": { uk: "розробнику", ru: "разработчику", en: "developer" },
+
   // — пользователи проекта (на странице проекта) —
   "projUsers.kicker": { uk: "Хто в проєкті", ru: "Кто в проекте", en: "Who is in the project" },
   "projUsers.title": { uk: "Користувачі проєкту", ru: "Пользователи проекта", en: "Project users" },

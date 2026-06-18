@@ -66,6 +66,12 @@ export interface ProjectMeta {
   startedAt?: string;
   /** Плановая дата завершения (ISO YYYY-MM-DD). Нет — прогресс-бар по времени скрыт. */
   deadline?: string;
+  /**
+   * Видимость полей в карточке проекта «Детали и доступы» по ролям смотрящего.
+   * Ключ — поле (prodUrl|devUrl|design|devInfo|spec|accounts), значение — кому показывать.
+   * Если поле/флаг не задан — берётся дефолт поля (см. FIELD_VIS_DEFAULTS).
+   */
+  fieldVisibility?: Record<string, { client?: boolean; dev?: boolean }>;
   /** Клиентский Railway (для доставки dev→client: апрув деплоя, мониторинг, URL БД для миграции). */
   clientDeploy?: {
     railwayToken?: string;

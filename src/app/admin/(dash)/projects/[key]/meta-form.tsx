@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { saveMeta } from "../actions";
 import type { ProjectMeta } from "@/lib/tasks/types";
+import { FIELD_VIS_DEFAULTS, type FieldVis } from "@/lib/field-visibility";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
@@ -12,6 +13,31 @@ const Field = ({ label, value, onChange }: { label: string; value: string; onCha
     <input value={value} onChange={(e) => onChange(e.target.value)} style={ui.input} />
   </div>
 );
+
+/** Чекбокс «видно роли» под полем карточки «Детали и доступы». */
+function VisToggles({ field, vis, setVis, locale }: { field: string; vis: Record<string, FieldVis>; setVis: (f: (v: Record<string, FieldVis>) => Record<string, FieldVis>) => void; locale: Locale }) {
+  const d = FIELD_VIS_DEFAULTS[field] ?? { client: true, dev: true };
+  const cur = vis[field] ?? {};
+  const client = cur.client ?? d.client;
+  const dev = cur.dev ?? d.dev;
+  const set = (role: "client" | "dev", val: boolean) =>
+    setVis((v) => ({ ...v, [field]: { client, dev, [role]: val } }));
+  const boxStyle: React.CSSProperties = { display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer", ...ui.monoLabel, textTransform: "none" };
+  const inputStyle: React.CSSProperties = { width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" };
+  return (
+    <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
+      <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, "vis.hint")}</span>
+      <label style={boxStyle}>
+        <input type="checkbox" checked={client} onChange={(e) => set("client", e.target.checked)} style={inputStyle} />
+        {t(locale, "vis.client")}
+      </label>
+      <label style={boxStyle}>
+        <input type="checkbox" checked={dev} onChange={(e) => set("dev", e.target.checked)} style={inputStyle} />
+        {t(locale, "vis.dev")}
+      </label>
+    </div>
+  );
+}
 
 export function MetaForm({
   projectKey,
@@ -56,6 +82,7 @@ export function MetaForm({
   const [spec, setSpec] = useState(m.spec ?? "");
   const [devInfo, setDevInfo] = useState(m.devInfo ?? "");
   const [autoApprove, setAutoApprove] = useState(!!m.autoApprove);
+  const [vis, setVis] = useState<Record<string, FieldVis>>(m.fieldVisibility ?? {});
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -96,6 +123,7 @@ export function MetaForm({
           ? { token: cvToken || undefined, projectId: cvProject || undefined, teamId: cvTeam || undefined }
           : undefined,
       credentials: m.credentials, // секреты теперь редактируются в «Секрети та доступи» (project_secrets)
+      fieldVisibility: Object.keys(vis).length ? vis : undefined,
     };
     start(async () => {
       const r = await saveMeta(projectKey, name, meta);
@@ -160,9 +188,15 @@ export function MetaForm({
       </div>
 
       <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.hosting")}</div>
-      <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label={t(locale, "projects.prodUrl")} value={prodUrl} onChange={setProdUrl} />
-        <Field label={t(locale, "projects.devUrl")} value={devUrl} onChange={setDevUrl} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <Field label={t(locale, "projects.prodUrl")} value={prodUrl} onChange={setProdUrl} />
+          <VisToggles field="prodUrl" vis={vis} setVis={setVis} locale={locale} />
+        </div>
+        <div>
+          <Field label={t(locale, "projects.devUrl")} value={devUrl} onChange={setDevUrl} />
+          <VisToggles field="devUrl" vis={vis} setVis={setVis} locale={locale} />
+        </div>
       </div>
 
       <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.deploy")}</div>
@@ -173,6 +207,7 @@ export function MetaForm({
 
       <div style={{ marginTop: 18 }}>
         <Field label={t(locale, "projects.design")} value={design} onChange={setDesign} />
+        <VisToggles field="design" vis={vis} setVis={setVis} locale={locale} />
       </div>
 
       <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.clientDeploy")}</div>
@@ -201,12 +236,20 @@ export function MetaForm({
         <label style={ui.fieldLabel}>{t(locale, "projects.spec")}</label>
         <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.specHint")}</div>
         <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={10} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
+        <VisToggles field="spec" vis={vis} setVis={setVis} locale={locale} />
       </div>
 
       <div style={{ marginTop: 18 }}>
         <label style={ui.fieldLabel}>{t(locale, "projects.devInfo")}</label>
         <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.devInfoHint")}</div>
         <textarea value={devInfo} onChange={(e) => setDevInfo(e.target.value)} rows={6} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
+        <VisToggles field="devInfo" vis={vis} setVis={setVis} locale={locale} />
+      </div>
+
+      {/* Аккаунты входа редактируются в самой карточке, но видимостью управляем здесь. */}
+      <div style={{ marginTop: 18 }}>
+        <label style={ui.fieldLabel}>{t(locale, "proj.accounts")}</label>
+        <VisToggles field="accounts" vis={vis} setVis={setVis} locale={locale} />
       </div>
 
       <label style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 18, cursor: "pointer" }}>
