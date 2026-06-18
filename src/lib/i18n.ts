@@ -258,6 +258,7 @@ export const DICT: Record<string, Entry> = {
   "tasks.clientKicker": { uk: "Мої заявки", ru: "Мои заявки", en: "My requests" },
   "tasks.empty": { uk: "Активних задач немає.", ru: "Активных задач нет.", en: "No active tasks." },
   "tasks.filterAll": { uk: "Усі", ru: "Все", en: "All" },
+  "tasks.allTiles": { uk: "Всі задачі", ru: "Все задачи", en: "All tasks" },
   // — панель форматирования (rich-text toolbar) —
   "md.bold": { uk: "Жирний", ru: "Жирный", en: "Bold" },
   "md.italic": { uk: "Курсив", ru: "Курсив", en: "Italic" },

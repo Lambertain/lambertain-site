@@ -35,8 +35,8 @@ export function ClientBoard({
   empty: string;
   feedbackKey?: string;
 }) {
-  const keys = projects.map((p) => p.key);
-  const [activeProject, setActiveProject] = useState<string>(keys[0] ?? "");
+  // "" = «Всі задачі» (по всех проектах) — выбрано по умолчанию; карточку проекта показываем при выборе конкретного.
+  const [activeProject, setActiveProject] = useState<string>("");
 
   return (
     <div>
@@ -53,6 +53,7 @@ export function ClientBoard({
         feedbackKey={feedbackKey}
         activeProject={activeProject}
         onProjectChange={setActiveProject}
+        allowAll
       />
     </div>
   );

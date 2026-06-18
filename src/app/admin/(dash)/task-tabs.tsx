@@ -197,6 +197,7 @@ export function TaskTabs({
   initialBucket,
   activeProject: controlledProject,
   onProjectChange,
+  allowAll,
 }: {
   tasks: BoardTask[];
   projects: Proj[];
@@ -212,10 +213,12 @@ export function TaskTabs({
   /** Контролируемый режим: выбранный проект задаёт родитель (чтобы синхронить с карточкой проекта сверху). */
   activeProject?: string;
   onProjectChange?: (key: string) => void;
+  /** Показать плитку «ВСЕ ЗАДАЧИ» (по всем проектам) первой и выбрать её по умолчанию. */
+  allowAll?: boolean;
 }) {
   const projectKeys = projects.map((p) => p.key);
   const [internalProject, setInternalProject] = useState<string>(
-    initialProject && projectKeys.includes(initialProject) ? initialProject : projectKeys[0] ?? "",
+    initialProject && projectKeys.includes(initialProject) ? initialProject : allowAll ? "" : projectKeys[0] ?? "",
   );
   // Контролируемый проект (от родителя) приоритетнее внутреннего — так карточка сверху и табы синхронны.
   const activeProject = controlledProject !== undefined ? controlledProject : internalProject;
@@ -225,7 +228,7 @@ export function TaskTabs({
   function openProject(key: string) {
     if (onProjectChange) onProjectChange(key); else setInternalProject(key);
     setBucket(null);
-    if (!opened.has(key)) {
+    if (key && !opened.has(key)) { // "" = «ВСЕ» — не отмечаем как открытый проект
       setOpened((s) => new Set(s).add(key));
       startSeen(() => { markProjectOpened(key); });
     }
@@ -241,8 +244,8 @@ export function TaskTabs({
   }, []);
 
   const projTasks = useMemo(
-    () => (projectKeys.length ? tasks.filter((tk) => tk.projectKey === activeProject) : tasks),
-    [tasks, activeProject, projectKeys.length],
+    () => (allowAll && activeProject === "" ? tasks : projectKeys.length ? tasks.filter((tk) => tk.projectKey === activeProject) : tasks),
+    [tasks, activeProject, projectKeys.length, allowAll],
   );
 
   const byBucket = useMemo(() => {
@@ -259,8 +262,13 @@ export function TaskTabs({
 
   return (
     <div style={{ marginTop: 16 }}>
-      {projects.length > 1 && (
+      {(allowAll ? projects.length >= 1 : projects.length > 1) && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          {allowAll && (
+            <TabBtn active={activeProject === ""} onClick={() => openProject("")}>
+              {t(locale, "tasks.allTiles")}
+            </TabBtn>
+          )}
           {projects.map((p) => (
             <TabBtn key={p.key} active={p.key === activeProject} hasNew={p.hasNew && !opened.has(p.key)} onClick={() => openProject(p.key)}>
               {p.name}
