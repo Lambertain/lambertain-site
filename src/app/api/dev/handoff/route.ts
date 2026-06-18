@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     const ownerText = cls.ownerText || action;
     await setOwnerAction(taskId, ownerText);
     if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
-    await notifyAdmin(`🛠 <b>Нужно действие владельца</b> · ${await taskTag(taskId)}: ${task.summary}\n${ownerText.slice(0, 600)}`, taskBtn).catch(() => {});
+    await notifyAdmin(`🛠 <b>Ручной шаг агентства</b> (от Claude разработчика) · ${await taskTag(taskId)}: ${task.summary}\n${ownerText.slice(0, 600)}`, taskBtn).catch(() => {});
     return NextResponse.json({ ok: true, handedOff: "owner", note: "Клиент видит «в работе». Бери следующую незаблокированную задачу." });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
