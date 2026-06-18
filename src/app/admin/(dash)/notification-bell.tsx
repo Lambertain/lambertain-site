@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { myNotifications, readTaskNotifications, readNotification, readAllNotifications } from "./notif-actions";
 import { t, type Locale } from "@/lib/i18n";
@@ -62,7 +63,7 @@ export function NotificationBell({ initial, projectNames, locale }: { initial: N
         )}
       </button>
 
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1200, background: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "flex-end" }}>
           <div onClick={(e) => e.stopPropagation()} style={{ width: "min(420px, 100%)", height: "100%", background: "var(--surface)", borderLeft: "1px solid var(--border)", display: "flex", flexDirection: "column", boxShadow: "-8px 0 24px rgba(0,0,0,0.4)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 18px", borderBottom: "1px solid var(--border)" }}>
@@ -96,7 +97,8 @@ export function NotificationBell({ initial, projectNames, locale }: { initial: N
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
