@@ -82,16 +82,6 @@ export function MetaForm({
   const [paidParts, setPaidParts] = useState(m.paidParts != null ? String(m.paidParts) : "0");
   const [startedAt, setStartedAt] = useState(m.startedAt ?? "");
   const [deadline, setDeadline] = useState(m.deadline ?? "");
-  const cd = m.clientDeploy ?? {};
-  const [cdToken, setCdToken] = useState(cd.railwayToken ?? "");
-  const [cdProject, setCdProject] = useState(cd.projectId ?? "");
-  const [cdEnv, setCdEnv] = useState(cd.environmentId ?? "");
-  const [cdService, setCdService] = useState(cd.serviceId ?? "");
-  const [cdPg, setCdPg] = useState(cd.pgServiceId ?? "");
-  const cv = m.clientVercel ?? {};
-  const [cvToken, setCvToken] = useState(cv.token ?? "");
-  const [cvProject, setCvProject] = useState(cv.projectId ?? "");
-  const [cvTeam, setCvTeam] = useState(cv.teamId ?? "");
   const [clientGit, setClientGit] = useState(m.clientGit ?? "");
   const [devGit, setDevGit] = useState(m.devGit ?? "");
   const [localPath, setLocalPath] = useState(m.localPath ?? "");
@@ -106,8 +96,23 @@ export function MetaForm({
   const [vis, setVis] = useState<Record<string, FieldVis>>(m.fieldVisibility ?? {});
   const [prodAccounts, setProdAccounts] = useState<Account[]>(m.prodAccounts ?? []);
   const [devAccounts, setDevAccounts] = useState<Account[]>(m.devAccounts ?? []);
-  const [enabledFields, setEnabledFields] = useState<string[]>(m.enabledFields ?? []);
-  const [customFields, setCustomFields] = useState<Record<string, Record<string, string>>>(m.customFields ?? {});
+  // Railway/Vercel — реестр-поля, но значения «отражают» clientDeploy/clientVercel. На входе подтягиваем их в
+  // customFields (как рабочую копию для формы) и включаем поле, если значения есть. На save проецируем обратно.
+  const nonEmpty = (o: Record<string, unknown> | undefined): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(o ?? {})) if (v) out[k] = String(v);
+    return out;
+  };
+  const initCustom: Record<string, Record<string, string>> = { ...(m.customFields ?? {}) };
+  const cdInit = nonEmpty(m.clientDeploy);
+  const cvInit = nonEmpty(m.clientVercel);
+  if (Object.keys(cdInit).length) initCustom.railway = cdInit;
+  if (Object.keys(cvInit).length) initCustom.vercel = cvInit;
+  const initEnabled = [...(m.enabledFields ?? [])];
+  if (Object.keys(cdInit).length && !initEnabled.includes("railway")) initEnabled.push("railway");
+  if (Object.keys(cvInit).length && !initEnabled.includes("vercel")) initEnabled.push("vercel");
+  const [enabledFields, setEnabledFields] = useState<string[]>(initEnabled);
+  const [customFields, setCustomFields] = useState<Record<string, Record<string, string>>>(initCustom);
   const [addField, setAddField] = useState("");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,26 +139,29 @@ export function MetaForm({
       paidParts: Number(paidParts) >= 0 ? Math.floor(Number(paidParts)) : undefined,
       startedAt: startedAt || undefined,
       deadline: deadline || undefined,
-      clientDeploy:
-        cdToken || cdProject || cdEnv || cdService || cdPg
-          ? {
-              railwayToken: cdToken || undefined,
-              projectId: cdProject || undefined,
-              environmentId: cdEnv || undefined,
-              serviceId: cdService || undefined,
-              pgServiceId: cdPg || undefined,
-            }
-          : undefined,
-      clientVercel:
-        cvToken || cvProject || cvTeam
-          ? { token: cvToken || undefined, projectId: cvProject || undefined, teamId: cvTeam || undefined }
-          : undefined,
+      // Railway/Vercel — проекция реестр-полей обратно в clientDeploy/clientVercel (логика деплоя читает их).
+      clientDeploy: (() => {
+        const r = customFields.railway ?? {};
+        return r.railwayToken || r.projectId || r.environmentId || r.serviceId || r.pgServiceId
+          ? { railwayToken: r.railwayToken || undefined, projectId: r.projectId || undefined, environmentId: r.environmentId || undefined, serviceId: r.serviceId || undefined, pgServiceId: r.pgServiceId || undefined }
+          : undefined;
+      })(),
+      clientVercel: (() => {
+        const v = customFields.vercel ?? {};
+        return v.token || v.projectId || v.teamId
+          ? { token: v.token || undefined, projectId: v.projectId || undefined, teamId: v.teamId || undefined }
+          : undefined;
+      })(),
       credentials: m.credentials, // секреты теперь редактируются в «Секрети та доступи» (project_secrets)
       fieldVisibility: Object.keys(vis).length ? vis : undefined,
       prodAccounts: prodAccounts.filter((a) => a.login || a.pass || a.note).length ? prodAccounts.filter((a) => a.login || a.pass || a.note) : undefined,
       devAccounts: devAccounts.filter((a) => a.login || a.pass || a.note).length ? devAccounts.filter((a) => a.login || a.pass || a.note) : undefined,
       enabledFields: enabledFields.length ? enabledFields : undefined,
-      customFields: Object.keys(customFields).length ? customFields : undefined,
+      // backed-поля (railway/vercel) в customFields не храним — их значения уже в clientDeploy/clientVercel.
+      customFields: (() => {
+        const c = { ...customFields }; delete c.railway; delete c.vercel;
+        return Object.keys(c).length ? c : undefined;
+      })(),
     };
     start(async () => {
       const r = await saveMeta(projectKey, name, meta);
@@ -250,27 +258,7 @@ export function MetaForm({
         <VisToggles field="design" vis={vis} setVis={setVis} locale={locale} />
       </div>
 
-      <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.clientDeploy")}</div>
-      <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 10 }}>{t(locale, "projects.clientDeployHint")}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field label={t(locale, "projects.cdToken")} value={cdToken} onChange={setCdToken} />
-        <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label={t(locale, "projects.cdProject")} value={cdProject} onChange={setCdProject} />
-          <Field label={t(locale, "projects.cdEnv")} value={cdEnv} onChange={setCdEnv} />
-          <Field label={t(locale, "projects.cdService")} value={cdService} onChange={setCdService} />
-          <Field label={t(locale, "projects.cdPg")} value={cdPg} onChange={setCdPg} />
-        </div>
-      </div>
-
-      <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.vercel")}</div>
-      <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 10 }}>{t(locale, "projects.vercelHint")}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <Field label={t(locale, "projects.vercelToken")} value={cvToken} onChange={setCvToken} />
-        <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Field label={t(locale, "projects.vercelProject")} value={cvProject} onChange={setCvProject} />
-          <Field label={t(locale, "projects.vercelTeam")} value={cvTeam} onChange={setCvTeam} />
-        </div>
-      </div>
+      {/* Railway/Vercel перенесены в реестр «Додаткові поля» ниже (значения по-прежнему в clientDeploy/clientVercel). */}
 
       <div style={{ marginTop: 18 }}>
         <label style={ui.fieldLabel}>{t(locale, "projects.spec")}</label>

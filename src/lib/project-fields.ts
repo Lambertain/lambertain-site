@@ -18,6 +18,12 @@ export type ProjectFieldDef = {
   group: "hosting" | "social" | "messenger" | "analytics" | "access" | "other";
   label: L;
   subs: FieldSub[];
+  /**
+   * Поле «отражает» существующую структуру meta (НЕ хранится в customFields): значения живут в
+   * meta.clientDeploy / meta.clientVercel — их читает логика деплоя. Реестр лишь даёт UI вкл/выкл + видимость.
+   * Подполя такого поля = ключи соответствующей структуры meta.
+   */
+  backed?: "clientDeploy" | "clientVercel";
 };
 
 const url = (uk: string, ru: string, en: string): FieldSub => ({ key: "url", label: { uk, ru, en }, kind: "url" });
@@ -25,6 +31,19 @@ const login: FieldSub = { key: "login", label: { uk: "Логін", ru: "Логи
 const pass: FieldSub = { key: "pass", label: { uk: "Пароль", ru: "Пароль", en: "Password" }, kind: "secret" };
 
 export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
+  // Хостинг/деплой — значения «отражают» meta.clientDeploy / meta.clientVercel (логика деплоя не трогается).
+  { key: "railway", group: "hosting", backed: "clientDeploy", label: { uk: "Railway (деплой)", ru: "Railway (деплой)", en: "Railway (deploy)" }, subs: [
+    { key: "railwayToken", label: { uk: "Railway токен", ru: "Railway токен", en: "Railway token" }, kind: "secret" },
+    { key: "projectId", label: { uk: "Project ID", ru: "Project ID", en: "Project ID" }, kind: "text" },
+    { key: "environmentId", label: { uk: "Environment ID", ru: "Environment ID", en: "Environment ID" }, kind: "text" },
+    { key: "serviceId", label: { uk: "Service ID (app)", ru: "Service ID (app)", en: "Service ID (app)" }, kind: "text" },
+    { key: "pgServiceId", label: { uk: "Postgres Service ID", ru: "Postgres Service ID", en: "Postgres Service ID" }, kind: "text" },
+  ] },
+  { key: "vercel", group: "hosting", backed: "clientVercel", label: { uk: "Vercel (деплой)", ru: "Vercel (деплой)", en: "Vercel (deploy)" }, subs: [
+    { key: "token", label: { uk: "Vercel токен", ru: "Vercel токен", en: "Vercel token" }, kind: "secret" },
+    { key: "projectId", label: { uk: "Project ID", ru: "Project ID", en: "Project ID" }, kind: "text" },
+    { key: "teamId", label: { uk: "Team ID", ru: "Team ID", en: "Team ID" }, kind: "text" },
+  ] },
   { key: "facebook", group: "social", label: { uk: "Facebook", ru: "Facebook", en: "Facebook" }, subs: [url("Сторінка/URL", "Страница/URL", "Page/URL"), login, pass] },
   { key: "instagram", group: "social", label: { uk: "Instagram", ru: "Instagram", en: "Instagram" }, subs: [url("Профіль/URL", "Профиль/URL", "Profile/URL"), login, pass] },
   { key: "tiktok", group: "social", label: { uk: "TikTok", ru: "TikTok", en: "TikTok" }, subs: [url("Профіль/URL", "Профиль/URL", "Profile/URL"), login, pass] },

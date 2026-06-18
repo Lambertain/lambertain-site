@@ -171,10 +171,19 @@ export function ProjectInfoCard({
           {see("prodAccounts") && (m.prodAccounts?.length ?? 0) > 0 && <AccountsView title={t(locale, "proj.accountsProd")} rows={m.prodAccounts!} />}
           {see("devAccounts") && (m.devAccounts?.length ?? 0) > 0 && <AccountsView title={t(locale, "proj.accountsDev")} rows={m.devAccounts!} />}
 
-          {/* Кастомные поля из реестра (соцсети/мессенджеры/доступы) — каждое по своей видимости. */}
-          {(m.enabledFields ?? []).filter((k) => see(k)).map((k) => (
-            <CustomFieldView key={k} fieldKey={k} values={m.customFields?.[k]} locale={locale} />
-          ))}
+          {/* Кастомные поля из реестра (соцсети/мессенджеры/деплой/доступы) — каждое по своей видимости.
+              backed-поля (railway/vercel) берут значения из clientDeploy/clientVercel; включаем их и для старых проектов. */}
+          {Array.from(new Set([
+            ...(m.enabledFields ?? []),
+            ...(m.clientDeploy && Object.values(m.clientDeploy).some(Boolean) ? ["railway"] : []),
+            ...(m.clientVercel && Object.values(m.clientVercel).some(Boolean) ? ["vercel"] : []),
+          ])).filter((k) => see(k)).map((k) => {
+            const def = getFieldDef(k);
+            const values = def?.backed === "clientDeploy" ? (m.clientDeploy as Record<string, string> | undefined)
+              : def?.backed === "clientVercel" ? (m.clientVercel as Record<string, string> | undefined)
+              : m.customFields?.[k];
+            return <CustomFieldView key={k} fieldKey={k} values={values} locale={locale} />;
+          })}
 
           {/* Инфо от клиента + полная спека — видимость по настройке (дефолт: только разработчику). */}
           {see("devInfo") && m.devInfo && (
