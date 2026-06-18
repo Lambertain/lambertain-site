@@ -105,6 +105,23 @@ export async function createRequestTask(
       return { id: task.id, url: task.url };
     }
 
+    // Супер-админ / админ ставит задачу-ВОПРОС КЛИЕНТУ: клиент видит и отвечает комментами; разработчику
+    // НЕ назначается и НЕ идёт в ИИ-триаж (это не работа дева, а уточнение у клиента).
+    if ((isSuperAdmin(me) || me.realRole === "admin") && !isFeedback && recipient === "client") {
+      const task = await be.createTask({
+        projectKey,
+        summary,
+        description: "",
+        assigneeLogin: null,
+        reporterLogin: me.youtrackLogin ?? null, // супер-админ без логина → клиент видит «Lambertain»
+        approvalStatus: "approved",
+        internal: false, // клиент видит
+      });
+      await appendRequestBlocks(task.id, blocks);
+      await notifyProjectClients(projectKey, `❓ <b>Питання/задача</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
+      return { id: task.id, url: task.url };
+    }
+
     // Фидбек-проект — без апрува и без ИИ-триажа (пожелания по порталу, напрямую админу).
     const appr = isFeedback
       ? { approvalStatus: "approved" as const, createdByRole: me.role, pending: false, approver: null }
