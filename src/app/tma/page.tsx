@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { t, detectClientLocale, persistLocale, type Locale } from "@/lib/i18n";
 import { ui } from "../admin/ui-styles";
 
-type Phase = "loading" | "choose_role" | "requested" | "error";
+type Phase = "loading" | "no_invite" | "error";
 
 export default function TmaPage() {
   const router = useRouter();
@@ -64,32 +64,11 @@ export default function TmaPage() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.ok) ensureWriteAccess(() => router.replace(targetAfterAuth()));
-      else if (data.needRole) setPhase("choose_role");
+      // Не найден/нет привязки → доступ ТОЛЬКО по приглашению (внешний запрос доступа убран, чтобы не было путаницы с ролью).
+      else if (data.needRole) setPhase("no_invite");
       else {
         setPhase("error");
         setErrKey("tma.authFailed");
-      }
-    } catch {
-      setPhase("error");
-      setErrKey("tma.netError");
-    }
-  }
-
-  async function requestRole(role: "client" | "contributor" | "employee") {
-    const initData = getInitData();
-    if (!initData) return;
-    setPhase("loading");
-    setErrKey("common.sending");
-    try {
-      const res = await fetch("/api/tma/request-access", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData, role }),
-      });
-      if (res.ok) ensureWriteAccess(() => setPhase("requested"));
-      else {
-        setPhase("error");
-        setErrKey("tma.requestFailed");
       }
     } catch {
       setPhase("error");
@@ -110,26 +89,10 @@ export default function TmaPage() {
       <div style={{ ...ui.card, maxWidth: 360, textAlign: "center" }}>
         <div style={ui.monoLabel}>Lambertain Dev</div>
 
-        {phase === "choose_role" ? (
+        {phase === "no_invite" ? (
           <>
-            <h1 style={{ ...ui.h1, fontSize: 24, marginTop: 14 }}>{t(locale, "tma.whoAreYou")}</h1>
-            <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 8 }}>{t(locale, "tma.chooseRoleHint")}</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 18 }}>
-              <button onClick={() => requestRole("client")} style={ui.btnAccent}>
-                {t(locale, "role.client")}
-              </button>
-              <button onClick={() => requestRole("employee")} style={ui.btn}>
-                {t(locale, "role.employee")}
-              </button>
-              <button onClick={() => requestRole("contributor")} style={ui.btn}>
-                {t(locale, "role.contributor")}
-              </button>
-            </div>
-          </>
-        ) : phase === "requested" ? (
-          <>
-            <h1 style={{ ...ui.h1, fontSize: 22, marginTop: 14 }}>{t(locale, "tma.requestSent")}</h1>
-            <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12 }}>{t(locale, "tma.requestSentHint")}</p>
+            <h1 style={{ ...ui.h1, fontSize: 22, marginTop: 14 }}>{t(locale, "tma.inviteOnly")}</h1>
+            <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 12, lineHeight: 1.6 }}>{t(locale, "tma.inviteOnlyHint")}</p>
             <a
               href="https://t.me/soloveynik"
               target="_blank"

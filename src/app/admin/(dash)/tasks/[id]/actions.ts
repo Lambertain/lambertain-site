@@ -67,16 +67,18 @@ export async function addTaskComment(
       const imgs = attachmentIdsIn(body, task.description);
       const projName = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey)?.name || task.projectKey;
       const openBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` };
+      // me.tgId — автор: ему не шлём пуш о СВОЁМ комменте (ни одним из каналов).
+      const authorTg = me.tgId;
       if (clientSide) {
         // Клиент (или сотрудник-как-клиент) написал → ответственному разработчику + админу.
-        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${projName} · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
-        await notifyAdmin(`💬 <b>Вопрос клиента</b> · ${projName} · ${id}: ${task.summary}`, openBtn);
+        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${projName} · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn, authorTg);
+        await notifyAdmin(`💬 <b>Вопрос клиента</b> · ${projName} · ${id}: ${task.summary}`, openBtn, authorTg);
       } else if (visibility === "client") {
         // Команда ответила клиенту → клиенту/сотруднику проекта.
-        await notifyProjectClients(task.projectKey, `💬 <b>${projName} · ${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn);
+        await notifyProjectClients(task.projectKey, `💬 <b>${projName} · ${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn, authorTg);
       } else if (task.assignee?.login && task.assignee.login !== me.youtrackLogin) {
         // Внутренний коммент → ответственному разработчику.
-        await notifyLogins([task.assignee.login], `📝 <b>${projName} · ${id}</b> (внутр.): ${body.slice(0, 300)}`, imgs, openBtn);
+        await notifyLogins([task.assignee.login], `📝 <b>${projName} · ${id}</b> (внутр.): ${body.slice(0, 300)}`, imgs, openBtn, authorTg);
       }
     } catch {
       // уведомления не должны валить коммент

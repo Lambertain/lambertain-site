@@ -43,9 +43,10 @@ export async function sendTo(chatId: number | string, text: string, button?: Lin
 }
 
 /** Уведомление админу (Никите). */
-export async function notifyAdmin(text: string, button?: LinkButton): Promise<void> {
+export async function notifyAdmin(text: string, button?: LinkButton, excludeTgId?: number): Promise<void> {
   const chat = process.env.TELEGRAM_CHAT_ID;
-  if (chat) await sendTo(chat, text, button);
+  // Не слать автору действия (он сам это сделал) — напр. супер-админ написал коммент.
+  if (chat && (excludeTgId == null || Number(chat) !== excludeTgId)) await sendTo(chat, text, button);
 }
 
 /**
@@ -107,22 +108,24 @@ async function tgIdsForProject(projectKey: string, roles: string[]): Promise<num
   return rows.map((r) => r.tg_id);
 }
 
-async function sendWithImages(chatIds: number[], text: string, attachmentIds: number[], button?: LinkButton): Promise<void> {
-  if (!chatIds.length) return;
+async function sendWithImages(chatIds: number[], text: string, attachmentIds: number[], button?: LinkButton, excludeTgId?: number): Promise<void> {
+  // Исключаем автора действия — он не должен получать пуш о собственном комменте/задаче.
+  const targets = excludeTgId != null ? chatIds.filter((id) => id !== excludeTgId) : chatIds;
+  if (!targets.length) return;
   // Картинки грузим один раз, шлём каждому.
   const photos = (await Promise.all(attachmentIds.map((id) => getAttachment(id)))).filter(Boolean) as { mime: string | null; data: Buffer }[];
-  for (const chatId of chatIds) {
+  for (const chatId of targets) {
     await sendTo(chatId, text, button);
     for (const p of photos) await sendPhoto(chatId, p.mime, p.data);
   }
 }
 
-/** Уведомить по логинам (разработчик/сотрудник/клиент) с картинками и опц. кнопкой-ссылкой. */
-export async function notifyLogins(logins: string[], text: string, attachmentIds: number[] = [], button?: LinkButton): Promise<void> {
-  await sendWithImages(await tgIdsForLogins(logins), text, attachmentIds, button);
+/** Уведомить по логинам (разработчик/сотрудник/клиент) с картинками и опц. кнопкой-ссылкой. excludeTgId — автор, ему не слать. */
+export async function notifyLogins(logins: string[], text: string, attachmentIds: number[] = [], button?: LinkButton, excludeTgId?: number): Promise<void> {
+  await sendWithImages(await tgIdsForLogins(logins), text, attachmentIds, button, excludeTgId);
 }
 
-/** Уведомить клиента/сотрудника проекта с картинками и опц. кнопкой-ссылкой. */
-export async function notifyProjectClients(projectKey: string, text: string, attachmentIds: number[] = [], button?: LinkButton): Promise<void> {
-  await sendWithImages(await tgIdsForProject(projectKey, ["client", "employee"]), text, attachmentIds, button);
+/** Уведомить клиента/сотрудника проекта с картинками и опц. кнопкой-ссылкой. excludeTgId — автор, ему не слать. */
+export async function notifyProjectClients(projectKey: string, text: string, attachmentIds: number[] = [], button?: LinkButton, excludeTgId?: number): Promise<void> {
+  await sendWithImages(await tgIdsForProject(projectKey, ["client", "employee"]), text, attachmentIds, button, excludeTgId);
 }

@@ -153,6 +153,12 @@ export const DICT: Record<string, Entry> = {
     en: "To activate access, message:",
   },
   "tma.writeAdmin": { uk: "Написати @soloveynik", ru: "Написать @soloveynik", en: "Message @soloveynik" },
+  "tma.inviteOnly": { uk: "Доступ лише за запрошенням", ru: "Доступ только по приглашению", en: "Access by invitation only" },
+  "tma.inviteOnlyHint": {
+    uk: "Портал відкривається за персональним посиланням-запрошенням від Lambertain. Якщо ви маєте співпрацювати — зверніться, вам надішлють посилання.",
+    ru: "Портал открывается по персональной ссылке-приглашению от Lambertain. Если вы должны сотрудничать — обратитесь, вам пришлют ссылку.",
+    en: "The portal opens via a personal invite link from Lambertain. If you should collaborate — reach out and we’ll send you a link.",
+  },
 
   // — новая задача —
   "newtask.kicker": { uk: "Постановка", ru: "Постановка", en: "New" },
