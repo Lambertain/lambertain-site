@@ -34,13 +34,20 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   const principal = await getPrincipal();
   if (!principal) redirect("/admin/login");
   const locale = await getLocale();
-  const nav = NAV[principal.role] ?? [];
-
   // Колокольчик: непрочитанные уведомления текущего пользователя + имена проектов для группировки.
-  const [unread, allProjects] = principal.tgId
-    ? await Promise.all([listUnreadNotifications(principal.tgId).catch(() => []), listProjectsWithMeta().catch(() => [])])
-    : [[], []];
+  const [unread, allProjects] = await Promise.all([
+    principal.tgId ? listUnreadNotifications(principal.tgId).catch(() => []) : Promise.resolve([]),
+    listProjectsWithMeta().catch(() => []),
+  ]);
   const projectNames: Record<string, string> = Object.fromEntries(allProjects.map((p) => [p.key, p.name]));
+
+  // Таб «Инструкция» у клиента — только если онбординг для его проекта ВКЛЮЧЕН (иначе не показываем по умолчанию).
+  let nav = NAV[principal.role] ?? [];
+  if (principal.role === "client") {
+    const myProj = principal.projectKey ? allProjects.find((p) => p.key === principal.projectKey) : undefined;
+    const onboardingOn = !!(myProj?.meta.showOnboarding || myProj?.meta.onboardingSetToken);
+    if (!onboardingOn) nav = nav.filter((n) => n.key !== "nav.onboarding");
+  }
 
   return (
     <div style={{ ...ui.page, height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>

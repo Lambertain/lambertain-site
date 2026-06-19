@@ -198,3 +198,11 @@ body::after {
 /* Карточка проекта на дашборде — кликабельна */
 .pm-dash-card { transition: border-color 0.15s ease; }
 .pm-dash-card:hover { border-color: var(--accent) !important; }
+
+/* WYSIWYG-композер: плейсхолдер, когда поле пустое */
+.rich-composer[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  pointer-events: none;
+  display: block;
+}

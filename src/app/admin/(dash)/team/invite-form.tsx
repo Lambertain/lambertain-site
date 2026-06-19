@@ -15,7 +15,7 @@ export function InviteForm({ projects, locale, sets = [] }: { projects: Proj[]; 
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false); // онбординг-инструкция — по умолчанию ВЫКЛ (включаю осознанно для конкретного клиента)
   const [setToken, setSetToken] = useState("");
   const [pending, start] = useTransition();
 

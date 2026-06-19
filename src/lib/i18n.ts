@@ -361,6 +361,8 @@ export const DICT: Record<string, Entry> = {
   "projects.typeMine": { uk: "Мій", ru: "Мой", en: "Mine" },
   "projects.typeClient": { uk: "Клієнтський", ru: "Клиентский", en: "Client" },
   "projects.typeHint": { uk: "Клієнтський — постановник задач клієнт (отримує сповіщення, приймає результат). Мій — постановник я.", ru: "Клиентский — постановщик задач клиент (получает уведомления, принимает результат). Мой — постановщик я.", en: "Client — the client is the task reporter (gets notifications, accepts results). Mine — I'm the reporter." },
+  "projects.onboardingLabel": { uk: "Показувати клієнту онбординг-інструкцію", ru: "Показывать клиенту онбординг-инструкцию", en: "Show client the onboarding guide" },
+  "projects.onboardingHint": { uk: "Банер «пройти інструкцію» і вкладка «Інструкція» у клієнта. За замовчуванням вимкнено — вмикаю для тих, кому потрібно.", ru: "Баннер «пройти инструкцию» и вкладка «Инструкция» у клиента. По умолчанию выключено — включаю тем, кому нужно.", en: "The «walk through the guide» banner and «Guide» tab for the client. Off by default — enable per client as needed." },
   "projects.open": { uk: "Відкрити", ru: "Открыть", en: "Open" },
   "projects.save": { uk: "Зберегти", ru: "Сохранить", en: "Save" },
   "projects.saved": { uk: "Збережено ✓", ru: "Сохранено ✓", en: "Saved ✓" },

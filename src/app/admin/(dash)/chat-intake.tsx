@@ -3,43 +3,15 @@
 import { useState, useRef, useTransition, useEffect } from "react";
 import { detectFeminine } from "@/lib/gender-check";
 import { t, type Locale } from "@/lib/i18n";
-import { MarkdownToolbar } from "./markdown-toolbar";
+import { RichComposer, type RichComposerHandle } from "./rich-composer";
 import { ui } from "../ui-styles";
 
 type Proj = { key: string; name: string };
-type Att = { id: string; mime: string; data: string; name: string; image: boolean };
 type Created = { id: string; url: string };
-type Block =
-  | { type: "text"; text: string }
-  | { type: "image"; mime: string; data: string }
-  | { type: "file"; mime: string; data: string; name: string };
 
-const SPEECH_LANG: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
-
-// Черновик задачи в localStorage — чтобы введённый текст не пропал при ошибке/обновлении
-// (в т.ч. когда в момент работы выкатывается новая версия портала → stale Server Action).
+// Черновик задачи в localStorage — чтобы введённый текст не пропал при случайном обновлении страницы.
+// (Деплой больше не форсит перезагрузку: отправка идёт fetch-ом, а не Server Action.) Картинки в черновик не пишем.
 const DRAFT_KEY = "lamb:intake-draft";
-
-/** Разбить тело (markdown с маркерами ![..](att:ID) / [..](att:ID)) на блоки с сохранением порядка. */
-function buildBlocks(text: string, atts: Att[]): Block[] {
-  const blocks: Block[] = [];
-  const re = /(!?)\[[^\]]*\]\(att:([^)]+)\)/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const seg = text.slice(last, m.index).trim();
-    if (seg) blocks.push({ type: "text", text: seg });
-    const a = atts.find((x) => x.id === m![2]);
-    if (a) {
-      if (m[1] === "!" && a.image) blocks.push({ type: "image", mime: a.mime, data: a.data });
-      else blocks.push({ type: "file", mime: a.mime, data: a.data, name: a.name });
-    }
-    last = re.lastIndex;
-  }
-  const tail = text.slice(last).trim();
-  if (tail) blocks.push({ type: "text", text: tail });
-  return blocks;
-}
 
 export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, feedbackKey, lockedProject }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; isAdmin?: boolean; feedbackKey?: string; lockedProject?: string }) {
   // lockedProject — проект уже выбран явным шагом до формы; иначе дефолт — первый НЕ-фидбек проект.
@@ -47,157 +19,53 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
   const [recipient, setRecipient] = useState<"admin" | "client">("admin");
   const [selfTask, setSelfTask] = useState(false);
   const [internalTask, setInternalTask] = useState(false); // админ: задача разработчику мимо клиента
-  const [clientTask, setClientTask] = useState(false); // супер-админ/админ: задача-вопрос клиенту (клиент видит, отвечает, делегирует сотруднику)
-  const [fromClientTask, setFromClientTask] = useState(false); // супер-админ/админ: задача разработчику ОТ ИМЕНИ клиента (постановщик — клиент)
+  const [clientTask, setClientTask] = useState(false); // супер-админ/админ: задача-вопрос клиенту
+  const [fromClientTask, setFromClientTask] = useState(false); // супер-админ/админ: задача разработчику ОТ ИМЕНИ клиента
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [images, setImages] = useState<Att[]>([]);
+  const [bodyText, setBodyText] = useState(""); // плоский текст из редактора — для предупреждения о роде и черновика
   const [created, setCreated] = useState<Created | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recording, setRecording] = useState(false);
   const [pending, start] = useTransition();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const recRef = useRef<unknown>(null);
-  const idSeq = useRef(0);
+  const composerRef = useRef<RichComposerHandle>(null);
 
-  // Восстановить черновик при открытии (если поля ещё пустые) и сохранять его при наборе.
+  // —— восстановление черновика (текст) после монтирования: сначала читаем, потом монтируем редактор ——
+  const [ready, setReady] = useState(false);
+  const [draftText, setDraftText] = useState("");
   useEffect(() => {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw) as { title?: string; body?: string; projectKey?: string };
-      if (!title && !body && (d.title || d.body)) {
+      if (raw) {
+        const d = JSON.parse(raw) as { title?: string; body?: string; projectKey?: string };
         if (d.title) setTitle(d.title);
-        if (d.body) setBody(d.body);
-        if (d.projectKey && projects.some((p) => p.key === d.projectKey)) setProjectKey(d.projectKey);
+        if (d.body) { setDraftText(d.body); setBodyText(d.body); }
+        if (d.projectKey && projects.some((p) => p.key === d.projectKey) && !lockedProject) setProjectKey(d.projectKey);
       }
     } catch { /* ignore */ }
+    setReady(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     try {
-      if (title.trim() || body.trim()) localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, body, projectKey }));
+      if (title.trim() || bodyText.trim()) localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, body: bodyText, projectKey }));
       else localStorage.removeItem(DRAFT_KEY);
     } catch { /* ignore */ }
-  }, [title, body, projectKey]);
-
-  /** Вставить текст в тело на позицию курсора. */
-  function insertAtCursor(text: string) {
-    const ta = bodyRef.current;
-    const pos = ta ? ta.selectionStart : body.length;
-    setBody((b) => b.slice(0, pos) + text + b.slice(pos));
-    setTimeout(() => { if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = pos + text.length; } }, 0);
-  }
-
-  function addFiles(files: FileList | File[] | null) {
-    if (!files) return;
-    Array.from(files).forEach((f) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const [meta, data] = String(reader.result).split(",");
-        const mime = meta.slice(5, meta.indexOf(";"));
-        const image = mime.startsWith("image/");
-        const id = `i${++idSeq.current}`;
-        const name = f.name || (image ? `screen-${id}` : "file");
-        setImages((p) => [...p, { id, mime, data, name, image }]);
-        insertAtCursor(image ? `\n![${name}](att:${id})\n` : `\n[${name}](att:${id})\n`);
-      };
-      reader.readAsDataURL(f);
-    });
-  }
-
-  function onDrop(e: React.DragEvent) {
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length) { e.preventDefault(); addFiles(files); }
-  }
-  function onDragOver(e: React.DragEvent) { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }
-
-  function onPaste(e: React.ClipboardEvent) {
-    const files = Array.from(e.clipboardData.files);
-    if (files.length) { e.preventDefault(); addFiles(files); }
-  }
-
-  function removeImage(id: string) {
-    setImages((p) => p.filter((i) => i.id !== id));
-    setBody((b) => b.replace(new RegExp(`\\n?!?\\[[^\\]]*\\]\\(att:${id}\\)\\n?`, "g"), ""));
-  }
-
-  // —— голосовой ввод (работает и в браузере, и в Mini App) ——
-  const baseRef = useRef("");      // тело до начала записи
-  const posRef = useRef(0);        // позиция вставки
-  const committedRef = useRef(""); // финализированный текст за сессию
-  const sessionFinalRef = useRef("");
-  const manualStopRef = useRef(false);
-
-  function startVoice() {
-    // @ts-expect-error — Web Speech API
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setError("Голосовой ввод не поддерживается этим браузером."); return; }
-    const ta = bodyRef.current;
-    baseRef.current = body;
-    posRef.current = ta ? ta.selectionStart : body.length;
-    committedRef.current = "";
-    sessionFinalRef.current = "";
-    manualStopRef.current = false;
-    setRecording(true);
-    spawn(SR);
-  }
-  // @ts-expect-error — SR конструктор
-  function spawn(SR) {
-    const rec = new SR();
-    rec.lang = SPEECH_LANG[locale];
-    rec.interimResults = true;
-    rec.continuous = true;
-    rec.onresult = (e: { results: ArrayLike<{ isFinal: boolean } & ArrayLike<{ transcript: string }>> }) => {
-      let fin = "", interim = "";
-      for (const r of Array.from(e.results)) {
-        if ((r as unknown as { isFinal: boolean }).isFinal) fin += r[0].transcript;
-        else interim += r[0].transcript;
-      }
-      sessionFinalRef.current = fin;
-      const ins = committedRef.current + fin + interim;
-      const base = baseRef.current, p = posRef.current;
-      setBody(base.slice(0, p) + ins + base.slice(p));
-    };
-    rec.onend = () => {
-      committedRef.current += sessionFinalRef.current;
-      sessionFinalRef.current = "";
-      if (!manualStopRef.current) { try { rec.start(); } catch { spawn(SR); } }
-      else setRecording(false);
-    };
-    rec.onerror = () => { /* onend перезапустит/завершит */ };
-    recRef.current = rec;
-    rec.start();
-  }
-  function stopVoice() {
-    manualStopRef.current = true;
-    (recRef.current as { stop: () => void } | null)?.stop();
-    setRecording(false);
-  }
-  function toggleVoice() {
-    if (recording) stopVoice();
-    else startVoice();
-  }
+  }, [title, bodyText, projectKey]);
 
   const isFeedbackSel = !!feedbackKey && projectKey === feedbackKey;
   const showRecipient = !!isContributor && !isFeedbackSel; // разработчик в обычном проекте — выбирает адресата
-  const showSelf = !!isAdmin && !isFeedbackSel; // супер-админ — может поставить задачу СЕБЕ (личная, внутренняя)
-  // Предупреждение о женском роде — когда разработчик пишет задачу-вопрос клиенту.
-  const femWords = showRecipient && recipient === "client" ? detectFeminine(title + " " + body) : [];
+  const showSelf = !!isAdmin && !isFeedbackSel; // супер-админ — может поставить задачу СЕБЕ / клиенту / от клиента
+  const femWords = showRecipient && recipient === "client" ? detectFeminine(title + " " + bodyText) : [];
 
   function createTask() {
     if (!title.trim()) { setError(t(locale, "request.titleRequired")); return; }
     if (!projectKey) return;
-    if (recording) stopVoice();
-    const blocks = buildBlocks(body, images);
+    const blocks = composerRef.current?.getContent().blocks ?? [];
     setError(null);
     start(async () => {
       const rcpt = showRecipient ? recipient : showSelf && selfTask ? "self" : showSelf && clientTask ? "client" : showSelf && fromClientTask ? "from_client" : undefined;
       const wantInternal = showSelf && internalTask && !selfTask && !clientTask && !fromClientTask; // задача разработчику, скрытая от клиента
       try {
-        // Отправка через обычный fetch к API-роуту (не Server Action): URL переживает деплой, поэтому
-        // выкатка новой версии портала НИКАК не мешает создавать задачу — перезагрузка не нужна, скрины не теряются.
+        // fetch к API-роуту (не Server Action): деплой не форсит перезагрузку, скрины не теряются.
         const r = await fetch("/api/portal/create-task", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -207,21 +75,18 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
         if (res.error) setError(res.error);
         else if (res.id && res.url) {
           setCreated({ id: res.id, url: res.url });
-          setTitle(""); setBody(""); setImages([]);
+          setTitle(""); setBodyText(""); composerRef.current?.clear();
           try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
         } else {
           setError(t(locale, "request.sendFailed"));
         }
       } catch {
-        // Сетевой сбой (не деплой — деплой на fetch не влияет): поля НЕ очищаем, текст/скрины остаются для повтора.
         setError(t(locale, "request.sendFailed"));
       }
     });
   }
 
-  function startOver() { setCreated(null); setTitle(""); setBody(""); setImages([]); setError(null); try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } }
-
-  const iconBtn: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, flexShrink: 0, background: "transparent", border: "1px solid var(--border-2)", color: "var(--muted)", cursor: "pointer", borderRadius: 2 };
+  function startOver() { setCreated(null); setTitle(""); setBodyText(""); composerRef.current?.clear(); setError(null); try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } }
 
   if (created) {
     return (
@@ -237,6 +102,12 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
     );
   }
 
+  const submitBtn = (
+    <button onClick={createTask} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>
+      {pending ? "…" : t(locale, "request.submit")}
+    </button>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: fill ? "100%" : "calc(100dvh - 200px)", minHeight: 0, flex: fill ? 1 : undefined, marginTop: fill ? 0 : 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
       {/* проект */}
@@ -251,8 +122,7 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
         )}
       </div>
 
-      {/* себе (только супер-админ): личная внутренняя задача — без триажа, без дева, клиент не видит */}
-      {/* супер-админ/админ: куда адресовать задачу — себе / клиенту / от клиента разработчику / внутр. разработчику. Взаимоисключающие. */}
+      {/* супер-админ/админ: куда адресовать задачу — себе / клиенту / от клиента / внутр. разработчику. Взаимоисключающие. */}
       {showSelf && (() => {
         const opts = [
           { key: "self", on: selfTask, set: setSelfTask, label: "newtask.self", hint: "newtask.selfHint" },
@@ -295,85 +165,22 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
         style={{ background: "transparent", border: "none", borderBottom: "1px solid var(--border)", color: "var(--text)", fontSize: 20, fontWeight: 600, padding: "14px 16px", outline: "none" }}
       />
 
-      {/* панель форматирования над описанием */}
-      <div style={{ padding: "8px 12px 0" }}><MarkdownToolbar taRef={bodyRef} value={body} onChange={setBody} locale={locale} /></div>
-
-      {/* описание — одно сплошное поле */}
-      <textarea
-        ref={bodyRef}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onPaste={onPaste}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        placeholder={t(locale, "request.placeholder")}
-        style={{ flex: 1, minHeight: 120, background: "transparent", border: "none", color: "var(--text)", fontSize: 15, lineHeight: 1.6, padding: "14px 16px", outline: "none", resize: "none", fontFamily: "var(--font-body), system-ui, sans-serif" }}
-      />
-
-      {/* живой рендер тела: текст + картинки inline на своих местах (а не миниатюрами внизу) */}
-      {images.length > 0 && <BodyPreview body={body} images={images} onRemove={removeImage} />}
-
       {femWords.length > 0 && (
-        <p style={{ fontSize: 13, color: "#e8b339", padding: "0 16px", lineHeight: 1.5 }}>⚠️ {t(locale, "gender.warn", { words: femWords.join(", ") })}</p>
+        <p style={{ fontSize: 13, color: "#e8b339", padding: "8px 16px 0", lineHeight: 1.5 }}>⚠️ {t(locale, "gender.warn", { words: femWords.join(", ") })}</p>
       )}
-      {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", padding: "0 16px" }}>{error}</p>}
+      {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", padding: "8px 16px 0" }}>{error}</p>}
 
-      {/* нижняя панель: скрепка, микрофон, [Создать задачу] */}
-      <div style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid var(--border)", alignItems: "center" }}>
-        <input ref={fileRef} type="file" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
-        <button onClick={() => fileRef.current?.click()} title={t(locale, "chat.attachFile")} style={iconBtn}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
-        </button>
-        <button onClick={toggleVoice} title={t(locale, "chat.voice")} style={{ ...iconBtn, background: recording ? "#ff5b5b" : "transparent", borderColor: recording ? "#ff5b5b" : "var(--border-2)", color: recording ? "#fff" : "var(--muted)" }}>
-          {recording ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-          ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
-          )}
-        </button>
-        <button onClick={createTask} disabled={pending} style={{ ...ui.btnAccent, marginLeft: "auto", opacity: pending ? 0.5 : 1 }}>
-          {pending ? "…" : t(locale, "request.submit")}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** Живой рендер тела заявки: текст + картинки/файлы inline на своих местах (по att-маркерам). */
-function BodyPreview({ body, images, onRemove }: { body: string; images: Att[]; onRemove: (id: string) => void }) {
-  const re = /(!?)\[[^\]]*\]\(att:([^)]+)\)/g;
-  const nodes: React.ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  let k = 0;
-  while ((m = re.exec(body))) {
-    const seg = body.slice(last, m.index);
-    if (seg.trim()) nodes.push(<span key={`t${k++}`} style={{ whiteSpace: "pre-wrap" }}>{seg}</span>);
-    const a = images.find((x) => x.id === m![2]);
-    if (a && a.image) {
-      nodes.push(
-        <span key={`i${k++}`} style={{ position: "relative", display: "block", margin: "8px 0" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`data:${a.mime};base64,${a.data}`} alt={a.name} style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 6, border: "1px solid var(--border-2)", display: "block" }} />
-          <button onClick={() => onRemove(a.id)} aria-label="Видалити" style={{ position: "absolute", top: 6, right: 6, width: 22, height: 22, borderRadius: "50%", background: "rgba(0,0,0,0.6)", color: "#fff", border: "none", cursor: "pointer", fontSize: 14, lineHeight: "22px", padding: 0 }}>×</button>
-        </span>,
-      );
-    } else if (a) {
-      nodes.push(
-        <span key={`f${k++}`} style={{ display: "inline-flex", alignItems: "center", gap: 6, ...ui.monoLabel, textTransform: "none", padding: "4px 8px", border: "1px solid var(--border-2)", borderRadius: 4, margin: "0 4px" }}>
-          📎 {a.name.slice(0, 24)}
-          <button onClick={() => onRemove(a.id)} style={{ background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 13, padding: 0 }}>×</button>
-        </span>,
-      );
-    }
-    last = re.lastIndex;
-  }
-  const tail = body.slice(last);
-  if (tail.trim()) nodes.push(<span key="tail" style={{ whiteSpace: "pre-wrap" }}>{tail}</span>);
-  return (
-    <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", fontSize: 14, lineHeight: 1.6, color: "var(--text)", maxHeight: 360, overflowY: "auto" }}>
-      <div style={{ ...ui.monoLabel, color: "var(--muted)", marginBottom: 8 }}>Тіло задачі (попередній перегляд)</div>
-      {nodes}
+      {/* тело — WYSIWYG: текст + картинки/файлы инлайн, тулбар, скрепка/микрофон и кнопка отправки */}
+      {ready && (
+        <RichComposer
+          ref={composerRef}
+          locale={locale}
+          placeholder={t(locale, "request.placeholder")}
+          initialText={draftText}
+          onChange={(_empty, text) => setBodyText(text)}
+          controls={submitBtn}
+        />
+      )}
     </div>
   );
 }

@@ -81,6 +81,7 @@ export function MetaForm({
   const [name, setName] = useState(initialName);
   // Тип проекта: клиентский (постановщик задач = клиент) или мой личный (постановщик = я). Дефолт — по наличию клиента.
   const [projectType, setProjectType] = useState<"mine" | "client">(m.projectType ?? (hasClient ? "client" : "mine"));
+  const [showOnboarding, setShowOnboarding] = useState(!!m.showOnboarding); // показывать ли клиенту онбординг-инструкцию
   const [defaultAssignee, setDefaultAssignee] = useState(m.defaultAssignee ?? "");
   const [cost, setCost] = useState(m.cost != null ? String(m.cost) : "");
   const [currency, setCurrency] = useState(m.currency ?? "₴");
@@ -152,6 +153,8 @@ export function MetaForm({
     setError(null);
     const meta: ProjectMeta = {
       projectType,
+      showOnboarding: showOnboarding || undefined,
+      onboardingSetToken: m.onboardingSetToken, // набор инструкций (если привязан) — не теряем при сохранении
       clientGit: clientGit || undefined,
       devGit: devGit || undefined,
       localPath: localPath || undefined,
@@ -213,6 +216,15 @@ export function MetaForm({
           ))}
         </div>
         <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 6 }}>{t(locale, "projects.typeHint")}</span>
+      </div>
+
+      {/* Онбординг-инструкция клиенту — по умолчанию ВЫКЛ; включаю осознанно для конкретного проекта. */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", ...ui.monoLabel, textTransform: "none" }}>
+          <input type="checkbox" checked={showOnboarding} onChange={(e) => setShowOnboarding(e.target.checked)} style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
+          {t(locale, "projects.onboardingLabel")}
+        </label>
+        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 6 }}>{t(locale, "projects.onboardingHint")}</span>
       </div>
 
       <Field label={t(locale, "projects.name")} value={name} onChange={setName} />
