@@ -13,6 +13,7 @@ import { nowMs } from "@/lib/now";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { ChatModal } from "./chat-modal";
+import { NewProjectButton } from "./new-project-button";
 import { type BoardTask } from "./task-tabs";
 import { ClientBoard } from "./client-board";
 import { DevDashboard, type DashProject } from "./dev-dashboard";
@@ -57,6 +58,7 @@ export default async function HomePage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>{t(locale, "projects.manage")}</Link>
+            <NewProjectButton locale={locale} />
             <ChatModal projects={chatProjects} locale={locale} isAdmin={isSuperAdmin(me)} role={me.role} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
           </div>
         </div>

@@ -163,6 +163,12 @@ export const DICT: Record<string, Entry> = {
   // — новая задача —
   "newtask.kicker": { uk: "Постановка", ru: "Постановка", en: "New" },
   "newtask.title": { uk: "Нова задача", ru: "Новая задача", en: "New task" },
+  "newtask.short": { uk: "Задача", ru: "Задача", en: "Task" },
+  "newproject.title": { uk: "Проєкт", ru: "Проект", en: "Project" },
+  "newproject.heading": { uk: "Новий проєкт", ru: "Новый проект", en: "New project" },
+  "newproject.namePh": { uk: "Назва проєкту", ru: "Название проекта", en: "Project name" },
+  "newproject.create": { uk: "Створити", ru: "Создать", en: "Create" },
+  "newproject.nameRequired": { uk: "Вкажіть назву", ru: "Укажите название", en: "Enter a name" },
   "newtask.pickProject": { uk: "Оберіть проєкт для задачі", ru: "Выберите проект для задачи", en: "Choose a project for the task" },
   "pick.cta": { uk: "Створити задачу", ru: "Создать задачу", en: "Create task" },
   "pick.client": { uk: "Ви власник цього проєкту — можете поставити задачу або поставити запитання розробнику.", ru: "Вы владелец этого проекта — можете поставить задачу или задать вопрос разработчику.", en: "You own this project — you can create a task or ask the developer a question." },
