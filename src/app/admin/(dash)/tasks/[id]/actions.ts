@@ -3,7 +3,7 @@
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
-import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny } from "@/lib/moderation";
+import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny, makeCommentClientVisible } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
@@ -179,9 +179,10 @@ export async function superDeleteComment(commentId: string, taskId: string): Pro
 }
 
 /** Супер-админ редактирует любой коммент (в т.ч. свой — у него нет member-логина для «правки своего»). */
-export async function superEditComment(commentId: string, taskId: string, text: string): Promise<{ ok?: boolean; error?: string }> {
+export async function superEditComment(commentId: string, taskId: string, text: string, visibleToClient?: boolean): Promise<{ ok?: boolean; error?: string }> {
   if (!isSuperAdmin(await getPrincipal())) return { error: "Нет прав" };
-  const r = await editCommentAny(commentId, text);
+  // visibleToClient — перевести внутренний коммент в видимый клиенту (опубликовать + уведомить); иначе просто правка текста.
+  const r = visibleToClient ? await makeCommentClientVisible(commentId, text) : await editCommentAny(commentId, text);
   revalidatePath(`/admin/tasks/${taskId}`);
   return "error" in r ? { error: r.error } : { ok: true };
 }

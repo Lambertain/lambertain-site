@@ -136,6 +136,24 @@ export async function deleteCommentAny(commentId: string): Promise<void> {
   await q("DELETE FROM comments WHERE id = $1", [commentId]);
 }
 
+/**
+ * Супер-админ при редактировании переводит ВНУТРЕННИЙ коммент в ВИДИМЫЙ КЛИЕНТУ: публикует (approved, visibility=client)
+ * и уведомляет клиента проекта. Текст можно заодно отредактировать. Так внутреннюю заметку можно «открыть» клиенту.
+ */
+export async function makeCommentClientVisible(commentId: string, body: string): Promise<{ taskId: string } | { error: string }> {
+  if (!body.trim()) return { error: "empty" };
+  await q("UPDATE comments SET body = $2, visibility = 'client', approved = true WHERE id = $1", [commentId, body]);
+  const r = await commentInfo(commentId);
+  if (!r) return { error: "not found" };
+  await notifyProjectClients(
+    r.project_key,
+    `💬 <b>${r.project_name} · ${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
+    attachmentIdsIn(r.body),
+    taskBtn(r.readable_id),
+  ).catch(() => {});
+  return { taskId: r.readable_id };
+}
+
 /** Супер-админ редактирует текст ЛЮБОГО коммента (его собственные комменты тоже — у него нет member-логина,
  *  поэтому «правка своего» по логину ему недоступна). Статус публикации/модерации не трогаем. */
 export async function editCommentAny(commentId: string, body: string): Promise<{ ok: true } | { error: string }> {

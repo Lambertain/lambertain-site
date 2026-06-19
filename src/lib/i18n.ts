@@ -451,6 +451,8 @@ export const DICT: Record<string, Entry> = {
   "owner.done": { uk: "Виконав", ru: "Выполнил", en: "Done" },
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
   "comment.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
+  "comment.makeClientVisible": { uk: "Зробити видимим клієнту (опублікувати)", ru: "Сделать видимым клиенту (опубликовать)", en: "Make visible to client (publish)" },
+  "comment.publishToClient": { uk: "Опублікувати клієнту", ru: "Опубликовать клиенту", en: "Publish to client" },
   "comment.editLocked": { uk: "На коментар вже відповіли — редагування недоступне.", ru: "На комментарий уже ответили — редактирование недоступно.", en: "The comment has been answered — editing is no longer available." },
   "comment.deleteConfirm": { uk: "Видалити цей коментар?", ru: "Удалить этот комментарий?", en: "Delete this comment?" },
 

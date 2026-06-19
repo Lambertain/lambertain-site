@@ -122,7 +122,7 @@ export function CommentsView({
                   : !pending && c.canEdit
                     ? <OwnPublishedEdit taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
                     : !pending && canModerate
-                      ? <SuperEdit taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
+                      ? <SuperEdit taskId={taskId} commentId={c.id} text={c.text} internal={c.visibility === "internal"} locale={locale} />
                       : c.devAuthored && canManageDev
                         ? <DevManageEdit taskId={taskId} commentId={c.id} text={c.text} locale={locale} />
                         : null}
@@ -233,16 +233,24 @@ function OwnPublishedEdit({ taskId, commentId, text, locale }: { taskId: string;
 }
 
 /** Супер-админ правит ЛЮБОЙ опубликованный коммент (в т.ч. свой — у него нет логина для «правки своего»). */
-function SuperEdit({ taskId, commentId, text, locale }: { taskId: string; commentId: string; text: string; locale: Locale }) {
+function SuperEdit({ taskId, commentId, text, internal, locale }: { taskId: string; commentId: string; text: string; internal?: boolean; locale: Locale }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
+  const [toClient, setToClient] = useState(false); // перевести внутренний → видимый клиенту
   const [pending, start] = useTransition();
   if (editing) {
     return (
       <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-2)", display: "flex", flexDirection: "column", gap: 8 }}>
         <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={5} style={{ ...ui.input, resize: "vertical", fontFamily: "inherit", width: "100%" }} />
+        {/* Внутренний коммент можно «открыть» клиенту прямо при редактировании. */}
+        {internal && (
+          <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", ...ui.monoLabel, textTransform: "none" }}>
+            <input type="checkbox" checked={toClient} onChange={(e) => setToClient(e.target.checked)} style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
+            {t(locale, "comment.makeClientVisible")}
+          </label>
+        )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={() => start(async () => { const r = await superEditComment(commentId, taskId, draft); if (!r?.error) setEditing(false); })} disabled={pending || !draft.trim()} style={{ ...ui.btnAccent, opacity: pending || !draft.trim() ? 0.5 : 1 }}>{t(locale, "mod.save")}</button>
+          <button onClick={() => start(async () => { const r = await superEditComment(commentId, taskId, draft, internal && toClient); if (!r?.error) setEditing(false); })} disabled={pending || !draft.trim()} style={{ ...ui.btnAccent, opacity: pending || !draft.trim() ? 0.5 : 1 }}>{toClient ? t(locale, "comment.publishToClient") : t(locale, "mod.save")}</button>
           <button onClick={() => { setDraft(text); setEditing(false); }} style={ui.btn}>{t(locale, "common.cancel")}</button>
         </div>
       </div>
