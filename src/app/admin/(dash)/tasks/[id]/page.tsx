@@ -135,16 +135,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       <div style={{ display: "flex", gap: 16, ...ui.monoLabel, textTransform: "none", marginTop: 10, flexWrap: "wrap" }}>
         {me.role !== "client" && task.assignee && <span>→ {task.assignee.fullName}</span>}
-        {/* Постановщик. reporter=null = сторона агентства (супер-админ/админ) или старая задача без логина:
-            подписываем по created_by_role (разработчик/сотрудник), иначе «Lambertain». Клиенту команду не раскрываем. */}
+        {/* Постановщик. reporter=null бывает ТОЛЬКО у супер-админа (у всех остальных ролей есть member-логин,
+            он и пишется в постановщики). created_by_role при null лишь отражает режим «просмотра как» — не реального
+            автора, поэтому для null подписываем «Lambertain» (агентство). Клиенту команду не раскрываем. */}
         {(() => {
-          const name = task.reporter
-            ? task.reporter.fullName
-            : task.createdByRole === "contributor"
-              ? t(locale, "role.contributor")
-              : task.createdByRole === "employee"
-                ? t(locale, "role.employee")
-                : "Lambertain";
+          const name = task.reporter ? task.reporter.fullName : "Lambertain";
           const show = task.reporter
             ? me.role !== "client" || task.reporter.role === "client" || task.reporter.role === "employee"
             : me.role !== "client";
