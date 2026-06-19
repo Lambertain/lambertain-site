@@ -43,7 +43,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   let task, comments, deps, reads, users, tags, projects;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    [task, comments, deps, reads, users, tags, projects] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), isSuperAdmin(me) ? be.listProjects() : Promise.resolve([])]);
+    [task, comments, deps, reads, users, tags, projects] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), be.listProjects()]);
   } catch (e) {
     return (
       <div>
@@ -59,6 +59,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   if (task.internal && me.role === "client") redirect(backHref);
 
   const blockers = deps.filter((d) => statusBucket(d.status) !== "done");
+  // Навигация: имя проекта + ссылка на доску этого проекта (для крошек и корректного «назад»).
+  const projectName = projects.find((p) => p.key === task.projectKey)?.name ?? task.projectKey;
+  const projectBoardHref = `/admin/tasks?project=${encodeURIComponent(task.projectKey)}`;
+  const taskBackHref = me.role === "client" ? "/admin" : projectBoardHref;
   // Гайд-инструкция к действию клиента (как зарегистрировать) — если привязан, на локали пользователя.
   const cg = task.clientActionGuide ? await getGuide(task.clientActionGuide) : null;
   const clientGuide = cg ? guideText(cg, locale) : null;
@@ -100,11 +104,22 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       {/* «← к задачам» липкая (DEV-3): остаётся видимой при прокрутке длинной задачи — пилюля с фоном поверх контента. */}
       <div style={{ position: "sticky", top: 0, zIndex: 20, marginBottom: 4, display: "flex" }}>
         <BackButton
-          fallbackHref={backHref}
+          fallbackHref={taskBackHref}
           label={t(locale, "task.backPrev")}
           style={{ ...ui.monoLabel, display: "inline-flex", alignItems: "center", color: "var(--muted)", textDecoration: "none", background: "rgba(8,8,8,0.85)", backdropFilter: "blur(8px)", border: "1px solid var(--border-2)", borderRadius: 999, padding: "6px 12px", cursor: "pointer" }}
         />
       </div>
+
+      {/* Хлебные крошки (DEV-5): Задачи › <Проект> › <ID>. Проект — кликабелен → доска этого проекта. Клиенту не показываем. */}
+      {me.role !== "client" && (
+        <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+          <Link href="/admin/tasks" style={{ color: "var(--muted)", textDecoration: "none" }}>{t(locale, "nav.tasks")}</Link>
+          <span>›</span>
+          <Link href={projectBoardHref} style={{ color: "var(--accent)", textDecoration: "none" }}>{projectName}</Link>
+          <span>›</span>
+          <span style={{ color: "var(--text)" }}>{task.id}</span>
+        </div>
+      )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>

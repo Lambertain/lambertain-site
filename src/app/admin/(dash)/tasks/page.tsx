@@ -75,6 +75,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         unread,
         blocked: blockers.length > 0,
         blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
+        ownerAction: tk.ownerAction,
+        clientAction: tk.clientAction,
       };
     });
     const fbSet = new Set(projectsList.filter((p) => p.meta.feedback).map((p) => p.key));
@@ -109,6 +111,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           canStart={false}
           empty={t(locale, "tasks.empty")}
           feedbackKey={projectsList.find((p) => p.meta.feedback)?.key}
+          initialProject={typeof sp.project === "string" ? sp.project : undefined}
+          initialBucket={(BUCKET_ORDER as readonly string[]).includes(sp.tab ?? "") ? (sp.tab as Bucket) : undefined}
           allowAll
           searchable
         />
@@ -148,6 +152,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         description: tk.description, created: tk.created, updated: tk.updated, commentCount: tk.commentCount,
         assignee: tk.assignee?.fullName ?? null, unread,
         blocked: blockers.length > 0, blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
+        ownerAction: tk.ownerAction, clientAction: tk.clientAction,
       };
     });
     const projectsWithNew = visible

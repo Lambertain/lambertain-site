@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { updateTaskStatus, markProjectOpened, deleteTask, moveToReview } from "./tasks-actions";
 import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { t, type Locale } from "@/lib/i18n";
@@ -21,6 +22,8 @@ export type BoardTask = {
   newComments?: number;
   blocked?: boolean;
   blockers?: { id: string; summary: string }[];
+  ownerAction?: string | null; // ждёт ops-шага агентства (владельца)
+  clientAction?: string | null; // ждёт действия клиента
 };
 
 type Proj = { key: string; name: string; hasNew?: boolean };
@@ -150,6 +153,17 @@ function Row({
           {t(locale, "deps.blockedBy")} {task.blockers.map((b) => b.id).join(", ")}
         </div>
       )}
+      {/* На ком блокер (DEV-5): ждём действия владельца (агентства) или клиента + причина. */}
+      {task.ownerAction && (
+        <div style={{ ...ui.monoLabel, textTransform: "none", color: "#e8b339", marginTop: 8 }}>
+          ⏳ {t(locale, "block.owner")}: {String(task.ownerAction).slice(0, 80)}
+        </div>
+      )}
+      {task.clientAction && (
+        <div style={{ ...ui.monoLabel, textTransform: "none", color: "#e8b339", marginTop: 8 }}>
+          ⏳ {t(locale, "block.client")}: {String(task.clientAction).slice(0, 80)}
+        </div>
+      )}
     </div>
   );
 }
@@ -228,6 +242,17 @@ export function TaskTabs({
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [, startSeen] = useTransition();
+  const router = useRouter();
+  const pathname = usePathname();
+  // Сохраняем выбранный проект+таб в URL (?project=&tab=) — чтобы «назад» из карточки возвращал на ту же доску
+  // и обновление страницы не сбрасывало вид. Только для НЕконтролируемых досок (админ/разработчик); клиентскую
+  // доску (controlledProject) не трогаем.
+  const writeUrl = onProjectChange ? undefined : (proj: string, bkt: Bucket | "") => {
+    const q = new URLSearchParams();
+    if (proj) q.set("project", proj);
+    if (bkt) q.set("tab", bkt);
+    router.replace(q.toString() ? `${pathname}?${q}` : pathname, { scroll: false });
+  };
 
   // Поиск по слагу (id) или названию — по ВСЕМ задачам, поверх табов/корзин.
   const q = query.trim().toLowerCase();
@@ -239,10 +264,15 @@ export function TaskTabs({
   function openProject(key: string) {
     if (onProjectChange) onProjectChange(key); else setInternalProject(key);
     setBucket(null);
+    writeUrl?.(key, "");
     if (key && !opened.has(key)) { // "" = «ВСЕ» — не отмечаем как открытый проект
       setOpened((s) => new Set(s).add(key));
       startSeen(() => { markProjectOpened(key); });
     }
+  }
+  function pickBucket(b: Bucket) {
+    setBucket(b);
+    writeUrl?.(activeProject, b);
   }
 
   // Открытие апки = просмотр активного проекта (снимаем его метку New).
@@ -323,7 +353,7 @@ export function TaskTabs({
 
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 16, overflowX: "auto", borderBottom: "1px solid var(--border)", paddingBottom: 2 }}>
         {BUCKET_ORDER.map((b) => (
-          <TabBtn key={b} variant="status" active={b === activeBucket} onClick={() => setBucket(b)}>
+          <TabBtn key={b} variant="status" active={b === activeBucket} onClick={() => pickBucket(b)}>
             {t(locale, BUCKET_LABEL[b])} · {byBucket[b].length}
           </TabBtn>
         ))}

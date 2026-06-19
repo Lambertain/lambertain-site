@@ -122,6 +122,9 @@ export default async function HomePage() {
       newComments,
       blocked: blockers.length > 0,
       blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
+      // Клиенту ops-шаг агентства (ownerAction) не показываем; его собственное действие (clientAction) — показываем.
+      ownerAction: me.role === "client" ? null : tk.ownerAction,
+      clientAction: tk.clientAction,
     };
   });
 
