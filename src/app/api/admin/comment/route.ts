@@ -39,6 +39,10 @@ export async function POST(req: Request) {
   if (visible) {
     await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(readableId)}</b>: ${task.summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), link).catch(() => {});
   }
+  // Уведомить постановщика (если он не клиент — клиентов уже покрыл notifyProjectClients): новый коммент по его задаче.
+  if (task.reporter?.login && task.reporter.role !== "client") {
+    await notifyLogins([task.reporter.login], `💬 <b>Відповідь по задачі</b> · ${await taskTag(readableId)}: ${task.summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), link).catch(() => {});
+  }
   if (b.review === true) {
     await be.updateStatus(readableId, "Review");
     if (task.reporter?.login) await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(readableId)}: ${task.summary}`, [], link).catch(() => {});
