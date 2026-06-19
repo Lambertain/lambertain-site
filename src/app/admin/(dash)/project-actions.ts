@@ -1,7 +1,7 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, getProjectClientLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins } from "@/lib/notify";
@@ -66,6 +66,8 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
     if (!tasks.length) return { error: "Не удалось разбить спеку на задачи" };
     const be = getBackend();
     const assignee = p.meta.defaultAssignee || null;
+    // Постановщик задач проекта — КЛИЕНТ (его проект, он принимает результат). Нет клиента → null.
+    const clientLogin = await getProjectClientLogin(projectKey);
     const ids: string[] = [];
     for (const tk of tasks) {
       const task = await be.createTask({
@@ -73,9 +75,9 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
         summary: tk.summary,
         description: tk.description || "",
         assigneeLogin: assignee,
-        reporterLogin: me.youtrackLogin ?? null,
+        reporterLogin: clientLogin,
         approvalStatus: "approved",
-        autoDone: true, // спека супер-админа: на готовности — авто-Готово, без ручной приёмки
+        autoDone: false, // клиент-постановщик принимает результат сам
       });
       await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (Array.isArray(tk.skills) ? tk.skills : []).filter(Boolean) });
       await setTaskAiStatus(task.id, "done"); // уже размечено — отдельный триаж не нужен

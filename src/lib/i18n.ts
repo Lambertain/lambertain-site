@@ -179,6 +179,8 @@ export const DICT: Record<string, Entry> = {
   "newtask.internal": { uk: "Внутрішня — клієнт не бачить", ru: "Внутренняя — клиент не видит", en: "Internal — hidden from client" },
   "newtask.internalHint": { uk: "Задача піде в роботу розробнику, але клієнт її не побачить.", ru: "Задача уйдёт в работу разработчику, но клиент её не увидит.", en: "Goes to the developer, but the client won't see it." },
   "newtask.client": { uk: "Клієнту — питання/задача", ru: "Клиенту — вопрос/задача", en: "To the client — question/task" },
+  "newtask.fromClient": { uk: "Від клієнта — розробнику", ru: "От клиента — разработчику", en: "From the client — to developer" },
+  "newtask.fromClientHint": { uk: "Звичайна задача розробнику, але постановник — клієнт (він її приймає, йому йдуть сповіщення про коментарі/рев'ю).", ru: "Обычная задача разработчику, но постановщик — клиент (он её принимает, ему идут уведомления о комментариях/ревью).", en: "A normal task to the developer, but the reporter is the client (they accept it and get comment/review notifications)." },
   "newtask.clientHint": { uk: "Клієнт побачить, отримає сповіщення й відповість коментарем; може делегувати своєму співробітнику. Розробнику не призначається.", ru: "Клиент увидит, получит уведомление и ответит комментарием; может делегировать своему сотруднику. Разработчику не назначается.", en: "The client sees it, gets a push and replies in comments; can delegate to their employee. Not assigned to the developer." },
   "newtask.hint": {
     uk: "Опиши задачу в чаті — я уточню деталі, гляну код і запропоную готові задачі. Можна додавати скриншоти.",

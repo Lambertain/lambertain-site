@@ -6,7 +6,7 @@ import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
 import { notifyLogins, notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { projectHasClient, appendRequestBlocks, setTaskAiStatus, type ReqBlock } from "@/lib/db";
+import { projectHasClient, appendRequestBlocks, setTaskAiStatus, getProjectClientLogin, type ReqBlock } from "@/lib/db";
 
 /** Кнопка «Открыть задачу» (в notify конвертируется в web_app Mini App с диплинком). */
 const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
@@ -57,7 +57,7 @@ export async function createRequestTask(
   projectKey: string,
   title: string,
   blocks: ReqBlock[],
-  recipient?: "admin" | "client" | "self",
+  recipient?: "admin" | "client" | "self" | "from_client",
   internal?: boolean,
 ): Promise<{ id?: string; url?: string; error?: string }> {
   const me = await getPrincipal();
@@ -119,6 +119,24 @@ export async function createRequestTask(
       });
       await appendRequestBlocks(task.id, blocks);
       await notifyProjectClients(projectKey, `❓ <b>Питання/задача</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
+      return { id: task.id, url: task.url };
+    }
+
+    // Супер-админ / админ ставит задачу ОТ ИМЕНИ КЛИЕНТА: обычная задача разработчику (с триажем),
+    // но постановщик — клиент проекта (он же её принимает; уведомления о коммент/ревью идут ему).
+    if ((isSuperAdmin(me) || me.realRole === "admin") && !isFeedback && recipient === "from_client") {
+      const clientLogin = await getProjectClientLogin(projectKey);
+      const task = await be.createTask({
+        projectKey,
+        summary,
+        description: "",
+        assigneeLogin: project?.meta.defaultAssignee ?? null, // в работу ответственному разработчику
+        reporterLogin: clientLogin, // постановщик — клиент
+        approvalStatus: "approved",
+        internal: false,
+      });
+      await appendRequestBlocks(task.id, blocks);
+      await setTaskAiStatus(task.id, "pending"); // отложенный ИИ-триаж + уведомление разработчику (как обычная задача)
       return { id: task.id, url: task.url };
     }
 

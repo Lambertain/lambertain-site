@@ -278,6 +278,15 @@ export async function projectHasClient(projectKey: string): Promise<boolean> {
   return (rows[0]?.n ?? 0) > 0;
 }
 
+/** Логин клиента проекта (постановщик «от клиента» / получатель приёмки). null — клиент не привязан. */
+export async function getProjectClientLogin(projectKey: string): Promise<string | null> {
+  const rows = await q<{ youtrack_login: string }>(
+    "SELECT youtrack_login FROM tg_links WHERE project_key = $1 AND role = 'client' ORDER BY linked_at LIMIT 1",
+    [projectKey],
+  );
+  return rows[0]?.youtrack_login ?? null;
+}
+
 /**
  * Удалить пользователя из портала: отвязка от бота, проектов и ролей, удаление member.
  * Ссылки в задачах/комментах обнуляются (авторство сохраняется через orig_author_login/orig_*).
