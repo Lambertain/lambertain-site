@@ -358,7 +358,10 @@ ADMIN_PASSWORD                       вход в /admin (web)
 ADMIN_TELEGRAM_ID                    Telegram id админа
 SESSION_SECRET                       подпись сессионной куки
 DATABASE_URL                         Postgres (локально 5434, на Railway — плагин)
-# флаги поллера (любой = "0" отключает): TRIAGE, REMIND_APPROVALS, NOTIFY_TOKENS
+# флаги поллера (любой = "0" отключает): TRIAGE, REMIND_APPROVALS, REMIND_ASSIGNEES, REMIND_COMMENTS, REMIND_REVIEW, NOTIFY_TOKENS
+#   REMIND_ASSIGNEES — исполнителю по задачам в работе РАЗ В 24 Ч (от создания; дедлайнов в системе нет)
+#   REMIND_COMMENTS  — исполнителю каждые 15 мин, пока висит неотвеченный коммент клиента (клиентские комменты — без модерации)
+#   REMIND_REVIEW    — постановщику/клиенту каждые 15 мин про задачи на ревью/апруве старше суток
 # TRIAGE_DELAY_MIN=5, POLL_INTERVAL_SEC=60, POLL_ONCE=1 (один цикл), DRY_RUN=1 (без отправки)
 ```
 

@@ -2,8 +2,9 @@
  * Фоновый воркер портала (Railway). Самодостаточный: pg + fetch, без Next-зависимостей.
  * Уведомления о событиях задач шлёт само приложение (src/lib/notify.ts). Здесь — фоновые шаги по БД:
  *   TRIAGE            — отложенный ИИ-триаж задач (через ~TRIAGE_DELAY_MIN минут после создания)
- *   REMIND_APPROVALS  — напоминание супер-админу про модерацию/апрув/ops-шаги
- *   REMIND_ASSIGNEES  — каждые 15 мин долбить исполнителя по задачам старше суток (пока не выполнит)
+ *   REMIND_APPROVALS  — напоминание супер-админу про модерацию/апрув/ops-шаги (каждые 15 мин)
+ *   REMIND_ASSIGNEES  — напоминание исполнителю по задачам в работе РАЗ В 24 Ч (от создания задачи)
+ *   REMIND_COMMENTS   — каждые 15 мин долбить исполнителя, если на задаче висит неотвеченный коммент клиента
  *   NOTIFY_TOKENS     — суточный дайджест расхода токенов
  * Любой шаг отключается флагом env = "0".
  *
@@ -32,6 +33,8 @@ const pool = new pg.Pool({
 async function ensureSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS poller_state (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
   await pool.query(`CREATE TABLE IF NOT EXISTS token_usage (id SERIAL PRIMARY KEY, ts TIMESTAMPTZ NOT NULL DEFAULT now(), model TEXT, kind TEXT, input_tokens INT NOT NULL DEFAULT 0, output_tokens INT NOT NULL DEFAULT 0, cost_usd NUMERIC NOT NULL DEFAULT 0)`);
+  // Счётчик суточных окон напоминаний (дублирует migrate.mjs — на случай, если поллер крутится раньше web-деплоя).
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS remind_count INT NOT NULL DEFAULT 0`);
 }
 async function getState(key) {
   const r = await pool.query("SELECT value FROM poller_state WHERE key=$1", [key]);
@@ -89,23 +92,25 @@ async function sendButtonsTo(chatId, text, buttons) {
 }
 
 /**
- * Каждые 15 мин: долбить ИСПОЛНИТЕЛЯ по задачам, которые висят больше СУТОК и ещё не выполнены.
+ * Напоминание ИСПОЛНИТЕЛЮ по задачам в работе — максимум РАЗ В 24 ЧАСА на задачу, отсчёт от времени
+ * СОЗДАНИЯ (скользящие сутки, не календарные): первое — в возрасте 24 ч, затем 48 ч, 72 ч и т.д.
+ * Дедлайнов в системе нет, поэтому ориентир — возраст задачи (DEV-9: правка Никиты).
  * Не трогаем: сданные на ревью (Review), заблокированные (Blocked) и ждущие внешнего действия
  * (ops-шаг владельца / действие клиента) — это не вина исполнителя. Done (resolved) исключены.
+ * Дедуп по суткам — через tasks.remind_count: шлём, когда floor(возраст/24ч) > remind_count.
  */
 async function remindAssignees() {
   if (!TG_TOKEN) return;
-  const last = Number((await getState("last_remind_assignee")) || 0);
-  if (Date.now() - last < REMIND_MS) return; // не чаще раза в 15 мин
+  const ageDays = `floor(EXTRACT(EPOCH FROM (now() - t.created_at)) / 86400)::int`;
   const rows = (await pool.query(
-    `SELECT t.readable_id, t.title, l.tg_id
+    `SELECT t.id, t.readable_id, t.title, l.tg_id
        FROM tasks t
        JOIN members m ON m.id = t.assignee_id
        JOIN tg_links l ON l.youtrack_login = m.login
       WHERE t.resolved_at IS NULL
         AND t.status NOT IN ('Review', 'Blocked', 'Done')
         AND t.owner_action IS NULL AND t.client_action IS NULL
-        AND t.created_at < now() - interval '24 hours'
+        AND ${ageDays} > t.remind_count   -- наступило новое суточное окно от создания, ещё не напоминали
         -- не долбим за задачи, заблокированные невыполненной зависимостью (исполнитель не может их начать)
         AND NOT EXISTS (
           SELECT 1 FROM task_deps d JOIN tasks bt ON bt.id = d.depends_on_id
@@ -113,17 +118,59 @@ async function remindAssignees() {
         )
       ORDER BY l.tg_id, t.created_at`,
   )).rows;
-  if (!rows.length) { await setState("last_remind_assignee", String(Date.now())); return; }
-  // Группируем по исполнителю — один пуш со списком его просроченных задач.
+  if (!rows.length) return; // без «пустых» напоминаний
+  // Группируем по исполнителю — один пуш со списком его задач.
   const byTg = new Map();
   for (const r of rows) { if (!byTg.has(r.tg_id)) byTg.set(r.tg_id, []); byTg.get(r.tg_id).push(r); }
   for (const [tgId, tasks] of byTg) {
-    const lines = [`⏰ <b>Нагадування</b>: ${tasks.length} задач(і) висять понад добу — час завершити:`];
+    const lines = [`⏰ <b>Нагадування</b>: ${tasks.length} задач(і) у роботі — час завершити:`];
     for (const tk of tasks.slice(0, 10)) lines.push(`• <b>${tk.readable_id}</b>: ${String(tk.title || "").slice(0, 60)}`);
     const buttons = tasks.slice(0, 8).map((tk) => ({ text: `→ ${tk.readable_id}`, web_app: { url: `${PUBLIC_SITE}/tma?task=${encodeURIComponent(tk.readable_id)}` } }));
     await sendButtonsTo(tgId, lines.join("\n"), buttons);
   }
-  await setState("last_remind_assignee", String(Date.now()));
+  // Отметить текущее суточное окно обработанным (idempotent: пропущенные окна схлопываются в одно напоминание).
+  if (!DRY) {
+    await pool.query(
+      `UPDATE tasks t SET remind_count = ${ageDays} WHERE t.id = ANY($1)`,
+      [rows.map((r) => r.id)],
+    );
+  }
+}
+
+/**
+ * Каждые 15 мин: долбить ИСПОЛНИТЕЛЯ, если ПОСЛЕДНИЙ коммент на его незакрытой задаче — от КЛИЕНТА
+ * (значит, разработчик ещё не ответил). Комменты клиента идут без модерации сразу разработчику, поэтому
+ * ответ на нём. Как только кто-то из команды ответит в треде (последний коммент уже не клиента) — стихает.
+ * Берём последний коммент ЛЮБОГО статуса (даже ответ на модерации = разработчик уже отреагировал).
+ */
+async function remindCommentReplies() {
+  if (!TG_TOKEN) return;
+  const last = Number((await getState("last_remind_comments")) || 0);
+  if (Date.now() - last < REMIND_MS) return; // не чаще раза в 15 мин
+  const rows = (await pool.query(
+    `SELECT t.readable_id, t.title, l.tg_id
+       FROM tasks t
+       JOIN members am ON am.id = t.assignee_id
+       JOIN tg_links l ON l.youtrack_login = am.login
+       JOIN LATERAL (
+         SELECT c.author_id, c.created_at FROM comments c
+          WHERE c.task_id = t.id ORDER BY c.created_at DESC LIMIT 1
+       ) lc ON true
+       JOIN members cm ON cm.id = lc.author_id AND cm.role = 'client'
+      WHERE t.resolved_at IS NULL
+        AND lc.created_at < now() - interval '15 minutes'  -- не дублируем мгновенное уведомление
+      ORDER BY l.tg_id, lc.created_at`,
+  )).rows;
+  if (!rows.length) { await setState("last_remind_comments", String(Date.now())); return; }
+  const byTg = new Map();
+  for (const r of rows) { if (!byTg.has(r.tg_id)) byTg.set(r.tg_id, []); byTg.get(r.tg_id).push(r); }
+  for (const [tgId, tasks] of byTg) {
+    const lines = [`💬 <b>Нагадування</b>: ${tasks.length} коментар(і) клієнта чекають на вашу відповідь:`];
+    for (const tk of tasks.slice(0, 10)) lines.push(`• <b>${tk.readable_id}</b>: ${String(tk.title || "").slice(0, 60)}`);
+    const buttons = tasks.slice(0, 8).map((tk) => ({ text: `→ ${tk.readable_id}`, web_app: { url: `${PUBLIC_SITE}/tma?task=${encodeURIComponent(tk.readable_id)}` } }));
+    await sendButtonsTo(tgId, lines.join("\n"), buttons);
+  }
+  await setState("last_remind_comments", String(Date.now()));
 }
 
 const NOT_ON_MODERATION = `NOT EXISTS (SELECT 1 FROM comments c WHERE c.task_id = t.id AND c.visibility = 'client' AND c.approved = false)`;
@@ -263,6 +310,7 @@ async function cycle() {
   if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
   if (flag("REMIND_APPROVALS")) await remindSuperAdmin().catch((e) => console.error("remind:", e.message));
   if (flag("REMIND_ASSIGNEES")) await remindAssignees().catch((e) => console.error("remind-assignees:", e.message));
+  if (flag("REMIND_COMMENTS")) await remindCommentReplies().catch((e) => console.error("remind-comments:", e.message));
   if (flag("REMIND_REVIEW")) await remindReviewApprovals().catch((e) => console.error("remind-review:", e.message));
   console.log(new Date().toISOString(), `цикл завершён, событий: ${total}`);
 }
