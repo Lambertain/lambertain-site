@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { randomBytes } from "node:crypto";
 import { requireAdmin } from "@/lib/principal";
-import { setProjectToken, createProject, generateProjectKey, setProjectMeta, setProjectArchived, getProjectFull } from "@/lib/db";
+import { setProjectToken, createProject, generateProjectKey, setProjectMeta, setProjectArchived, getProjectFull, reassignNullReporterToClient } from "@/lib/db";
 import { layProtocol, layProtocolAll } from "@/lib/protocol-deploy";
 import { notifyLogins } from "@/lib/notify";
 import type { ProjectMeta } from "@/lib/tasks/types";
@@ -61,6 +61,8 @@ export async function saveMeta(
     if (meta.defaultAssignee && meta.defaultAssignee !== prev?.meta.defaultAssignee) {
       await notifyLogins([meta.defaultAssignee], `📋 <b>Вас назначили ответственным на проект</b> «${name}».\nОткройте портал — детали, доступы и задачи там.`).catch(() => {});
     }
+    // Отметили проект клиентским (и клиент уже есть) → задачи, поставленные мной, переводим на клиента постановщиком.
+    if (meta.projectType === "client") await reassignNullReporterToClient(key).catch(() => {});
     revalidatePath("/admin");
     revalidatePath(`/admin/projects/${key}`);
     return { ok: true };

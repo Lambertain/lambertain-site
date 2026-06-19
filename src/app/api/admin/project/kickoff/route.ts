@@ -7,10 +7,10 @@
  */
 import { NextResponse } from "next/server";
 import { readJsonSmart } from "@/lib/req-body";
-import { getProjectFull, setTaskTags, setTaskAiStatus, setTaskDeps, getProjectClientLogin } from "@/lib/db";
+import { getProjectFull, setTaskTags, setTaskAiStatus, setTaskDeps, projectReporterLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
-import { notifyLogins } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients } from "@/lib/notify";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const be = getBackend();
     const assignee = p.meta.defaultAssignee || null;
     // Постановщик задач проекта — КЛИЕНТ (его проект, он принимает результат). Нет клиента → null.
-    const clientLogin = await getProjectClientLogin(projectKey);
+    const clientLogin = await projectReporterLogin(projectKey);
     const ids: string[] = [];
     for (const tk of tasks) {
       const task = await be.createTask({
@@ -60,6 +60,8 @@ export async function POST(req: Request) {
       if (deps.length) await setTaskDeps(ids[i], deps).catch(() => {});
     }
     if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай по порядку — блокеры расставлены.`).catch(() => {});
+    // Клиент-постановщик — пуш, что по проекту начали работу (вовлечённость + видно прогресс).
+    if (clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: по проєкту створено ${ids.length} задач — роботу розпочато. Стежте за прогресом у порталі.`).catch(() => {});
     return NextResponse.json({ ok: true, created: ids.length, ids });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Ошибка декомпозиции/создания" }, { status: 500 });

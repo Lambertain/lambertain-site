@@ -287,6 +287,42 @@ export async function getProjectClientLogin(projectKey: string): Promise<string 
   return rows[0]?.youtrack_login ?? null;
 }
 
+/** Тип проекта: явный meta.projectType, иначе вывод (есть клиент → client). */
+export async function getProjectType(projectKey: string): Promise<"mine" | "client"> {
+  const proj = await getProjectFull(projectKey).catch(() => null);
+  if (proj?.meta.projectType) return proj.meta.projectType;
+  return (await getProjectClientLogin(projectKey)) ? "client" : "mine";
+}
+
+/**
+ * Постановщик задач проекта: клиентский проект → клиент (или null, если ещё не привязан);
+ * мой проект → null (я, супер-админ). Используется в kickoff и «от клиента».
+ */
+export async function projectReporterLogin(projectKey: string): Promise<string | null> {
+  return (await getProjectType(projectKey)) === "client" ? await getProjectClientLogin(projectKey) : null;
+}
+
+/**
+ * Переназначить постановщиком клиента у задач, поставленных мной (reporter IS NULL, т.е. супер-админ/kickoff)
+ * в КЛИЕНТСКОМ проекте. Личные внутренние задачи (internal) не трогаем. Вызывается при добавлении клиента
+ * и разовой миграцией. Возвращает число переназначенных. Если проект «мой» или клиента/задач нет — 0.
+ */
+export async function reassignNullReporterToClient(projectKey: string): Promise<number> {
+  if ((await getProjectType(projectKey)) !== "client") return 0;
+  const client = await getProjectClientLogin(projectKey);
+  if (!client) return 0;
+  const m = await q<{ id: number }>("SELECT id FROM members WHERE login = $1", [client]);
+  if (!m[0]) return 0;
+  const rows = await q<{ id: number }>(
+    `UPDATE tasks t SET reporter_id = $1, updated_at = now()
+       FROM projects p
+      WHERE t.project_id = p.id AND p.key = $2 AND t.reporter_id IS NULL AND t.internal = false
+      RETURNING t.id`,
+    [m[0].id, projectKey],
+  );
+  return rows.length;
+}
+
 /**
  * Удалить пользователя из портала: отвязка от бота, проектов и ролей, удаление member.
  * Ссылки в задачах/комментах обнуляются (авторство сохраняется через orig_author_login/orig_*).

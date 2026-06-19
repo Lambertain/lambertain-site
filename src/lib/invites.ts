@@ -4,7 +4,7 @@
  * Server-side only.
  */
 import { randomBytes } from "node:crypto";
-import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet, deleteAccessRequest } from "./db";
+import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet, deleteAccessRequest, reassignNullReporterToClient } from "./db";
 import { notifyAdmin, notifyLogins } from "./notify";
 import { notifyProjectOnboarding } from "./onboarding-notify";
 import { t, normalizeLocale, DEFAULT_LOCALE } from "./i18n";
@@ -58,6 +58,8 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: keys[0] ?? null });
   if (inv.role === "contributor" && keys.length) await setDevProjects(login, keys);
   if (inv.role === "employee" && keys.length) await setMemberProjects(login, keys); // сотрудник — несколько проектов
+  // Клиент привязался к клиентскому проекту → задачи, поставленные мной (kickoff/от меня), переводим на него постановщиком.
+  if (inv.role === "client" && keys[0]) await reassignNullReporterToClient(keys[0]).catch(() => {});
   // Клиент с флагом онбординга — пометить его проект, чтобы показать инструкцию при входе.
   if (inv.role === "client" && inv.show_onboarding && keys[0]) await setProjectShowOnboarding(keys[0], true);
   // Клиент с привязанным набором инструкций — показать его при входе (баннер на /i/<token>).

@@ -93,6 +93,11 @@ export interface ProjectMeta {
   prodAccounts?: Array<{ login?: string; pass?: string; note?: string }>;
   /** Аккаунты входа dev-окружения — под Dev URL. */
   devAccounts?: Array<{ login?: string; pass?: string; note?: string }>;
+  /**
+   * Тип проекта: "client" — клиентский (постановщик задач = клиент проекта); "mine" — мой личный
+   * (постановщик = я). Если не задан — выводится: есть клиент → client, иначе mine.
+   */
+  projectType?: "mine" | "client";
   /** Включённые в проекте кастомные поля из реестра (project-fields.ts), напр. ["facebook","whatsapp"]. */
   enabledFields?: string[];
   /** Значения кастомных полей: ключ поля → { подполе → значение }. */

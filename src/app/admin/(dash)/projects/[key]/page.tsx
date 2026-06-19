@@ -65,7 +65,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
         <h1 style={{ ...ui.h1, fontSize: "clamp(24px,5vw,34px)", margin: 0 }}>{proj.name}</h1>
       </div>
 
-      <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
+      <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} hasClient={links.some((l) => l.role === "client" && l.project_key === key)} />
 
       <ProjectUsersPanel projectKey={key} users={projectUsers} candidates={candidates} locale={locale} />
 

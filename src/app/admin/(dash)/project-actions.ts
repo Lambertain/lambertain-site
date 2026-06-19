@@ -1,10 +1,10 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, getProjectClientLogin } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, projectReporterLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
-import { notifyLogins } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients } from "@/lib/notify";
 import { revalidatePath } from "next/cache";
 
 type Cred = { role?: string; env?: string; login?: string; pass?: string };
@@ -67,7 +67,7 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
     const be = getBackend();
     const assignee = p.meta.defaultAssignee || null;
     // Постановщик задач проекта — КЛИЕНТ (его проект, он принимает результат). Нет клиента → null.
-    const clientLogin = await getProjectClientLogin(projectKey);
+    const clientLogin = await projectReporterLogin(projectKey);
     const ids: string[] = [];
     for (const tk of tasks) {
       const task = await be.createTask({
@@ -89,6 +89,7 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
       if (deps.length) await setTaskDeps(ids[i], deps).catch(() => {});
     }
     if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай по порядку — блокеры расставлены.`).catch(() => {});
+    if (clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: по проєкту створено ${ids.length} задач — роботу розпочато. Стежте за прогресом у порталі.`).catch(() => {});
     revalidatePath("/admin");
     revalidatePath(`/admin/projects/${projectKey}`);
     return { created: ids.length };

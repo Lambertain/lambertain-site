@@ -68,15 +68,19 @@ export function MetaForm({
   initialMeta,
   contributors,
   locale,
+  hasClient,
 }: {
   projectKey: string;
   initialName: string;
   initialMeta: ProjectMeta;
   contributors: { login: string; fullName: string }[];
   locale: Locale;
+  hasClient: boolean;
 }) {
   const m = initialMeta;
   const [name, setName] = useState(initialName);
+  // Тип проекта: клиентский (постановщик задач = клиент) или мой личный (постановщик = я). Дефолт — по наличию клиента.
+  const [projectType, setProjectType] = useState<"mine" | "client">(m.projectType ?? (hasClient ? "client" : "mine"));
   const [defaultAssignee, setDefaultAssignee] = useState(m.defaultAssignee ?? "");
   const [cost, setCost] = useState(m.cost != null ? String(m.cost) : "");
   const [currency, setCurrency] = useState(m.currency ?? "₴");
@@ -147,6 +151,7 @@ export function MetaForm({
     setSaved(false);
     setError(null);
     const meta: ProjectMeta = {
+      projectType,
       clientGit: clientGit || undefined,
       devGit: devGit || undefined,
       localPath: localPath || undefined,
@@ -197,6 +202,19 @@ export function MetaForm({
 
   return (
     <div style={{ ...ui.card, marginTop: 16 }}>
+      {/* Тип проекта (вверху): постановщик задач — клиент (клиентский) или я (мой личный). */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={ui.fieldLabel}>{t(locale, "projects.typeLabel")}</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          {(["mine", "client"] as const).map((tp) => (
+            <button key={tp} onClick={() => setProjectType(tp)} style={{ ...ui.monoLabel, textTransform: "none", padding: "7px 14px", borderRadius: 2, cursor: "pointer", border: "1px solid " + (projectType === tp ? "var(--accent)" : "var(--border-2)"), background: projectType === tp ? "var(--accent)" : "transparent", color: projectType === tp ? "#000" : "var(--muted)" }}>
+              {t(locale, tp === "mine" ? "projects.typeMine" : "projects.typeClient")}
+            </button>
+          ))}
+        </div>
+        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 6 }}>{t(locale, "projects.typeHint")}</span>
+      </div>
+
       <Field label={t(locale, "projects.name")} value={name} onChange={setName} />
 
       <div style={{ marginTop: 14 }}>
