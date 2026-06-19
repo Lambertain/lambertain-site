@@ -41,6 +41,8 @@ export interface ProjectMeta {
   credentials?: Array<{ role?: string; env?: string; login?: string; pass?: string }>;
   design?: string;
   deploy?: { prodBranch?: string; devBranch?: string };
+  /** Доставка клиенту через Pull Request: не пушить в дефолтную ветку клиента, а открывать PR (клиент мержит сам). */
+  clientDeliverPR?: boolean;
   /** Конвенции/правила проекта (легаси; основной источник — CLAUDE.md дев-репо). */
   conventions?: string;
   /** Полная спека/роадмэп проекта — общий контекст для Claude разработчика (отдаётся через dev-API). */

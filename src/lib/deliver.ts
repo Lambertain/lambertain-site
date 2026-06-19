@@ -120,6 +120,8 @@ export interface DeliverInput {
   targetBranch: string;
   /** Текст коммита. */
   message: string;
+  /** PR-режим: пушить не в дефолтную ветку, а в служебную ветку и открывать Pull Request (клиент мержит сам). */
+  asPR?: boolean;
 }
 export interface DeliverResult {
   clientRepo: string;
@@ -128,7 +130,11 @@ export interface DeliverResult {
   commitUrl: string;
   /** true, если пушили в дефолтную ветку клиента (там сработает авто-деплой). */
   toDefault: boolean;
+  /** Ссылка на открытый/обновлённый Pull Request (в PR-режиме). */
+  prUrl?: string;
 }
+
+const PR_BRANCH = "lambertain-delivery"; // служебная ветка доставки для PR-режима
 
 /** Доставить состояние dev-репо одним коммитом в client-репо в выбранную ветку. */
 export async function deliverDevToClient(input: DeliverInput): Promise<DeliverResult> {
@@ -141,8 +147,9 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
   const devInfo = await ghJson<{ default_branch: string }>(`/repos/${devRepo}`);
   const clientInfo = await ghJson<{ default_branch: string }>(`/repos/${clientRepo}`);
   const devBranch = devInfo.default_branch;
-  const targetBranch = input.targetBranch.trim() || clientInfo.default_branch;
-  const toDefault = targetBranch === clientInfo.default_branch;
+  // PR-режим: всегда в служебную ветку (не в дефолтную) → потом открываем PR. Иначе — выбранная ветка.
+  const targetBranch = input.asPR ? PR_BRANCH : (input.targetBranch.trim() || clientInfo.default_branch);
+  const toDefault = !input.asPR && targetBranch === clientInfo.default_branch;
 
   const devRef = await ghJson<{ object: { sha: string } }>(`/repos/${devRepo}/git/ref/heads/${devBranch}`);
   const devCommit = await ghJson<{ tree: { sha: string } }>(`/repos/${devRepo}/git/commits/${devRef.object.sha}`);
@@ -219,7 +226,29 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
     });
   }
 
-  return { clientRepo, branch: targetBranch, files: entries.length, commitUrl: commit.html_url, toDefault };
+  // 5. PR-режим: открыть Pull Request из служебной ветки в дефолтную (или вернуть уже открытый).
+  let prUrl: string | undefined;
+  if (input.asPR && targetBranch !== clientInfo.default_branch) {
+    const create = await gh(`/repos/${clientRepo}/pulls`, {
+      method: "POST",
+      body: JSON.stringify({
+        title: input.message,
+        head: targetBranch,
+        base: clientInfo.default_branch,
+        body: "Автоматическая доставка Lambertain. Проверьте изменения и смержите в основную ветку.",
+      }),
+    });
+    if (create.ok) {
+      prUrl = ((await create.json()) as { html_url: string }).html_url;
+    } else {
+      // PR с этой ветки уже открыт (422) — найдём существующий.
+      const owner = clientRepo.split("/")[0];
+      const list = await gh(`/repos/${clientRepo}/pulls?state=open&head=${encodeURIComponent(`${owner}:${targetBranch}`)}`);
+      if (list.ok) { const arr = (await list.json()) as { html_url: string }[]; if (arr[0]) prUrl = arr[0].html_url; }
+    }
+  }
+
+  return { clientRepo, branch: targetBranch, files: entries.length, commitUrl: commit.html_url, toDefault, prUrl };
 }
 
 // ---- Апрув/мониторинг клиентского Railway-деплоя ----
@@ -332,6 +361,7 @@ export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(Deliv
     clientGit: meta.clientGit,
     targetBranch: preview.clientDefaultBranch,
     message: `Lambertain auto-delivery — ${new Date().toISOString().slice(0, 10)}`,
+    asPR: meta.clientDeliverPR,
   });
   let deploy: DeployStatus | null = null;
   if (res.toDefault) {

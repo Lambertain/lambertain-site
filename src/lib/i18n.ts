@@ -369,6 +369,8 @@ export const DICT: Record<string, Entry> = {
   "projects.repos": { uk: "Репозиторії", ru: "Репозитории", en: "Repositories" },
   "projects.clientGit": { uk: "Git клієнта", ru: "Git клиента", en: "Client git" },
   "projects.devGit": { uk: "Dev git (команда)", ru: "Dev git (команда)", en: "Dev git (team)" },
+  "projects.deliverPR": { uk: "Доставка клієнту через Pull Request", ru: "Доставка клиенту через Pull Request", en: "Deliver to client via Pull Request" },
+  "projects.deliverPRHint": { uk: "Не пушити в основну гілку клієнта, а відкривати PR у службову гілку «lambertain-delivery» — клієнт сам перевіряє і мержить.", ru: "Не пушить в основную ветку клиента, а открывать PR из служебной ветки «lambertain-delivery» — клиент сам проверяет и мержит.", en: "Don't push to the client's main branch — open a PR from the «lambertain-delivery» branch; the client reviews and merges." },
   "projects.repoPair": { uk: "Репозиторій (пара)", ru: "Репозиторий (пара)", en: "Repository (pair)" },
   "projects.addRepo": { uk: "Додати репозиторій (dev → client)", ru: "Добавить репозиторий (dev → client)", en: "Add repository (dev → client)" },
   "projects.localPath": { uk: "Локальний шлях", ru: "Локальный путь", en: "Local path" },
@@ -411,6 +413,10 @@ export const DICT: Record<string, Entry> = {
   "deliver.run": { uk: "Доставити", ru: "Доставить", en: "Deliver" },
   "deliver.done": { uk: "Доставлено {n} файлів у гілку {branch}", ru: "Доставлено {n} файлов в ветку {branch}", en: "Delivered {n} files to branch {branch}" },
   "deliver.commit": { uk: "Коміт", ru: "Коммит", en: "Commit" },
+  "deliver.pr": { uk: "Pull Request", ru: "Pull Request", en: "Pull Request" },
+  "tasks.searchPh": { uk: "Пошук за слагом або назвою…", ru: "Поиск по слагу или названию…", en: "Search by slug or title…" },
+  "tasks.searchFound": { uk: "Знайдено", ru: "Найдено", en: "Found" },
+  "tasks.searchNone": { uk: "Нічого не знайдено", ru: "Ничего не найдено", en: "Nothing found" },
   "deliver.deploy": { uk: "Деплой клієнта", ru: "Деплой клиента", en: "Client deploy" },
 
   // — страница задачи —

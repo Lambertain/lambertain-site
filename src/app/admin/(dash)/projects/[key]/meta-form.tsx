@@ -101,6 +101,7 @@ export function MetaForm({
   const [spec, setSpec] = useState(m.spec ?? "");
   const [devInfo, setDevInfo] = useState(m.devInfo ?? "");
   const [autoApprove, setAutoApprove] = useState(!!m.autoApprove);
+  const [deliverPR, setDeliverPR] = useState(!!m.clientDeliverPR);
   const [vis, setVis] = useState<Record<string, FieldVis>>(m.fieldVisibility ?? {});
   const [prodAccounts, setProdAccounts] = useState<Account[]>(m.prodAccounts ?? []);
   const [devAccounts, setDevAccounts] = useState<Account[]>(m.devAccounts ?? []);
@@ -165,6 +166,7 @@ export function MetaForm({
       localPath: localPath || undefined,
       apps: { prod: { url: prodUrl || undefined, host: "" }, dev: { url: devUrl || undefined, host: "" } },
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
+      clientDeliverPR: deliverPR || undefined,
       design: design || undefined,
       spec: spec || undefined,
       devInfo: devInfo || undefined,
@@ -332,6 +334,13 @@ export function MetaForm({
         <Field label={t(locale, "projects.prodBranch")} value={prodBranch} onChange={setProdBranch} />
         <Field label={t(locale, "projects.devBranch")} value={devBranch} onChange={setDevBranch} />
       </div>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginTop: 10 }}>
+        <input type="checkbox" checked={deliverPR} onChange={(e) => setDeliverPR(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />
+        <span>
+          <span style={{ fontSize: 14 }}>{t(locale, "projects.deliverPR")}</span>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "projects.deliverPRHint")}</span>
+        </span>
+      </label>
 
       <div style={{ marginTop: 18 }}>
         <Field label={t(locale, "projects.design")} value={design} onChange={setDesign} />

@@ -198,6 +198,7 @@ export function TaskTabs({
   activeProject: controlledProject,
   onProjectChange,
   allowAll,
+  searchable,
 }: {
   tasks: BoardTask[];
   projects: Proj[];
@@ -215,6 +216,8 @@ export function TaskTabs({
   onProjectChange?: (key: string) => void;
   /** Показать плитку «ВСЕ ЗАДАЧИ» (по всем проектам) первой и выбрать её по умолчанию. */
   allowAll?: boolean;
+  /** Поиск по слагу/названию (по всем проектам) — НЕ для клиентских ролей. */
+  searchable?: boolean;
 }) {
   const projectKeys = projects.map((p) => p.key);
   const [internalProject, setInternalProject] = useState<string>(
@@ -223,7 +226,15 @@ export function TaskTabs({
   // Контролируемый проект (от родителя) приоритетнее внутреннего — так карточка сверху и табы синхронны.
   const activeProject = controlledProject !== undefined ? controlledProject : internalProject;
   const [opened, setOpened] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState("");
   const [, startSeen] = useTransition();
+
+  // Поиск по слагу (id) или названию — по ВСЕМ задачам, поверх табов/корзин.
+  const q = query.trim().toLowerCase();
+  const searchResults = useMemo(
+    () => (q ? tasks.filter((tk) => tk.id.toLowerCase().includes(q) || tk.summary.toLowerCase().includes(q)) : []),
+    [tasks, q],
+  );
 
   function openProject(key: string) {
     if (onProjectChange) onProjectChange(key); else setInternalProject(key);
@@ -262,6 +273,33 @@ export function TaskTabs({
 
   return (
     <div style={{ marginTop: 16 }}>
+      {searchable && (
+        <div style={{ marginBottom: 14, position: "relative", maxWidth: 420 }}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t(locale, "tasks.searchPh")}
+            style={{ ...ui.input, width: "100%", paddingRight: query ? 34 : 12 }}
+          />
+          {query && (
+            <button onClick={() => setQuery("")} aria-label={t(locale, "common.cancel")} style={{ position: "absolute", top: "50%", right: 8, transform: "translateY(-50%)", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+          )}
+        </div>
+      )}
+
+      {q ? (
+        searchResults.length === 0 ? (
+          <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "tasks.searchNone")}</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>{t(locale, "tasks.searchFound")}: {searchResults.length}</span>
+            {searchResults.map((tk) => (
+              <Row key={tk.id} task={tk} locale={locale} canEditStatus={canEditStatus} canDelete={canDelete} mode="open" />
+            ))}
+          </div>
+        )
+      ) : (
+      <>
       {(allowAll ? projects.length >= 1 : projects.length > 1) && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           {allowAll && (
@@ -306,6 +344,8 @@ export function TaskTabs({
             />
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

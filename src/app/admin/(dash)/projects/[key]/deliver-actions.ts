@@ -23,6 +23,7 @@ export interface DeliverResultUI {
   files: number;
   commitUrl: string;
   toDefault: boolean;
+  prUrl?: string;
   deploy?: DeployStatus | null;
 }
 
@@ -51,6 +52,7 @@ export async function runDeliver(
       clientGit: proj.meta.clientGit,
       targetBranch: targetBranch || preview.clientDefaultBranch,
       message: `Lambertain delivery — ${new Date().toISOString().slice(0, 10)}`,
+      asPR: proj.meta.clientDeliverPR,
     });
 
     let deploy: DeployStatus | null = null;

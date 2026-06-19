@@ -93,6 +93,11 @@ export function DeliverPanel({ projectKey, locale }: { projectKey: string; local
           <a href={result.commitUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>
             {t(locale, "deliver.commit")} →
           </a>
+          {result.prUrl && (
+            <a href={result.prUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btnAccent, display: "inline-block", marginTop: 8, marginLeft: 8, textDecoration: "none" }}>
+              {t(locale, "deliver.pr")} →
+            </a>
+          )}
           {result.deploy && (
             <p style={{ ...ui.monoLabel, textTransform: "none", marginTop: 10, color: result.deploy.status === "SUCCESS" ? "var(--accent)" : "#e8b339" }}>
               {t(locale, "deliver.deploy")}: {result.deploy.status} ({result.deploy.commit})

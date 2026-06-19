@@ -110,6 +110,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           empty={t(locale, "tasks.empty")}
           feedbackKey={projectsList.find((p) => p.meta.feedback)?.key}
           allowAll
+          searchable
         />
       </div>
     );
@@ -174,6 +175,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           initialProject={initialProject}
           initialBucket={initialBucket}
           allowAll
+          searchable
         />
       </div>
     );
