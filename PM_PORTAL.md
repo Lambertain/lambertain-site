@@ -355,7 +355,8 @@ ADMIN_PASSWORD                       вход в /admin (web)
 ADMIN_TELEGRAM_ID                    Telegram id админа
 SESSION_SECRET                       подпись сессионной куки
 DATABASE_URL                         Postgres (локально 5434, на Railway — плагин)
-# флаги поллера (любой = "0" отключает): REMIND_APPROVALS, REMIND_ASSIGNEES, REMIND_COMMENTS, REMIND_REVIEW, NOTIFY_TOKENS
+# флаги поллера (любой = "0" отключает): REMIND_APPROVALS, REMIND_ASSIGNEES, REMIND_COMMENTS, REMIND_REVIEW, NOTIFY_TOKENS, DEPLOY_SYNC
+#   DEPLOY_SYNC      — деплой-стадия задач: PR смержен → 'dev' (дёргает /api/admin/deploy-sync; GitHub-логика на портале)
 #   REMIND_ASSIGNEES — исполнителю по задачам в работе РАЗ В 24 Ч (от создания; дедлайнов в системе нет)
 #   REMIND_COMMENTS  — исполнителю каждые 15 мин, пока висит неотвеченный коммент клиента (клиентские комменты — без модерации)
 #   REMIND_REVIEW    — постановщику/клиенту каждые 15 мин про задачи на ревью/апруве старше суток

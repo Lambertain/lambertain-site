@@ -77,6 +77,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
         ownerAction: tk.ownerAction,
         clientAction: tk.clientAction,
+        deployStage: tk.deployStage,
       };
     });
     const fbSet = new Set(projectsList.filter((p) => p.meta.feedback).map((p) => p.key));
@@ -152,7 +153,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         description: tk.description, created: tk.created, updated: tk.updated, commentCount: tk.commentCount,
         assignee: tk.assignee?.fullName ?? null, unread,
         blocked: blockers.length > 0, blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
-        ownerAction: tk.ownerAction, clientAction: tk.clientAction,
+        ownerAction: tk.ownerAction, clientAction: tk.clientAction, deployStage: tk.deployStage,
       };
     });
     const projectsWithNew = visible

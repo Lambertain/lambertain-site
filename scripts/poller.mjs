@@ -17,6 +17,8 @@ const TG_CHAT = process.env.TELEGRAM_CHAT_ID || "";
 const INTERVAL = Number(process.env.POLL_INTERVAL_SEC || 60) * 1000;
 const ONCE = process.env.POLL_ONCE === "1";
 const DRY = process.env.DRY_RUN === "1";
+const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN || "";
+const PORTAL_BASE = (process.env.PORTAL_BASE || "https://lambertain-site-production.up.railway.app").replace(/\/$/, "");
 
 const flag = (name) => process.env[name] !== "0";
 
@@ -272,7 +274,20 @@ async function checkTokenDigest() {
   await setState("token_digest_day", today);
 }
 
+/** Синк деплой-стадии: задачи в 'pr' с смерженным PR → 'dev'. Логика (GitHub) на портале. */
+async function runDeploySync() {
+  if (!ADMIN_TOKEN || DRY) return;
+  try {
+    const r = await fetch(`${PORTAL_BASE}/api/admin/deploy-sync`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}`, "Content-Type": "application/json" },
+    });
+    if (!r.ok) console.error("deploy-sync", r.status, (await r.text()).slice(0, 120));
+  } catch (e) { console.error("deploy-sync", e.message); }
+}
+
 async function cycle() {
+  if (flag("DEPLOY_SYNC")) await runDeploySync().catch((e) => console.error("deploy-sync:", e.message));
   if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
   if (flag("REMIND_APPROVALS")) await remindSuperAdmin().catch((e) => console.error("remind:", e.message));
   if (flag("REMIND_ASSIGNEES")) await remindAssignees().catch((e) => console.error("remind-assignees:", e.message));

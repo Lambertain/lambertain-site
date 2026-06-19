@@ -8,7 +8,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse, after } from "next/server";
-import { getProjectKeyByToken, getProjectFull } from "@/lib/db";
+import { getProjectKeyByToken, getProjectFull, promoteProjectDevToProd } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
@@ -56,6 +56,7 @@ export async function POST(req: Request) {
             try {
               const d = await autoDeliverIfConfigured(meta);
               if (d) {
+                if (d.toDefault) await promoteProjectDevToProd(projectKey).catch(() => {}); // опубликовано в прод → dev-задачи → prod
                 await notifyAdmin(
                   `🚀 <b>Авто-доставка</b> · ${await taskTag(taskId)}\nКлієнт: ${d.clientRepo} (${d.branch}), файлів: ${d.files}` +
                     (d.deploy ? `\nДеплой: ${d.deploy.status}${d.deploy.commit ? ` · ${d.deploy.commit}` : ""}` : ""),

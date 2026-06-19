@@ -125,6 +125,7 @@ export default async function HomePage() {
       // Клиенту ops-шаг агентства (ownerAction) не показываем; его собственное действие (clientAction) — показываем.
       ownerAction: me.role === "client" ? null : tk.ownerAction,
       clientAction: tk.clientAction,
+      deployStage: tk.deployStage,
     };
   });
 

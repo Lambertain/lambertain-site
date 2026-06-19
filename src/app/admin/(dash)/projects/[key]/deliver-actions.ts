@@ -1,7 +1,7 @@
 "use server";
 
 import { requireAdmin } from "@/lib/principal";
-import { getProjectFull } from "@/lib/db";
+import { getProjectFull, promoteProjectDevToProd } from "@/lib/db";
 import { previewDelivery, deliverDevToClient, approveClientDeploy, clientDeployStatus, vercelDeployStatus, type DeliveryPreview, type DeployStatus } from "@/lib/deliver";
 
 /** Превью доставки: число файлов + изменения схемы БД + дефолтная ветка клиента. */
@@ -55,6 +55,9 @@ export async function runDeliver(
       message: `Lambertain delivery — ${new Date().toISOString().slice(0, 10)}`,
       asPR: proj.meta.clientDeliverPR,
     });
+
+    // Доставка в дефолтную ветку клиента = публикация в прод → все 'dev'-задачи проекта становятся 'prod'.
+    if (res.toDefault) await promoteProjectDevToProd(key).catch(() => {});
 
     let deploy: DeployStatus | null = null;
     if (res.toDefault) {

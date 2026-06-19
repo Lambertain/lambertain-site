@@ -734,6 +734,32 @@ export async function getReviewRef(taskId: string): Promise<string | null> {
   return rows[0]?.review_ref ?? null;
 }
 
+// ---- Деплой-стадия задачи (pr → dev → prod), независимая от статуса ----
+/** Привязать PR к задаче → стадия 'pr' (готовится/на проверке кода). */
+export async function setTaskPr(taskId: string, prUrl: string): Promise<{ projectKey: string } | null> {
+  const r = await q<{ key: string }>(
+    `UPDATE tasks t SET pr_url=$2, deploy_stage='pr' FROM projects p WHERE t.project_id=p.id AND t.readable_id=$1 RETURNING p.key`,
+    [taskId, prUrl],
+  );
+  return r[0] ? { projectKey: r[0].key } : null;
+}
+/** Задачи в стадии 'pr' с привязанным PR — для синка merge→dev. */
+export async function listPrStageTasks(): Promise<{ readable_id: string; pr_url: string }[]> {
+  return q<{ readable_id: string; pr_url: string }>("SELECT readable_id, pr_url FROM tasks WHERE deploy_stage='pr' AND pr_url IS NOT NULL");
+}
+/** Установить деплой-стадию задачи. */
+export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<void> {
+  await q("UPDATE tasks SET deploy_stage=$2 WHERE readable_id=$1", [taskId, stage]);
+}
+/** Доставка в прод → все 'dev'-задачи проекта переходят в 'prod'. Возвращает число переведённых. */
+export async function promoteProjectDevToProd(projectKey: string): Promise<number> {
+  const r = await q<{ readable_id: string }>(
+    `UPDATE tasks t SET deploy_stage='prod' FROM projects p WHERE t.project_id=p.id AND p.key=$1 AND t.deploy_stage='dev' RETURNING t.readable_id`,
+    [projectKey],
+  );
+  return r.length;
+}
+
 /** Блок запроса: текст, картинка или файл (base64). Порядок блоков = хронология ввода. */
 export type ReqBlock =
   | { type: "text"; text: string }

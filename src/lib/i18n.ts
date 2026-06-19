@@ -537,6 +537,9 @@ export const DICT: Record<string, Entry> = {
   "deps.none": { uk: "немає кандидатів", ru: "нет кандидатов", en: "no candidates" },
   "deps.save": { uk: "Зберегти залежності", ru: "Сохранить зависимости", en: "Save dependencies" },
   "deps.blockedBy": { uk: "Заблоковано:", ru: "Заблокировано:", en: "Blocked by:" },
+  "deploy.pr": { uk: "Готується", ru: "Готовится", en: "In progress" },
+  "deploy.dev": { uk: "На тестовому сайті", ru: "На тестовом сайте", en: "On staging" },
+  "deploy.prod": { uk: "Опубліковано", ru: "Опубликовано", en: "Published" },
   "block.owner": { uk: "Чекає на агентство", ru: "Ждёт агентство", en: "Waiting on agency" },
   "block.client": { uk: "Чекає на клієнта", ru: "Ждёт клиента", en: "Waiting on client" },
 

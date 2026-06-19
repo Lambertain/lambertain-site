@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { updateTaskStatus, markProjectOpened, deleteTask, moveToReview } from "./tasks-actions";
+import { DeployBadge } from "./deploy-badge";
 import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
@@ -24,6 +25,7 @@ export type BoardTask = {
   blockers?: { id: string; summary: string }[];
   ownerAction?: string | null; // ждёт ops-шага агентства (владельца)
   clientAction?: string | null; // ждёт действия клиента
+  deployStage?: string | null; // pr → dev → prod (деплой-стадия, простыми словами для клиента)
 };
 
 type Proj = { key: string; name: string; hasNew?: boolean };
@@ -100,6 +102,7 @@ function Row({
         </div>
         {/* слаг задачи (HH-62) — виден во всех табах, не только при открытии */}
         <span style={{ ...ui.monoLabel, color: "var(--accent)", flexShrink: 0, alignSelf: "center" }}>{task.id}</span>
+        <DeployBadge stage={task.deployStage} locale={locale} />
         {/* название: переход в задачу (или старт в «Не начатых») */}
         {mode === "start" ? (
           <button onClick={startWork} title={t(locale, "tab.startHint")} style={{ flex: 1, textAlign: "left", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 15, fontWeight: 600, padding: 0 }}>

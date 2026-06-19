@@ -86,6 +86,9 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action_guide INT;
 -- Сколько суточных окон (от created_at) по задаче уже напомнили исполнителю — чтобы слать максимум 1 раз в 24 ч.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS remind_count INT NOT NULL DEFAULT 0;
+-- Деплой-стадия задачи (независимо от Open/Review/Done): pr → dev → prod. pr_url — PR от разработчика.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pr_url TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deploy_stage TEXT;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
