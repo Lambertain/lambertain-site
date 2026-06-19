@@ -9,6 +9,7 @@ import { getBackend } from "@/lib/tasks";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { MetaForm } from "./meta-form";
+import { ProjectTypeToggle } from "./project-type-toggle";
 import { KickoffPanel } from "./kickoff-panel";
 import { DeliverPanel } from "./deliver-panel";
 import { TokenRow } from "../token-row";
@@ -60,12 +61,18 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
       <Link href="/admin/projects" style={{ ...ui.monoLabel, color: "var(--muted)", textDecoration: "none" }}>
         ← {t(locale, "projects.title")}
       </Link>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
         <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{key}</span>
         <h1 style={{ ...ui.h1, fontSize: "clamp(24px,5vw,34px)", margin: 0 }}>{proj.name}</h1>
+        <span style={{ marginLeft: "auto" }}>
+          <ProjectTypeToggle projectKey={key} mine={proj.meta.projectType === "mine"} locale={locale} />
+        </span>
       </div>
 
-      <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} hasClient={links.some((l) => l.role === "client" && l.project_key === key)} />
+      {/* Доставка dev→client — первым блоком (частое действие). */}
+      {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} autoMigrate={!!proj.meta.clientAutoMigrate} />}
+
+      <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
 
       <ProjectUsersPanel projectKey={key} users={projectUsers} candidates={candidates} locale={locale} />
 
@@ -90,8 +97,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
       <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title }))} enabled={enabledGuides} />
 
       <KickoffPanel projectKey={key} locale={locale} hasSpec={!!proj.meta.spec?.trim()} />
-
-      {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} />}
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>{t(locale, "projects.kicker")}</div>

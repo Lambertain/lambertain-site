@@ -6,7 +6,7 @@ import type { DeliveryPreview } from "@/lib/deliver";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
-export function DeliverPanel({ projectKey, locale }: { projectKey: string; locale: Locale }) {
+export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: string; locale: Locale; autoMigrate?: boolean }) {
   const [preview, setPreview] = useState<DeliveryPreview | null>(null);
   const [branch, setBranch] = useState("");
   const [schemaOk, setSchemaOk] = useState(false);
@@ -23,9 +23,10 @@ export function DeliverPanel({ projectKey, locale }: { projectKey: string; local
       else if (r.preview) { setPreview(r.preview); setBranch(r.preview.clientDefaultBranch); }
     });
   }
+  const schemaBlocks = (p: DeliveryPreview) => p.schemaChanges.length > 0 && !autoMigrate && !schemaOk;
   function deliver() {
     if (!preview) return;
-    if (preview.schemaChanges.length > 0 && !schemaOk) return;
+    if (schemaBlocks(preview)) return;
     setError(null);
     startRun(async () => {
       const r = await runDeliver(projectKey, branch, schemaOk);
@@ -54,13 +55,17 @@ export function DeliverPanel({ projectKey, locale }: { projectKey: string; local
           </div>
 
           {preview.schemaChanges.length > 0 && (
-            <div style={{ ...ui.card, padding: 12, marginTop: 10, borderColor: "#ff5b5b" }}>
-              <div style={{ ...ui.monoLabel, color: "#ff5b5b" }}>{t(locale, "deliver.schemaChanged", { n: String(preview.schemaChanges.length) })}</div>
+            <div style={{ ...ui.card, padding: 12, marginTop: 10, borderColor: autoMigrate ? "var(--accent-line)" : "#ff5b5b" }}>
+              <div style={{ ...ui.monoLabel, color: autoMigrate ? "var(--accent)" : "#ff5b5b" }}>{t(locale, "deliver.schemaChanged", { n: String(preview.schemaChanges.length) })}</div>
               <div style={{ ...ui.monoLabel, textTransform: "none", marginTop: 6, whiteSpace: "pre-wrap" }}>{preview.schemaChanges.join("\n")}</div>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", fontSize: 13 }}>
-                <input type="checkbox" checked={schemaOk} onChange={(e) => setSchemaOk(e.target.checked)} style={{ width: 15, height: 15, accentColor: "var(--accent)" }} />
-                {t(locale, "deliver.schemaConfirm")}
-              </label>
+              {autoMigrate ? (
+                <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 8 }}>{t(locale, "deliver.schemaAuto")}</p>
+              ) : (
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", fontSize: 13 }}>
+                  <input type="checkbox" checked={schemaOk} onChange={(e) => setSchemaOk(e.target.checked)} style={{ width: 15, height: 15, accentColor: "var(--accent)" }} />
+                  {t(locale, "deliver.schemaConfirm")}
+                </label>
+              )}
             </div>
           )}
 
@@ -75,8 +80,8 @@ export function DeliverPanel({ projectKey, locale }: { projectKey: string; local
           <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
             <button
               onClick={deliver}
-              disabled={running || (preview.schemaChanges.length > 0 && !schemaOk)}
-              style={{ ...ui.btnAccent, opacity: running || (preview.schemaChanges.length > 0 && !schemaOk) ? 0.5 : 1 }}
+              disabled={running || schemaBlocks(preview)}
+              style={{ ...ui.btnAccent, opacity: running || schemaBlocks(preview) ? 0.5 : 1 }}
             >
               {running ? t(locale, "common.processing") : t(locale, "deliver.run")}
             </button>

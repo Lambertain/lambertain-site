@@ -43,6 +43,8 @@ export interface ProjectMeta {
   deploy?: { prodBranch?: string; devBranch?: string };
   /** Доставка клиенту через Pull Request: не пушить в дефолтную ветку клиента, а открывать PR (клиент мержит сам). */
   clientDeliverPR?: boolean;
+  /** Схема накатывается на клиентскую БД автоматически (preDeploy клиентского деплоя) — предупреждение о схеме при доставке не блокирует. */
+  clientAutoMigrate?: boolean;
   /** Конвенции/правила проекта (легаси; основной источник — CLAUDE.md дев-репо). */
   conventions?: string;
   /** Полная спека/роадмэп проекта — общий контекст для Claude разработчика (отдаётся через dev-API). */

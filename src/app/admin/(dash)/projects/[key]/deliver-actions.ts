@@ -43,7 +43,8 @@ export async function runDeliver(
     if (!proj) return { error: "Проект не найден" };
 
     const preview = await previewDelivery({ devGit: proj.meta.devGit, clientGit: proj.meta.clientGit });
-    if (preview.schemaChanges.length > 0 && !schemaConfirmed) {
+    // Если у проекта авто-накат схемы (preDeploy клиентского деплоя) — подтверждение не требуется.
+    if (preview.schemaChanges.length > 0 && !schemaConfirmed && !proj.meta.clientAutoMigrate) {
       return { error: `Схема БД изменилась (${preview.schemaChanges.length}). Накати миграцию на клиентскую БД и подтверди.` };
     }
 

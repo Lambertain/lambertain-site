@@ -68,19 +68,16 @@ export function MetaForm({
   initialMeta,
   contributors,
   locale,
-  hasClient,
 }: {
   projectKey: string;
   initialName: string;
   initialMeta: ProjectMeta;
   contributors: { login: string; fullName: string }[];
   locale: Locale;
-  hasClient: boolean;
 }) {
   const m = initialMeta;
   const [name, setName] = useState(initialName);
   // Тип проекта: клиентский (постановщик задач = клиент) или мой личный (постановщик = я). Дефолт — по наличию клиента.
-  const [projectType, setProjectType] = useState<"mine" | "client">(m.projectType ?? (hasClient ? "client" : "mine"));
   const [showOnboarding, setShowOnboarding] = useState(!!m.showOnboarding); // показывать ли клиенту онбординг-инструкцию
   const [defaultAssignee, setDefaultAssignee] = useState(m.defaultAssignee ?? "");
   const [cost, setCost] = useState(m.cost != null ? String(m.cost) : "");
@@ -102,6 +99,7 @@ export function MetaForm({
   const [devInfo, setDevInfo] = useState(m.devInfo ?? "");
   const [autoApprove, setAutoApprove] = useState(!!m.autoApprove);
   const [deliverPR, setDeliverPR] = useState(!!m.clientDeliverPR);
+  const [autoMigrate, setAutoMigrate] = useState(!!m.clientAutoMigrate);
   const [vis, setVis] = useState<Record<string, FieldVis>>(m.fieldVisibility ?? {});
   const [prodAccounts, setProdAccounts] = useState<Account[]>(m.prodAccounts ?? []);
   const [devAccounts, setDevAccounts] = useState<Account[]>(m.devAccounts ?? []);
@@ -154,7 +152,6 @@ export function MetaForm({
     setSaved(false);
     setError(null);
     const meta: ProjectMeta = {
-      projectType,
       showOnboarding: showOnboarding || undefined,
       onboardingSetToken: m.onboardingSetToken, // набор инструкций (если привязан) — не теряем при сохранении
       clientGit: clientGit || undefined,
@@ -167,6 +164,7 @@ export function MetaForm({
       apps: { prod: { url: prodUrl || undefined, host: "" }, dev: { url: devUrl || undefined, host: "" } },
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
       clientDeliverPR: deliverPR || undefined,
+      clientAutoMigrate: autoMigrate || undefined,
       design: design || undefined,
       spec: spec || undefined,
       devInfo: devInfo || undefined,
@@ -212,19 +210,6 @@ export function MetaForm({
 
   return (
     <div style={{ ...ui.card, marginTop: 16 }}>
-      {/* Тип проекта (вверху): постановщик задач — клиент (клиентский) или я (мой личный). */}
-      <div style={{ marginBottom: 16 }}>
-        <label style={ui.fieldLabel}>{t(locale, "projects.typeLabel")}</label>
-        <div style={{ display: "flex", gap: 8 }}>
-          {(["mine", "client"] as const).map((tp) => (
-            <button key={tp} onClick={() => setProjectType(tp)} style={{ ...ui.monoLabel, textTransform: "none", padding: "7px 14px", borderRadius: 2, cursor: "pointer", border: "1px solid " + (projectType === tp ? "var(--accent)" : "var(--border-2)"), background: projectType === tp ? "var(--accent)" : "transparent", color: projectType === tp ? "#000" : "var(--muted)" }}>
-              {t(locale, tp === "mine" ? "projects.typeMine" : "projects.typeClient")}
-            </button>
-          ))}
-        </div>
-        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 6 }}>{t(locale, "projects.typeHint")}</span>
-      </div>
-
       {/* Онбординг-инструкция клиенту — по умолчанию ВЫКЛ; включаю осознанно для конкретного проекта. */}
       <div style={{ marginBottom: 16 }}>
         <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", ...ui.monoLabel, textTransform: "none" }}>
@@ -339,6 +324,13 @@ export function MetaForm({
         <span>
           <span style={{ fontSize: 14 }}>{t(locale, "projects.deliverPR")}</span>
           <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "projects.deliverPRHint")}</span>
+        </span>
+      </label>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginTop: 10 }}>
+        <input type="checkbox" checked={autoMigrate} onChange={(e) => setAutoMigrate(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />
+        <span>
+          <span style={{ fontSize: 14 }}>{t(locale, "projects.autoMigrate")}</span>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "projects.autoMigrateHint")}</span>
         </span>
       </label>
 

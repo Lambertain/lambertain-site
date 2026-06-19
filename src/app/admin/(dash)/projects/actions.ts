@@ -46,6 +46,23 @@ export async function archiveProject(key: string, archived: boolean): Promise<{ 
   }
 }
 
+/** Тип проекта (наш/клиентский) — переключатель на строке с названием. ON=наш(mine), OFF=клиентский(client). */
+export async function setProjectKind(key: string, mine: boolean): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    const prev = await getProjectFull(key);
+    if (!prev) return { error: "Проект не найден" };
+    await setProjectMeta(key, prev.name, { ...prev.meta, projectType: mine ? "mine" : "client" });
+    // Стал клиентским → задачи, поставленные мной, переводим на клиента постановщиком.
+    if (!mine) await reassignNullReporterToClient(key).catch(() => {});
+    revalidatePath(`/admin/projects/${key}`);
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
 export async function saveMeta(
   key: string,
   name: string,
@@ -54,6 +71,8 @@ export async function saveMeta(
   try {
     await requireAdmin();
     const prev = await getProjectFull(key);
+    // Тип проекта управляется отдельным переключателем (setProjectKind), форма его НЕ трогает — сохраняем как есть.
+    meta.projectType = prev?.meta.projectType;
     await setProjectMeta(key, name, meta);
     // Привязали/обновили наш dev-репо → автоматически разложить туда протокол (новые репо подхватываются сами).
     if (meta.devGit) after(() => layProtocol(key));

@@ -135,10 +135,21 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
       <div style={{ display: "flex", gap: 16, ...ui.monoLabel, textTransform: "none", marginTop: 10, flexWrap: "wrap" }}>
         {me.role !== "client" && task.assignee && <span>→ {task.assignee.fullName}</span>}
-        {/* Сотрудник и клиент-репортёр видны клиенту; разработчик/админ — скрыты (агентство = Lambertain). */}
-        {task.reporter && (me.role !== "client" || task.reporter.role === "client" || task.reporter.role === "employee") && (
-          <span>{t(locale, "card.from", { name: task.reporter.fullName })}</span>
-        )}
+        {/* Постановщик. reporter=null = сторона агентства (супер-админ/админ) или старая задача без логина:
+            подписываем по created_by_role (разработчик/сотрудник), иначе «Lambertain». Клиенту команду не раскрываем. */}
+        {(() => {
+          const name = task.reporter
+            ? task.reporter.fullName
+            : task.createdByRole === "contributor"
+              ? t(locale, "role.contributor")
+              : task.createdByRole === "employee"
+                ? t(locale, "role.employee")
+                : "Lambertain";
+          const show = task.reporter
+            ? me.role !== "client" || task.reporter.role === "client" || task.reporter.role === "employee"
+            : me.role !== "client";
+          return show ? <span>{t(locale, "card.from", { name })}</span> : null;
+        })()}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
 
