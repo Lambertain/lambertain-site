@@ -30,6 +30,9 @@ export interface Project {
 export interface ProjectMeta {
   clientGit?: string;
   devGit?: string;
+  /** Доп. репозитории проекта парами dev→client (когда репо больше одного: backend+frontend и т.п.).
+   *  Первая пара — основная (clientGit/devGit выше); сюда добавляются остальные. */
+  extraRepos?: { dev?: string; client?: string }[];
   localPath?: string;
   apps?: {
     prod?: { url?: string; host?: "client" | "mine" | "" };

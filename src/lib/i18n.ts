@@ -369,6 +369,8 @@ export const DICT: Record<string, Entry> = {
   "projects.repos": { uk: "Репозиторії", ru: "Репозитории", en: "Repositories" },
   "projects.clientGit": { uk: "Git клієнта", ru: "Git клиента", en: "Client git" },
   "projects.devGit": { uk: "Dev git (команда)", ru: "Dev git (команда)", en: "Dev git (team)" },
+  "projects.repoPair": { uk: "Репозиторій (пара)", ru: "Репозиторий (пара)", en: "Repository (pair)" },
+  "projects.addRepo": { uk: "Додати репозиторій (dev → client)", ru: "Добавить репозиторий (dev → client)", en: "Add repository (dev → client)" },
   "projects.localPath": { uk: "Локальний шлях", ru: "Локальный путь", en: "Local path" },
   "projects.hosting": { uk: "Хостинг", ru: "Хостинг", en: "Hosting" },
   "projects.prodUrl": { uk: "Прод URL", ru: "Прод URL", en: "Prod URL" },

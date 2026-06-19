@@ -91,6 +91,7 @@ export function MetaForm({
   const [deadline, setDeadline] = useState(m.deadline ?? "");
   const [clientGit, setClientGit] = useState(m.clientGit ?? "");
   const [devGit, setDevGit] = useState(m.devGit ?? "");
+  const [extraRepos, setExtraRepos] = useState<{ dev?: string; client?: string }[]>(m.extraRepos ?? []);
   const [localPath, setLocalPath] = useState(m.localPath ?? "");
   const [prodUrl, setProdUrl] = useState(m.apps?.prod?.url ?? "");
   const [devUrl, setDevUrl] = useState(m.apps?.dev?.url ?? "");
@@ -157,6 +158,10 @@ export function MetaForm({
       onboardingSetToken: m.onboardingSetToken, // набор инструкций (если привязан) — не теряем при сохранении
       clientGit: clientGit || undefined,
       devGit: devGit || undefined,
+      extraRepos: (() => {
+        const rows = extraRepos.map((r) => ({ dev: r.dev?.trim() || undefined, client: r.client?.trim() || undefined })).filter((r) => r.dev || r.client);
+        return rows.length ? rows : undefined;
+      })(),
       localPath: localPath || undefined,
       apps: { prod: { url: prodUrl || undefined, host: "" }, dev: { url: devUrl || undefined, host: "" } },
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
@@ -277,6 +282,26 @@ export function MetaForm({
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Field label={t(locale, "projects.clientGit")} value={clientGit} onChange={setClientGit} />
         <Field label={t(locale, "projects.devGit")} value={devGit} onChange={setDevGit} />
+
+        {/* Доп. репозитории парами dev→client (когда у проекта несколько репо: backend + frontend и т.п.). */}
+        {extraRepos.map((r, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, border: "1px dashed var(--border-2)", borderRadius: 4 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, "projects.repoPair")} #{i + 2}</span>
+              <button onClick={() => setExtraRepos(extraRepos.filter((_, j) => j !== i))} style={{ background: "transparent", border: "none", color: "#ff5b5b", cursor: "pointer", fontSize: 16 }}>×</button>
+            </div>
+            <div>
+              <label style={ui.fieldLabel}>{t(locale, "projects.clientGit")}</label>
+              <input value={r.client ?? ""} onChange={(e) => setExtraRepos(extraRepos.map((x, j) => (j === i ? { ...x, client: e.target.value } : x)))} style={ui.input} />
+            </div>
+            <div>
+              <label style={ui.fieldLabel}>{t(locale, "projects.devGit")}</label>
+              <input value={r.dev ?? ""} onChange={(e) => setExtraRepos(extraRepos.map((x, j) => (j === i ? { ...x, dev: e.target.value } : x)))} style={ui.input} />
+            </div>
+          </div>
+        ))}
+        <button onClick={() => setExtraRepos([...extraRepos, {}])} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "1px dashed var(--border-2)", padding: "8px 12px", cursor: "pointer", borderRadius: 2, alignSelf: "flex-start" }}>+ {t(locale, "projects.addRepo")}</button>
+
         <Field label={t(locale, "projects.localPath")} value={localPath} onChange={setLocalPath} />
       </div>
 

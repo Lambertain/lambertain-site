@@ -39,17 +39,11 @@ function mergeClaudeMd(existing: string, block: string): string {
 export type LayStatus = "updated" | "unchanged" | "skipped" | "error";
 export interface LayResult { key: string; repo?: string; status: LayStatus; detail?: string }
 
-/** Разложить протокол в дев-репо одного проекта (идемпотентно). */
-export async function layProtocol(projectKey: string): Promise<LayResult> {
-  if (!process.env.GITHUB_TOKEN) return { key: projectKey, status: "error", detail: "нет GITHUB_TOKEN" };
-  const p = await getProjectFull(projectKey);
-  const repo = repoFromGit(p?.meta.devGit);
+/** Разложить протокол в один конкретный наш репо (идемпотентно). */
+async function layIntoRepo(projectKey: string, repoRaw: string | undefined, token: string): Promise<LayResult> {
+  const repo = repoFromGit(repoRaw);
   if (!repo || !/^Lambertain\//i.test(repo)) return { key: projectKey, status: "skipped", detail: "не наш dev-репо" };
   if (repo.toLowerCase() === SELF_REPO) return { key: projectKey, repo, status: "skipped", detail: "портал" };
-
-  // токен проекта (генерируем, если нет)
-  let token = (await getProjectTokens()).get(projectKey);
-  if (!token) { token = `pk_${randomBytes(20).toString("hex")}`; await setProjectToken(projectKey, token); }
 
   let existing = "", sha: string | undefined;
   const r = await gh(`/repos/${repo}/contents/CLAUDE.md`);
@@ -64,19 +58,40 @@ export async function layProtocol(projectKey: string): Promise<LayResult> {
     body: JSON.stringify({ message: "chore: протокол задач Lambertain (Claude Code)", content: Buffer.from(next, "utf-8").toString("base64"), sha }),
   });
   if (!put.ok) return { key: projectKey, repo, status: "error", detail: `write ${put.status} ${(await put.text()).slice(0, 150)}` };
+  return { key: projectKey, repo, status: "updated" };
+}
 
-  // Корневой фикс «стазлого клона»: в момент привязки/обновления протокола сигналим назначенному разработчику
-  // сделать git pull — иначе клон, сделанный ДО привязки, не имеет CLAUDE.md с токеном и Claude не видит задач.
+/** Разложить протокол во ВСЕ наши дев-репо проекта (основной devGit + доп. пары extraRepos). Идемпотентно. */
+export async function layProtocol(projectKey: string): Promise<LayResult> {
+  if (!process.env.GITHUB_TOKEN) return { key: projectKey, status: "error", detail: "нет GITHUB_TOKEN" };
+  const p = await getProjectFull(projectKey);
+
+  // токен проекта (генерируем, если нет) — один на проект, годится для всех его репо.
+  let token = (await getProjectTokens()).get(projectKey);
+  if (!token) { token = `pk_${randomBytes(20).toString("hex")}`; await setProjectToken(projectKey, token); }
+
+  const devRepos = [p?.meta.devGit, ...((p?.meta.extraRepos ?? []).map((x) => x.dev))];
+  const results: LayResult[] = [];
+  for (const dg of devRepos) {
+    if (!dg) continue;
+    results.push(await layIntoRepo(projectKey, dg, token));
+  }
+  const updated = results.filter((r) => r.status === "updated");
+
+  // Сигналим разработчику сделать git pull, если что-то реально обновилось (иначе старый клон без CLAUDE.md/токена).
   const dev = p?.meta.defaultAssignee;
-  if (dev) {
+  if (updated.length && dev) {
+    const repos = updated.map((r) => `<code>${r.repo}</code>`).join(", ");
     await notifyLogins(
       [dev],
       `🔗 <b>Проект «${p?.name || projectKey}» подключён к порталу</b>\n` +
-        `Сделай <code>git pull</code> в репо <code>${repo}</code> — подтянется CLAUDE.md с токеном.\n` +
+        `Сделай <code>git pull</code> в репо: ${repos} — подтянется CLAUDE.md с токеном.\n` +
         `Затем в новой сессии Claude первым сообщением: «следуй CLAUDE.md, получи протокол и возьми задачу с портала».`,
     ).catch(() => {});
   }
-  return { key: projectKey, repo, status: "updated" };
+  // Итог проекта: обновлено что-то → updated; иначе первый осмысленный статус (unchanged/skipped/error).
+  if (updated.length) return updated[0].status === "updated" ? { ...updated[0], detail: updated.length > 1 ? `репозиториев: ${updated.length}` : undefined } : updated[0];
+  return results[0] ?? { key: projectKey, status: "skipped", detail: "нет дев-репо" };
 }
 
 /** Разложить/обновить протокол во всех наших дев-репо (для обновления текста протокола). */
