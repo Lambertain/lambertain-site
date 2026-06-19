@@ -1,13 +1,11 @@
 "use server";
 
-import { after } from "next/server";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
-import { draftTask } from "@/lib/drafter";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { getTaskAiStatus, setTaskAiStatus, updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask } from "@/lib/db";
+import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { revalidatePath } from "next/cache";
@@ -49,13 +47,9 @@ export async function addTaskComment(
     // Автор коммента = текущий член (по логину); супер-админ без логина → Lambertain. Клиент видит команду как «Lambertain» (маскируется при выводе).
     await getBackend().addComment(id, body, visibility, me.youtrackLogin);
     revalidatePath(`/admin/tasks/${id}`);
-    // Клиент (или сотрудник-как-клиент) ответил: возобновить ИИ-триаж (если ждал) и разблокировать задачу (если была Blocked из-за эскалации).
+    // Клиент (или сотрудник-как-клиент) ответил: разблокировать задачу (если была Blocked из-за эскалации) —
+    // разработчик увидит ответ в треде и продолжит.
     if (clientSide) {
-      const ai = await getTaskAiStatus(id).catch(() => null);
-      if (ai === "waiting") {
-        await setTaskAiStatus(id, "pending").catch(() => {});
-        after(() => draftTask(id));
-      }
       try {
         const t = await getBackend().getTask(id);
         if (statusBucket(t.state) === "blocked") await getBackend().updateStatus(id, "In Progress");
@@ -302,17 +296,4 @@ export async function editTask(
   }
 }
 
-/** Перезапустить ИИ-проработку задачи (admin) — если зависла/нужно переделать. */
-export async function retryDrafting(id: string): Promise<{ ok?: boolean; error?: string }> {
-  const me = await getPrincipal();
-  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
-  try {
-    await setTaskAiStatus(id, "pending");
-    after(() => draftTask(id));
-    revalidatePath(`/admin/tasks/${id}`);
-    return { ok: true };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Ошибка" };
-  }
-}
 

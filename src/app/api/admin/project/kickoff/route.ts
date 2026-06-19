@@ -7,7 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { readJsonSmart } from "@/lib/req-body";
-import { getProjectFull, setTaskTags, setTaskAiStatus, setTaskDeps, projectReporterLogin } from "@/lib/db";
+import { getProjectFull, setTaskTags, setTaskDeps, projectReporterLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins, notifyProjectClients } from "@/lib/notify";
@@ -51,7 +51,6 @@ export async function POST(req: Request) {
         autoDone: false, // клиент-постановщик принимает результат сам (а не авто-Готово)
       });
       await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (Array.isArray(tk.skills) ? tk.skills : []).filter(Boolean) });
-      await setTaskAiStatus(task.id, "done");
       ids.push(task.id);
     }
     // Зависимости (правильный порядок выполнения).

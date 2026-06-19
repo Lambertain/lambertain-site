@@ -1,10 +1,9 @@
 "use server";
 
-import { after } from "next/server";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval, setTaskAiStatus, getTaskAiStatus, moveTaskToProject, markTaskNotificationsRead } from "@/lib/db";
-import { draftTask } from "@/lib/drafter";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead } from "@/lib/db";
+import { assignProjectDevAndNotify } from "@/lib/task-intake";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients, notifyLogins, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
@@ -37,12 +36,11 @@ export async function deleteTask(id: string): Promise<{ ok?: boolean; error?: st
   if (!me) return { error: "Не авторизован" };
   const adminOrClient = me.role === "admin" || me.role === "client" || me.realRole === "admin";
   let allowed = adminOrClient;
-  // Автор (разработчик/сотрудник/клиент) может удалить СВОЮ задачу в окне ДО триажа (ai_status='pending').
+  // Автор (разработчик/сотрудник/клиент) может удалить СВОЮ задачу, пока она ещё НЕ взята в работу (статус Open).
   if (!allowed && me.youtrackLogin) {
     try {
       const task = await getBackend().getTask(id);
-      const ai = await getTaskAiStatus(id);
-      if (task.reporter?.login === me.youtrackLogin && ai === "pending") allowed = true;
+      if (task.reporter?.login === me.youtrackLogin && statusBucket(task.state) === "notStarted") allowed = true;
     } catch { /* ignore */ }
   }
   if (!allowed) return { error: "Нет прав" };
@@ -96,13 +94,9 @@ export async function setApproval(id: string, status: "approved" | "rejected"): 
   }
   try {
     await setTaskApproval(id, status);
-    // После утверждения — запускаем ИИ-проработку (если ещё не запускалась). Отклонённую не прорабатываем.
+    // После утверждения — отдаём задачу разработчику проекта (назначаем + пуш). Отклонённую не трогаем.
     if (status === "approved") {
-      const ai = await getTaskAiStatus(id).catch(() => null);
-      if (!ai) {
-        await setTaskAiStatus(id, "pending");
-        after(() => draftTask(id));
-      }
+      await assignProjectDevAndNotify(id).catch(() => {});
     } else {
       // Reject → задача на «Доработку» + уведомление постановщику (создателю), чтобы доработал.
       await getBackend().updateStatus(id, "Rework").catch(() => {});

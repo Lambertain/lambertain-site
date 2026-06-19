@@ -10,7 +10,7 @@ import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
 import { notifyLogins, notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { projectHasClient, appendRequestBlocks, setTaskAiStatus, projectReporterLogin, type ReqBlock } from "@/lib/db";
+import { projectHasClient, appendRequestBlocks, assignTask, projectReporterLogin, type ReqBlock } from "@/lib/db";
 import type { DraftTask, Role } from "@/lib/tasks/types";
 
 /** Кнопка «Открыть задачу» (в notify конвертируется в web_app Mini App с диплинком). */
@@ -50,6 +50,23 @@ export async function notifyNewTask(task: { id: string; summary: string; assigne
   } catch {
     // best-effort
   }
+}
+
+/**
+ * Назначить задачу разработчику проекта (если ещё не назначена) и прислать ему пуш.
+ * Заменяет ИИ-триаж: разбор делает Claude разработчика — он читает задачу, смотрит код и сам
+ * задаёт уточнения клиенту в комментах, только если что-то непонятно. Если ответственного нет —
+ * задача остаётся в «Без ответственного», назначат вручную.
+ */
+export async function assignProjectDevAndNotify(taskId: string): Promise<void> {
+  const be = getBackend();
+  const task = await be.getTask(taskId).catch(() => null);
+  if (!task) return;
+  const project = (await be.listProjects()).find((p) => p.key === task.projectKey);
+  const dev = task.assignee?.login || project?.meta.defaultAssignee || null;
+  if (!dev) return;
+  if (!task.assignee?.login) await assignTask(taskId, dev).catch(() => {});
+  await notifyLogins([dev], `🆕 <b>Новая задача</b> · ${await taskTag(taskId)}: ${task.summary}`, [], taskBtn(taskId)).catch(() => {});
 }
 
 /**
@@ -140,7 +157,7 @@ export async function createRequestTaskCore(
         internal: false,
       });
       await appendRequestBlocks(task.id, blocks);
-      await setTaskAiStatus(task.id, "pending"); // отложенный ИИ-триаж + уведомление разработчику (как обычная задача)
+      await assignProjectDevAndNotify(task.id); // сразу разработчику — он сам разберёт по коду (без триажа)
       // Клиент — постановщик: уведомляем его, что в проекте появилась новая задача (он её ведёт/принимает).
       await notifyProjectClients(projectKey, `🆕 <b>Нова задача у вашому проєкті</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
       return { id: task.id, url: task.url };
@@ -167,13 +184,13 @@ export async function createRequestTaskCore(
     if (isFeedback) {
       await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${await taskTag(task.id)}: ${task.summary}\nОт: ${me.fullName}`, taskBtn(task.id)).catch(() => {});
     } else if (appr.pending && appr.approver) {
-      // Задача ждёт утверждения; ИИ-проработку запустим только после апрува (можно отредактировать до этого).
+      // Задача ждёт утверждения; разработчику отдадим только после апрува (до этого можно отредактировать).
       // best-effort: сбой уведомления не должен превращать уже созданную задачу в ошибку для пользователя.
       await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary).catch(() => {});
     } else {
-      // Триаж отложен: его запустит поллер через ~5 минут после создания — окно, чтобы автор
-      // успел отредактировать задачу/комментарий до того, как ИИ-триаж обработает её и уведомит разработчика.
-      await setTaskAiStatus(task.id, "pending");
+      // Без триажа: сразу назначаем разработчику проекта и шлём ему пуш — он сам прочитает задачу,
+      // посмотрит код и задаст клиенту уточнения только при необходимости.
+      await assignProjectDevAndNotify(task.id);
     }
     return { id: task.id, url: task.url };
   } catch (e) {

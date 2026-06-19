@@ -1,7 +1,7 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskAiStatus, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, projectReporterLogin } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, projectReporterLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins, notifyProjectClients } from "@/lib/notify";
@@ -80,7 +80,6 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
         autoDone: false, // клиент-постановщик принимает результат сам
       });
       await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (Array.isArray(tk.skills) ? tk.skills : []).filter(Boolean) });
-      await setTaskAiStatus(task.id, "done"); // уже размечено — отдельный триаж не нужен
       ids.push(task.id);
     }
     // Зависимости (правильный порядок выполнения).

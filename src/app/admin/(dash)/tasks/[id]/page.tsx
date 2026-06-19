@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskAiStatus, getTaskTags, getGuide, guideText, getProjectEmployees, projectHasClient } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, projectHasClient } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -14,7 +14,6 @@ import { OwnerActionBar } from "./owner-action-bar";
 import { ClientActionBar } from "./client-action-bar";
 import { DeleteOwnTask } from "./delete-own-task";
 import { DelegateBar } from "./delegate-bar";
-import { RetryDrafting } from "./retry-drafting";
 import { TaskEdit } from "./task-edit";
 import { MoveTask } from "./move-task";
 import { StatusPicker } from "./status-picker";
@@ -41,10 +40,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const canEditStatus = isAdmin || me.role === "contributor";
   const backHref = isAdmin ? "/admin/tasks" : "/admin";
 
-  let task, comments, deps, reads, aiStatus, users, tags, projects;
+  let task, comments, deps, reads, users, tags, projects;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    [task, comments, deps, reads, aiStatus, users, tags, projects] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), getTaskAiStatus(id), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), isSuperAdmin(me) ? be.listProjects() : Promise.resolve([])]);
+    [task, comments, deps, reads, users, tags, projects] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), isSuperAdmin(me) ? be.listProjects() : Promise.resolve([])]);
   } catch (e) {
     return (
       <div>
@@ -170,16 +169,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {(aiStatus === "pending" || aiStatus === "waiting") && (
-        <div style={{ ...ui.card, marginTop: 16, padding: 14, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: aiStatus === "waiting" ? "#e8b339" : "var(--accent)", display: "inline-block", flexShrink: 0 }} />
-          <span style={{ fontSize: 14 }}>{t(locale, aiStatus === "waiting" ? "ai.waiting" : "ai.drafting")}</span>
-          {isAdmin && <RetryDrafting id={task.id} label={t(locale, "ai.retry")} />}
-        </div>
-      )}
-
-      {/* Автор может удалить свою задачу в окне ДО триажа (пока ai_status=pending). */}
-      {aiStatus === "pending" && !!me.youtrackLogin && task.reporter?.login === me.youtrackLogin && (
+      {/* Автор может удалить свою задачу, пока она ещё НЕ взята в работу (статус Open). */}
+      {statusBucket(task.state) === "notStarted" && !!me.youtrackLogin && task.reporter?.login === me.youtrackLogin && (
         <div style={{ marginTop: 12 }}>
           <DeleteOwnTask taskId={task.id} label={t(locale, "task.deleteOwn")} confirmText={t(locale, "task.deleteOwnConfirm")} />
         </div>

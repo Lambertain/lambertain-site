@@ -1,15 +1,14 @@
 /**
  * Фоновый воркер портала (Railway). Самодостаточный: pg + fetch, без Next-зависимостей.
  * Уведомления о событиях задач шлёт само приложение (src/lib/notify.ts). Здесь — фоновые шаги по БД:
- *   TRIAGE            — отложенный ИИ-триаж задач (через ~TRIAGE_DELAY_MIN минут после создания)
  *   REMIND_APPROVALS  — напоминание супер-админу про модерацию/апрув/ops-шаги (каждые 15 мин)
  *   REMIND_ASSIGNEES  — напоминание исполнителю по задачам в работе РАЗ В 24 Ч (от создания задачи)
  *   REMIND_COMMENTS   — каждые 15 мин долбить исполнителя, если на задаче висит неотвеченный коммент клиента
  *   NOTIFY_TOKENS     — суточный дайджест расхода токенов
  * Любой шаг отключается флагом env = "0".
  *
- * Переменные: DATABASE_URL, ADMIN_API_TOKEN, PORTAL_BASE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
- *             TRIAGE_DELAY_MIN (по умолч. 5), POLL_INTERVAL_SEC (по умолч. 60), POLL_ONCE, DRY_RUN.
+ * Переменные: DATABASE_URL, PORTAL_BASE, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,
+ *             POLL_INTERVAL_SEC (по умолч. 60), POLL_ONCE, DRY_RUN.
  */
 import pg from "pg";
 
@@ -18,9 +17,6 @@ const TG_CHAT = process.env.TELEGRAM_CHAT_ID || "";
 const INTERVAL = Number(process.env.POLL_INTERVAL_SEC || 60) * 1000;
 const ONCE = process.env.POLL_ONCE === "1";
 const DRY = process.env.DRY_RUN === "1";
-const PORTAL_BASE = (process.env.PORTAL_BASE || "https://lambertain-site-production.up.railway.app").replace(/\/$/, "");
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN || "";
-const TRIAGE_DELAY_MIN = Number(process.env.TRIAGE_DELAY_MIN || 5); // окно на редактирование до триажа
 
 const flag = (name) => process.env[name] !== "0";
 
@@ -276,43 +272,13 @@ async function checkTokenDigest() {
   await setState("token_digest_day", today);
 }
 
-/**
- * Отложенный ИИ-триаж: задачи с ai_status='pending', созданные больше TRIAGE_DELAY_MIN минут назад,
- * отдаём порталу на триаж. Задержка — окно, чтобы автор успел отредактировать задачу/коммент
- * до того, как триаж обработает её и уведомит разработчика. Эндпоинт сам атомарно «забирает» задачу.
- */
-async function runDueTriage() {
-  if (!ADMIN_TOKEN) { console.warn("ADMIN_API_TOKEN не задан — отложенный триаж пропущен."); return 0; }
-  const rows = (await pool.query(
-    `SELECT readable_id FROM tasks WHERE ai_status = 'pending' AND created_at < now() - ($1 || ' minutes')::interval ORDER BY created_at LIMIT 25`,
-    [String(TRIAGE_DELAY_MIN)],
-  )).rows;
-  let n = 0;
-  for (const r of rows) {
-    if (DRY) { console.log(`[DRY] триаж → ${r.readable_id}`); n++; continue; }
-    try {
-      const resp = await fetch(`${PORTAL_BASE}/api/admin/run-triage`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${ADMIN_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: r.readable_id }),
-      });
-      if (resp.ok) n++;
-      else console.error("run-triage", r.readable_id, resp.status, (await resp.text()).slice(0, 120));
-    } catch (e) { console.error("run-triage", r.readable_id, e.message); }
-  }
-  if (n) console.log(`отложенный триаж запущен: ${n}`);
-  return n;
-}
-
 async function cycle() {
-  let total = 0;
-  if (flag("TRIAGE")) total += await runDueTriage().catch((e) => (console.error("triage:", e.message), 0));
   if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
   if (flag("REMIND_APPROVALS")) await remindSuperAdmin().catch((e) => console.error("remind:", e.message));
   if (flag("REMIND_ASSIGNEES")) await remindAssignees().catch((e) => console.error("remind-assignees:", e.message));
   if (flag("REMIND_COMMENTS")) await remindCommentReplies().catch((e) => console.error("remind-comments:", e.message));
   if (flag("REMIND_REVIEW")) await remindReviewApprovals().catch((e) => console.error("remind-review:", e.message));
-  console.log(new Date().toISOString(), `цикл завершён, событий: ${total}`);
+  console.log(new Date().toISOString(), "цикл завершён");
 }
 
 async function main() {
