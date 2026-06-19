@@ -80,12 +80,13 @@ export default async function HomePage() {
   let tasks, reads, projectSeen;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    // Контрибьютор — задачи, назначенные ему; клиент — один проект; сотрудник — все свои проекты (фильтр ниже по visibleKeys).
+    // Разработчик/сотрудник — ВСЕ задачи их проектов (включая исторические/выполненные, а не только назначенные
+    // ему лично — новый участник проекта должен видеть всю историю); клиент — его единственный проект.
     let filter: TaskFilter = { order: "updated_desc", limit: 300 };
-    if (me.role === "contributor" && me.youtrackLogin) {
-      filter = { assigneeLogin: me.youtrackLogin, order: "updated_desc", limit: 300 };
-    } else if (me.role === "client" && me.projectKey) {
+    if (me.role === "client" && me.projectKey) {
       filter = { projectKey: me.projectKey, order: "updated_desc", limit: 300 };
+    } else if (me.role === "contributor" || me.role === "employee") {
+      filter = { projectKeys: [...visibleKeys], order: "updated_desc", limit: 300 };
     }
     [tasks, reads, projectSeen] = await Promise.all([be.listTasks(filter), getReads(readKey), getProjectReads(readKey)]);
   } catch (e) {

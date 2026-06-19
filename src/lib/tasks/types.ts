@@ -163,6 +163,8 @@ export interface DraftTask {
 /** Структурный фильтр задач — backend-agnostic (вместо YouTrack-строки запроса). */
 export interface TaskFilter {
   projectKey?: string;
+  /** Набор проектов (разработчик/сотрудник — все задачи их проектов, включая исторические). */
+  projectKeys?: string[];
   assigneeLogin?: string;
   reporterLogin?: string;
   /** Постановщик не задан (reporter IS NULL) — «мои задачи» супер-админа (он ставит без member-логина). */

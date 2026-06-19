@@ -108,6 +108,7 @@ export const postgresBackend: TasksBackend = {
       where.push(cond.replace("$$", `$${params.length}`));
     };
     if (filter.projectKey) add("p.key = $$", filter.projectKey);
+    if (filter.projectKeys) add("p.key = ANY($$)", filter.projectKeys);
     if (filter.assigneeLogin) add("a.login = $$", filter.assigneeLogin);
     if (filter.reporterLogin) add("r.login = $$", filter.reporterLogin);
     if (filter.reporterIsNull) where.push("r.login IS NULL");

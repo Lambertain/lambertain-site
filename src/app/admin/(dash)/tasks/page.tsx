@@ -115,16 +115,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     );
   }
 
-  // —— Контрибьютор: задачи попроектно (табы проект→статус), дип-линк из карточки проекта (?project=&tab=) ——
-  if (me.role === "contributor") {
+  // —— Разработчик/сотрудник: задачи попроектно (табы проект→статус), дип-линк из карточки проекта (?project=&tab=).
+  // Видят ВСЕ задачи своих проектов (включая исторические/выполненные), а не только назначенные лично —
+  // новый участник проекта должен видеть всю историю. ——
+  if (me.role === "contributor" || me.role === "employee") {
     const sp = await searchParams;
     const all = await be.listProjects();
     const visible = visibleProjects(me, all);
     const fbSet = new Set(all.filter((p) => p.meta.feedback).map((p) => p.key));
     const byFbLast = (a: { key: string }, b: { key: string }) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0);
-    const filter: TaskFilter = me.youtrackLogin
-      ? { assigneeLogin: me.youtrackLogin, order: "updated_desc", limit: 300 }
-      : { order: "updated_desc", limit: 300 };
+    const filter: TaskFilter = { projectKeys: visible.map((p) => p.key), order: "updated_desc", limit: 300 };
     let raw, reads, projectSeen;
     try {
       [raw, reads, projectSeen] = await Promise.all([be.listTasks(filter), getReads(readKey), getProjectReads(readKey)]);
@@ -166,9 +166,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           tasks={board}
           projects={projectsWithNew}
           locale={locale}
-          canEditStatus={true}
+          canEditStatus={me.role === "contributor"}
           canDelete={false}
-          canStart={true}
+          canStart={me.role === "contributor"}
           empty={t(locale, "tasks.empty")}
           feedbackKey={all.find((p) => p.meta.feedback)?.key}
           initialProject={initialProject}
