@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useTransition, useEffect } from "react";
-import { createRequestTask } from "./actions";
 import { detectFeminine } from "@/lib/gender-check";
 import { t, type Locale } from "@/lib/i18n";
 import { MarkdownToolbar } from "./markdown-toolbar";
@@ -197,18 +196,25 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
       const rcpt = showRecipient ? recipient : showSelf && selfTask ? "self" : showSelf && clientTask ? "client" : showSelf && fromClientTask ? "from_client" : undefined;
       const wantInternal = showSelf && internalTask && !selfTask && !clientTask && !fromClientTask; // задача разработчику, скрытая от клиента
       try {
-        const res = await createRequestTask(projectKey, title.trim(), blocks, rcpt, wantInternal);
+        // Отправка через обычный fetch к API-роуту (не Server Action): URL переживает деплой, поэтому
+        // выкатка новой версии портала НИКАК не мешает создавать задачу — перезагрузка не нужна, скрины не теряются.
+        const r = await fetch("/api/portal/create-task", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectKey, title: title.trim(), blocks, recipient: rcpt, internal: wantInternal }),
+        });
+        const res = (await r.json().catch(() => ({}))) as { id?: string; url?: string; error?: string };
         if (res.error) setError(res.error);
         else if (res.id && res.url) {
           setCreated({ id: res.id, url: res.url });
           setTitle(""); setBody(""); setImages([]);
           try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+        } else {
+          setError(t(locale, "request.sendFailed"));
         }
-      } catch (e) {
-        // Чаще всего — устаревший Server Action после выкатки новой версии портала.
-        // Текст уже сохранён в localStorage, поля НЕ очищаем — после F5 черновик восстановится.
-        const msg = e instanceof Error ? e.message : String(e);
-        setError(t(locale, /server action|deployment/i.test(msg) ? "request.staleVersion" : "request.sendFailed"));
+      } catch {
+        // Сетевой сбой (не деплой — деплой на fetch не влияет): поля НЕ очищаем, текст/скрины остаются для повтора.
+        setError(t(locale, "request.sendFailed"));
       }
     });
   }
