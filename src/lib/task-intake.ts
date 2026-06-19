@@ -141,6 +141,8 @@ export async function createRequestTaskCore(
       });
       await appendRequestBlocks(task.id, blocks);
       await setTaskAiStatus(task.id, "pending"); // отложенный ИИ-триаж + уведомление разработчику (как обычная задача)
+      // Клиент — постановщик: уведомляем его, что в проекте появилась новая задача (он её ведёт/принимает).
+      await notifyProjectClients(projectKey, `🆕 <b>Нова задача у вашому проєкті</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
       return { id: task.id, url: task.url };
     }
 
