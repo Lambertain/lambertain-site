@@ -178,6 +178,18 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <ClientActionBar taskId={task.id} action={task.clientAction} guide={clientGuide} />
       )}
 
+      {/* Задача чекає на відповідь КЛІЄНТА (розробник поставив питання → Blocked, без блокувань-залежностей).
+          Явний банер, щоб клієнт не пропустив це у статусі «Заблоковано». Відповідь у коментарях знімає блок. */}
+      {clientSide && statusBucket(task.state) === "blocked" && blockers.length === 0 && (
+        <div style={{ ...ui.card, marginTop: 12, borderColor: "#e8b339", background: "rgba(232,179,57,0.06)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, ...ui.monoLabel, color: "#e8b339" }}>
+            <span style={{ fontSize: 16 }}>⏳</span>
+            <span>{t(locale, "awaitAnswer.title")}</span>
+          </div>
+          <p style={{ fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>{t(locale, "awaitAnswer.body")}</p>
+        </div>
+      )}
+
       {/* Клиент делегирует задачу своему сотруднику (если в проекте есть сотрудники) */}
       {me.role === "client" && employees.length > 0 && !task.internal && (
         <DelegateBar taskId={task.id} employees={employees} locale={locale} />

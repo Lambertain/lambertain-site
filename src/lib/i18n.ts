@@ -449,6 +449,8 @@ export const DICT: Record<string, Entry> = {
   "mod.ownNote": { uk: "На модерації — можете виправити до публікації:", ru: "На модерации — можно поправить до публикации:", en: "Pending review — you can edit before it's published:" },
   "owner.needLabel": { uk: "Ручний крок агентства (деплой / реєстрація / токен)", ru: "Ручной шаг агентства (деплой / регистрация / токен)", en: "Agency action required (deploy / registration / token)" },
   "owner.done": { uk: "Виконав", ru: "Выполнил", en: "Done" },
+  "awaitAnswer.title": { uk: "Потрібна ваша відповідь", ru: "Нужен ваш ответ", en: "Your answer is needed" },
+  "awaitAnswer.body": { uk: "Ми поставили вам запитання по цій задачі (нижче в коментарях) і чекаємо на відповідь, щоб продовжити. Напишіть відповідь у коментарях — і робота поновиться автоматично.", ru: "Мы задали вам вопрос по этой задаче (ниже в комментариях) и ждём ответа, чтобы продолжить. Напишите ответ в комментариях — и работа возобновится автоматически.", en: "We've asked you a question on this task (in the comments below) and are waiting for your answer to continue. Reply in the comments — work will resume automatically." },
   "owner.toClient": { uk: "Передати клієнту", ru: "Передать клиенту", en: "Hand to client" },
   "owner.toClientHint": { uk: "Виокремити клієнтську частину (зареєструвати сервіс/токен), надіслати клієнту з інструкцією і полем для даних.", ru: "Выделить клиентскую часть (зарегистрировать сервис/токен), отправить клиенту с инструкцией и полем для данных.", en: "Extract the client part (register service/token), send to the client with a guide and a data field." },
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
