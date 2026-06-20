@@ -8,7 +8,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse, after } from "next/server";
-import { getProjectKeyByToken, getProjectFull, promoteProjectDevToProd } from "@/lib/db";
+import { getProjectKeyByToken, getProjectFull, promoteProjectDevToProd, setDeployStage } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
       if (task.autoDone || proj?.meta.autoApprove) {
         await be.updateStatus(taskId, "Done");
+        await setDeployStage(taskId, "dev").catch(() => {}); // готово и на дев-мейн → «На тестовому»; авто-доставка ниже переведёт в «Опубліковано»
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
       await be.updateStatus(taskId, "Review");
+      await setDeployStage(taskId, "dev").catch(() => {}); // сдал на ревью = на дев-мейн → «На тестовому сайті»
       // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
       if (summary) {
         await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary, devAuthored: true });
@@ -86,6 +88,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, status: "Review" });
     }
     await be.updateStatus(taskId, status);
+    if (status === "In Progress") await setDeployStage(taskId, "pr").catch(() => {}); // взял в работу → «Готується»
     return NextResponse.json({ ok: true, status });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });

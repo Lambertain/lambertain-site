@@ -2,7 +2,7 @@
 
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage } from "@/lib/db";
 import { assignProjectDevAndNotify } from "@/lib/task-intake";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients, notifyLogins, taskTag } from "@/lib/notify";
@@ -14,10 +14,14 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
   if (!me) return { error: "Не авторизован" };
   try {
     await getBackend().updateStatus(id, status);
+    // Деплой-стадия от статуса: взял в работу → «Готується» (pr); на ревью → «На тестовому» (dev). prod ставит доставка.
+    const bucket = statusBucket(status);
+    if (bucket === "inProgress") await setDeployStage(id, "pr").catch(() => {});
+    else if (bucket === "review") await setDeployStage(id, "dev").catch(() => {});
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
     // Задача готова → уведомляем клиента проекта (best-effort).
-    if (statusBucket(status) === "done") {
+    if (bucket === "done") {
       try {
         const task = await getBackend().getTask(id);
         await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${await taskTag(id)}: ${task.summary}`);
@@ -74,6 +78,7 @@ export async function moveToReview(id: string, ref: string): Promise<{ ok?: bool
   try {
     await getBackend().updateStatus(id, "Review");
     await setReviewRef(id, ref.trim() || null);
+    await setDeployStage(id, "dev").catch(() => {}); // на ревью = на дев-мейн → «На тестовому сайті»
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
     return { ok: true };
