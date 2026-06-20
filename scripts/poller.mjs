@@ -108,6 +108,7 @@ async function remindAssignees() {
       WHERE t.resolved_at IS NULL
         AND t.status NOT IN ('Review', 'Blocked', 'Done')
         AND t.owner_action IS NULL AND t.client_action IS NULL
+        AND m.role NOT IN ('client', 'employee')   -- повторные напоминания только разработчику/админу, не клиенту/сотруднику
         AND ${ageDays} > t.remind_count   -- наступило новое суточное окно от создания, ещё не напоминали
         -- не долбим за задачи, заблокированные невыполненной зависимостью (исполнитель не может их начать)
         AND NOT EXISTS (
@@ -156,6 +157,7 @@ async function remindCommentReplies() {
        ) lc ON true
        JOIN members cm ON cm.id = lc.author_id AND cm.role = 'client'
       WHERE t.resolved_at IS NULL
+        AND am.role NOT IN ('client', 'employee')   -- ответ на коммент клиента долбим только разработчику/админу, не сотруднику
         AND lc.created_at < now() - interval '15 minutes'  -- не дублируем мгновенное уведомление
       ORDER BY l.tg_id, lc.created_at`,
   )).rows;
@@ -174,51 +176,31 @@ async function remindCommentReplies() {
 const NOT_ON_MODERATION = `NOT EXISTS (SELECT 1 FROM comments c WHERE c.task_id = t.id AND c.visibility = 'client' AND c.approved = false)`;
 
 /**
- * Каждые 15 мин: напоминание про приёмку/апрув, висящие больше СУТОК — ВСЕМ, от кого ждут действие:
- *  - задача на ревью (Review, итог опубликован) → ПОСТАНОВЩИКУ (кто создал: клиент / сотрудник / админ)
- *    И делегату-сотруднику (assignee = employee), если делегирована;
- *  - на утверждении (approval_status = pending) → КЛИЕНТУ проекта.
- * Так ни одна задача не застрянет на чьём-то апруве — долбим ответственного, пока не сдвинет.
+ * Каждые 15 мин: напоминание про приёмку, висящее больше СУТОК — ТОЛЬКО постановщику-агентству
+ * (админ/разработчик). Клиентам и сотрудникам повторно НЕ напоминаем — им достаточно одного уведомления
+ * (раньше долбили клиента-постановщика, делегата-сотрудника и клиента на апруве — убрано).
  */
 async function remindReviewApprovals() {
   if (!TG_TOKEN) return;
   const last = Number((await getState("last_remind_review")) || 0);
   if (Date.now() - last < REMIND_MS) return;
 
-  // A) Review → постановщику (reporter любой роли — кто принимает результат).
+  // Review → постановщику, но повторно долбим только админа/разработчика (НЕ клиента/сотрудника).
   const reporterRows = (await pool.query(
     `SELECT t.readable_id, t.title, lr.tg_id
        FROM tasks t
        JOIN members mr ON mr.id = t.reporter_id
        JOIN tg_links lr ON lr.youtrack_login = mr.login
       WHERE t.status = 'Review' AND t.resolved_at IS NULL
+        AND mr.role NOT IN ('client', 'employee')
         AND t.updated_at < now() - interval '24 hours' AND ${NOT_ON_MODERATION}`,
-  )).rows;
-
-  // B) Review → делегату-сотруднику (assignee = employee), если задача делегирована.
-  const empRows = (await pool.query(
-    `SELECT t.readable_id, t.title, l.tg_id
-       FROM tasks t
-       JOIN members m ON m.id = t.assignee_id AND m.role = 'employee'
-       JOIN tg_links l ON l.youtrack_login = m.login
-      WHERE t.status = 'Review' AND t.resolved_at IS NULL
-        AND t.updated_at < now() - interval '24 hours' AND ${NOT_ON_MODERATION}`,
-  )).rows;
-
-  // C) На утверждении (approval pending) → клиенту проекта.
-  const cliRows = (await pool.query(
-    `SELECT DISTINCT t.readable_id, t.title, l.tg_id
-       FROM tasks t JOIN projects p ON p.id = t.project_id
-       JOIN tg_links l ON l.project_key = p.key AND l.role = 'client'
-      WHERE t.resolved_at IS NULL AND t.internal = false
-        AND t.approval_status = 'pending' AND t.updated_at < now() - interval '24 hours'`,
   )).rows;
 
   const byTg = new Map();
   const seen = new Set();
-  for (const r of [...reporterRows, ...empRows, ...cliRows]) {
+  for (const r of reporterRows) {
     const k = `${r.tg_id}:${r.readable_id}`;
-    if (seen.has(k)) continue; // дедуп: постановщик может совпасть с делегатом
+    if (seen.has(k)) continue;
     seen.add(k);
     if (!byTg.has(r.tg_id)) byTg.set(r.tg_id, []);
     byTg.get(r.tg_id).push(r);
