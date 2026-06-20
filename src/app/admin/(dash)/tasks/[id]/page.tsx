@@ -124,7 +124,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-        <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>
+        {/* Слаг: команде он уже в хлебных крошках выше (не дублируем); клиенту крошек нет — показываем здесь. */}
+        {me.role === "client" && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>}
         {/* Смена статуса прямо тут — админ/разработчик (не клиент); иначе просто текст статуса. */}
         {task.state && canEditStatus ? (
           <StatusPicker taskId={task.id} status={task.state} locale={locale} />
