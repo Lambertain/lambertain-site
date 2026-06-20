@@ -1,7 +1,8 @@
 "use server";
 
 import { requireAdmin } from "@/lib/principal";
-import { getProjectFull, promoteProjectDevToProd } from "@/lib/db";
+import { getProjectFull } from "@/lib/db";
+import { publishProjectToProd } from "@/lib/deploy-stage";
 import { previewDelivery, deliverDevToClient, approveClientDeploy, clientDeployStatus, vercelDeployStatus, type DeliveryPreview, type DeployStatus } from "@/lib/deliver";
 
 /** Превью доставки: число файлов + изменения схемы БД + дефолтная ветка клиента. */
@@ -56,8 +57,8 @@ export async function runDeliver(
       asPR: proj.meta.clientDeliverPR,
     });
 
-    // Доставка в дефолтную ветку клиента = публикация в прод → все 'dev'-задачи проекта становятся 'prod'.
-    if (res.toDefault) await promoteProjectDevToProd(key).catch(() => {});
+    // Доставка в дефолтную ветку клиента = публикация в прод → все 'dev'-задачи проекта становятся 'prod' + коммент клиенту.
+    if (res.toDefault) await publishProjectToProd(key).catch(() => {});
 
     let deploy: DeployStatus | null = null;
     if (res.toDefault) {

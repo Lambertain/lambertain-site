@@ -747,17 +747,18 @@ export async function setTaskPr(taskId: string, prUrl: string): Promise<{ projec
 export async function listPrStageTasks(): Promise<{ readable_id: string; pr_url: string }[]> {
   return q<{ readable_id: string; pr_url: string }>("SELECT readable_id, pr_url FROM tasks WHERE deploy_stage='pr' AND pr_url IS NOT NULL");
 }
-/** Установить деплой-стадию задачи. */
-export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<void> {
-  await q("UPDATE tasks SET deploy_stage=$2 WHERE readable_id=$1", [taskId, stage]);
+/** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов). */
+export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<boolean> {
+  const r = await q<{ readable_id: string }>("UPDATE tasks SET deploy_stage=$2 WHERE readable_id=$1 AND deploy_stage IS DISTINCT FROM $2 RETURNING readable_id", [taskId, stage]);
+  return r.length > 0;
 }
-/** Доставка в прод → все 'dev'-задачи проекта переходят в 'prod'. Возвращает число переведённых. */
-export async function promoteProjectDevToProd(projectKey: string): Promise<number> {
+/** Задачи проекта в стадии 'dev' (на тестовом) — для публикации в прод при доставке. */
+export async function listProjectDevStageTasks(projectKey: string): Promise<string[]> {
   const r = await q<{ readable_id: string }>(
-    `UPDATE tasks t SET deploy_stage='prod' FROM projects p WHERE t.project_id=p.id AND p.key=$1 AND t.deploy_stage='dev' RETURNING t.readable_id`,
+    `SELECT t.readable_id FROM tasks t JOIN projects p ON p.id=t.project_id WHERE p.key=$1 AND t.deploy_stage='dev'`,
     [projectKey],
   );
-  return r.length;
+  return r.map((x) => x.readable_id);
 }
 
 /** Блок запроса: текст, картинка или файл (base64). Порядок блоков = хронология ввода. */

@@ -8,7 +8,8 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse, after } from "next/server";
-import { getProjectKeyByToken, getProjectFull, promoteProjectDevToProd, setDeployStage } from "@/lib/db";
+import { getProjectKeyByToken, getProjectFull, setDeployStage } from "@/lib/db";
+import { advanceStage, publishProjectToProd } from "@/lib/deploy-stage";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
       if (task.autoDone || proj?.meta.autoApprove) {
         await be.updateStatus(taskId, "Done");
-        await setDeployStage(taskId, "dev").catch(() => {}); // готово и на дев-мейн → «На тестовому»; авто-доставка ниже переведёт в «Опубліковано»
+        await advanceStage(taskId, "dev").catch(() => {}); // готово и на дев-мейн → «На тестовому» + коммент клиенту; авто-доставка ниже переведёт в «Опубліковано»
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
             try {
               const d = await autoDeliverIfConfigured(meta);
               if (d) {
-                if (d.toDefault) await promoteProjectDevToProd(projectKey).catch(() => {}); // опубликовано в прод → dev-задачи → prod
+                if (d.toDefault) await publishProjectToProd(projectKey).catch(() => {}); // опубликовано в прод → dev-задачи → prod + коммент клиенту
                 await notifyAdmin(
                   `🚀 <b>Авто-доставка</b> · ${await taskTag(taskId)}\nКлієнт: ${d.clientRepo} (${d.branch}), файлів: ${d.files}` +
                     (d.deploy ? `\nДеплой: ${d.deploy.status}${d.deploy.commit ? ` · ${d.deploy.commit}` : ""}` : ""),
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
       await be.updateStatus(taskId, "Review");
-      await setDeployStage(taskId, "dev").catch(() => {}); // сдал на ревью = на дев-мейн → «На тестовому сайті»
+      await advanceStage(taskId, "dev").catch(() => {}); // сдал на ревью = на дев-мейн → «На тестовому сайті» + коммент клиенту
       // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
       if (summary) {
         await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary, devAuthored: true });

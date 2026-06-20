@@ -4,7 +4,8 @@
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse } from "next/server";
-import { listPrStageTasks, setDeployStage } from "@/lib/db";
+import { listPrStageTasks } from "@/lib/db";
+import { advanceStage } from "@/lib/deploy-stage";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   let promoted = 0;
   for (const t of tasks) {
     const merged = await prMerged(t.pr_url).catch(() => null);
-    if (merged) { await setDeployStage(t.readable_id, "dev").catch(() => {}); promoted++; }
+    if (merged) { await advanceStage(t.readable_id, "dev").catch(() => {}); promoted++; } // + коммент клиенту «на тестовому»
   }
   return NextResponse.json({ ok: true, checked: tasks.length, promotedToDev: promoted });
 }

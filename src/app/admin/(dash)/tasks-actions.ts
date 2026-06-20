@@ -3,6 +3,7 @@
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage } from "@/lib/db";
+import { advanceStage } from "@/lib/deploy-stage";
 import { assignProjectDevAndNotify } from "@/lib/task-intake";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients, notifyLogins, taskTag } from "@/lib/notify";
@@ -17,7 +18,7 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
     // Деплой-стадия от статуса: взял в работу → «Готується» (pr); на ревью → «На тестовому» (dev). prod ставит доставка.
     const bucket = statusBucket(status);
     if (bucket === "inProgress") await setDeployStage(id, "pr").catch(() => {});
-    else if (bucket === "review") await setDeployStage(id, "dev").catch(() => {});
+    else if (bucket === "review") await advanceStage(id, "dev").catch(() => {}); // + коммент клиенту «на тестовому»
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
     // Задача готова → уведомляем клиента проекта (best-effort).
@@ -78,7 +79,7 @@ export async function moveToReview(id: string, ref: string): Promise<{ ok?: bool
   try {
     await getBackend().updateStatus(id, "Review");
     await setReviewRef(id, ref.trim() || null);
-    await setDeployStage(id, "dev").catch(() => {}); // на ревью = на дев-мейн → «На тестовому сайті»
+    await advanceStage(id, "dev").catch(() => {}); // на ревью = на дев-мейн → «На тестовому сайті» + коммент клиенту
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
     return { ok: true };
