@@ -10,6 +10,7 @@ import { ViewAs } from "./view-as";
 import { DevHelp } from "./dev-help";
 import { LocaleSwitch } from "./locale-switch";
 import { NotificationBell } from "./notification-bell";
+import { AutoRefresh } from "./auto-refresh";
 import { listUnreadNotifications, listProjectsWithMeta } from "@/lib/db";
 import { ui } from "../ui-styles";
 
@@ -51,6 +52,8 @@ export default async function DashLayout({ children }: { children: React.ReactNo
 
   return (
     <div style={{ ...ui.page, height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Живое обновление портала без F5: мягкий рефетч server-компонентов каждые 15с (видимая вкладка + при фокусе). */}
+      <AutoRefresh seconds={15} />
       <nav
         className="pm-nav"
         style={{
