@@ -31,15 +31,20 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "task not in project" }, { status: 403 });
     }
     const [task, comments, tags, proj] = await Promise.all([be.getTask(id), be.getComments(id), getTaskTags(id), getProjectFull(projectKey)]);
-    // Эскалации (вопросы клиенту) и ответы клиента — чтобы Claude понимал, на что уже ответили.
+    // Эскалации (вопросы) и ответы ПОЛЬЗОВАТЕЛЯ — чтобы Claude понимал, на что уже ответили.
+    // Отвечает «сторона пользователя»: клиент ИЛИ сотрудник (в проектах без клиента/с тех-поддержкой отвечает сотрудник —
+    // раньше учитывался только client, и ответы сотрудника игнорировались → Claude переспрашивал уже отвеченное).
+    const isUserSide = (role?: string) => role === "client" || role === "employee";
     const escalations = comments.filter((c) => c.text.startsWith(ESCALATION_MARK));
     const lastEsc = escalations[escalations.length - 1];
-    const clientAfter = lastEsc ? comments.filter((c) => c.author.role === "client" && c.created > lastEsc.created) : [];
-    const awaitingClient = !!lastEsc && clientAfter.length === 0;
-    const lastClientAnswer = clientAfter.length ? clientAfter[clientAfter.length - 1].text : null;
+    const answersAfter = lastEsc ? comments.filter((c) => isUserSide(c.author.role) && c.created > lastEsc.created) : [];
+    const awaitingClient = !!lastEsc && answersAfter.length === 0;
+    const lastClientAnswer = answersAfter.length ? answersAfter[answersAfter.length - 1].text : null;
+    // Картинки в ответах: ответ часто ПРИХОДИТ СКРИНОМ. Скачай их (/api/dev/files/<id>) и посмотри — не понимай только по тексту.
+    const answerImageIds = [...new Set(answersAfter.flatMap((c) => [...String(c.text).matchAll(/\/api\/files\/(\d+)/g)].map((m) => Number(m[1]))))];
     // projectSpec — ПОЛНАЯ спека проекта (общий контекст; читай ДО эскалаций — там почти всё).
     // tags: { type, complexity (small|feature), skills:[slug] } — по skills тяни плейбуки из /api/dev/skills.
-    return NextResponse.json({ task, tags, projectSpec: proj?.meta.spec || null, projectInfo: proj?.meta.devInfo || null, comments, awaitingClient, lastClientAnswer });
+    return NextResponse.json({ task, tags, projectSpec: proj?.meta.spec || null, projectInfo: proj?.meta.devInfo || null, comments, awaitingClient, lastClientAnswer, answerImageIds });
   }
 
   // Список задач проекта.
