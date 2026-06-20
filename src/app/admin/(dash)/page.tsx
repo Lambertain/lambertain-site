@@ -96,7 +96,14 @@ export default async function HomePage() {
   const visibleFiltered = tasks.filter((tk) => (me.role === "admin" ? true : visibleKeys.has(tk.projectKey)));
   // Фидбек-проект: убрать чужие фидбек-задачи, подмешать свои; клиенту — скрыть внутренние (разработчик→админ).
   const merged = await mergeFeedback(me, all, visibleFiltered);
-  const filtered = me.role === "client" ? merged.filter((tk) => !tk.internal) : merged;
+  // Видимость internal: клиент — никаких internal; админ/супер — всё; разработчик/сотрудник — только internal,
+  // адресованные деву (created_by_role admin/super), но НЕ личные само-задачи супер-админа (created_by_role null).
+  const filtered =
+    me.role === "client"
+      ? merged.filter((tk) => !tk.internal)
+      : me.realRole === "admin"
+        ? merged
+        : merged.filter((tk) => !tk.internal || tk.createdByRole === "admin" || tk.createdByRole === "super");
   const depMap = await getDepsFor(filtered.map((tk) => tk.id));
   const commentTimes = await commentTimesByTasks(filtered.map((tk) => tk.id));
   const board: BoardTask[] = filtered.map((tk) => {

@@ -142,7 +142,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </div>
       );
     }
-    const merged = await mergeFeedback(me, all, raw);
+    const merged0 = await mergeFeedback(me, all, raw);
+    // Разработчик/сотрудник видит internal только адресованные деву (admin/super), но НЕ личные само-задачи супер-админа.
+    const merged = me.realRole === "admin" ? merged0 : merged0.filter((tk) => !tk.internal || tk.createdByRole === "admin" || tk.createdByRole === "super");
     const depMap = await getDepsFor(merged.map((tk) => tk.id));
     const board: BoardTask[] = merged.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
