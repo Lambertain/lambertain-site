@@ -40,7 +40,7 @@ export async function POST(req: Request) {
   const gid = guideId ?? (await generateGuide(short).catch(() => null));
   await setClientAction(readableId, text, gid);
   await setOwnerAction(readableId, null);
-  await be.addComment(readableId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — нижче в задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, false).catch(() => {});
+  await be.addComment(readableId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — під заголовком задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, false).catch(() => {});
   await notifyProjectClients(task.projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(readableId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` }).catch(() => {});
   revalidatePath(`/admin/tasks/${readableId}`);
   return NextResponse.json({ ok: true, readableId, clientShort: short, guideId: gid });

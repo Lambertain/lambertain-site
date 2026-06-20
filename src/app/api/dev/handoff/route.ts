@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       let guideId = cls.guideId ?? null;
       if (guideId == null) guideId = await generateGuide(short).catch(() => null);
       await setClientAction(taskId, full, guideId);
-      await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — нижче в задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, true).catch(() => {});
+      await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — під заголовком задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, true).catch(() => {});
       if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
       await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => {});
       return NextResponse.json({ ok: true, handedOff: "client", needGuide: cls.guideId == null, note: "Запрос ушёл клиенту с инструкцией. Бери следующую незаблокированную задачу." });
