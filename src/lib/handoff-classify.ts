@@ -36,15 +36,21 @@ const TOOL: Anthropic.Tool = {
   },
 };
 
-export async function classifyHandoff(action: string, opts: { summary?: string; projectSpec?: string }): Promise<HandoffClassification> {
+export async function classifyHandoff(action: string, opts: { summary?: string; projectSpec?: string; hasClient?: boolean }): Promise<HandoffClassification> {
   const guides = await listGuides();
   const guideList = guides.map((g) => `#${g.id}: ${g.title}`).join("\n") || "(пусто)";
+  // Главный фактор: есть ли у проекта клиент. Без клиента некому регистрировать на стороне клиента → это owner.
+  const clientRule = opts.hasClient
+    ? "У ЭТОГО проекта ЕСТЬ клиент. Регистрация ЕГО сервисов/аккаунтов (Telegram-бот, аналитика, домен, платёжка), доступ к ЕГО данным, ЕГО токены/ключи → kind=client, НЕ owner. " +
+      "owner оставляй ТОЛЬКО для инфры самого агентства (наш хостинг/деплой Railway, наш биллинг, публикация в сторы, общие токены агентства). Если шаг про регистрацию/доступ/токен для функционала проекта — это почти всегда client."
+    : "У ЭТОГО проекта НЕТ клиента (личный/внутренний проект агентства). Регистрировать на стороне клиента НЕКОМУ — такие шаги делает владелец сам → kind=owner. kind=client НЕ используй.";
   const sys =
     "Ты — диспетчер агентства. Разработчик уперся в ручной ops-шаг и описал его. Определи, КТО должен это сделать:\n" +
     "• self — разработчик может сделать сам в коде/конфиге (НЕ нужен внешний аккаунт, регистрация или чужие данные).\n" +
     "• client — нужно действие на стороне КЛИЕНТА: зарегистрировать его сервис (Telegram-бот, Google Analytics, домен, платёжка), " +
     "создать аккаунт от его имени, дать доступ к ЕГО аккаунтам, прислать его токен/ключ.\n" +
     "• owner — инфра АГЕНТСТВА: наш хостинг/деплой (Railway), наш биллинг, публикация в сторы, наши общие токены/ключи.\n" +
+    `ВАЖНО: ${clientRule}\n` +
     "Если client — сформулируй для клиента понятный текст (что и зачем, без жаргона, на украинском) и короткую суть для пуша. " +
     "Подбери guide_id из списка гайдов, если подходящий есть (как это зарегистрировать), иначе null.\n\n" +
     `Доступные гайды:\n${guideList}`;
@@ -62,7 +68,9 @@ export async function classifyHandoff(action: string, opts: { summary?: string; 
   await logUsage(MODEL, "handoff-classify", r.usage.input_tokens, r.usage.output_tokens).catch(() => {});
   const tu = r.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
   const inp = (tu?.input ?? {}) as Record<string, unknown>;
-  const kind = (["self", "client", "owner"].includes(String(inp.kind)) ? inp.kind : "owner") as HandoffClassification["kind"];
+  let kind = (["self", "client", "owner"].includes(String(inp.kind)) ? inp.kind : opts.hasClient ? "client" : "owner") as HandoffClassification["kind"];
+  // Нет клиента → регистрировать на стороне клиента некому: client коерсим в owner. Есть клиент → owner-регистрацию НЕ трогаем (только инфра агентства — owner, это решает модель).
+  if (!opts.hasClient && kind === "client") kind = "owner";
   const gid = typeof inp.guide_id === "number" ? inp.guide_id : null;
   return {
     kind,

@@ -7,7 +7,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull } from "@/lib/db";
+import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull, projectHasClient } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
@@ -36,7 +36,8 @@ export async function POST(req: Request) {
   try {
     const task = await be.getTask(taskId);
     const proj = await getProjectFull(projectKey);
-    const cls = await classifyHandoff(action, { summary: task.summary, projectSpec: proj?.meta.spec });
+    const hasClient = await projectHasClient(projectKey).catch(() => false);
+    const cls = await classifyHandoff(action, { summary: task.summary, projectSpec: proj?.meta.spec, hasClient });
     const taskBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
 
     if (cls.kind === "self") {
