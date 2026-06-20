@@ -449,6 +449,8 @@ export const DICT: Record<string, Entry> = {
   "mod.ownNote": { uk: "На модерації — можете виправити до публікації:", ru: "На модерации — можно поправить до публикации:", en: "Pending review — you can edit before it's published:" },
   "owner.needLabel": { uk: "Ручний крок агентства (деплой / реєстрація / токен)", ru: "Ручной шаг агентства (деплой / регистрация / токен)", en: "Agency action required (deploy / registration / token)" },
   "owner.done": { uk: "Виконав", ru: "Выполнил", en: "Done" },
+  "owner.toClient": { uk: "Передати клієнту", ru: "Передать клиенту", en: "Hand to client" },
+  "owner.toClientHint": { uk: "Виокремити клієнтську частину (зареєструвати сервіс/токен), надіслати клієнту з інструкцією і полем для даних.", ru: "Выделить клиентскую часть (зарегистрировать сервис/токен), отправить клиенту с инструкцией и полем для данных.", en: "Extract the client part (register service/token), send to the client with a guide and a data field." },
   "comment.newBelow": { uk: "NEW нижче · {n}", ru: "NEW ниже · {n}", en: "NEW below · {n}" },
   "comment.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
   "comment.makeClientVisible": { uk: "Зробити видимим клієнту (опублікувати)", ru: "Сделать видимым клиенту (опубликовать)", en: "Make visible to client (publish)" },

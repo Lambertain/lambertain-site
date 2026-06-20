@@ -71,7 +71,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const employees = me.role === "client" ? await getProjectEmployees(id.split("-")[0]) : [];
   // Сотрудник в проекте БЕЗ клиента приравнивается к клиенту (пользователь/постановщик): пишет клиент-видимые
   // комменты без выбора видимости и без гендер-предупреждения — как клиент.
-  const clientSide = me.role === "client" || (me.role === "employee" && !(await projectHasClient(id.split("-")[0])));
+  const projHasClient = await projectHasClient(id.split("-")[0]);
+  const clientSide = me.role === "client" || (me.role === "employee" && !projHasClient);
 
   // Новые комменты — появившиеся после последнего открытия задачи.
   const prevRead = reads.get(id) ?? 0;
@@ -168,7 +169,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       {/* Нужно действие владельца (деплой/регистрация/токен) — только команде (агентство).
           НЕ показываем стороне клиента: ни клиенту-владельцу, ни его сотруднику (оба — пользователи продукта). */}
       {me.role !== "client" && me.role !== "employee" && task.ownerAction && (
-        <OwnerActionBar taskId={task.id} action={task.ownerAction} canResolve={isSuperAdmin(me)} locale={locale} />
+        <OwnerActionBar taskId={task.id} action={task.ownerAction} canResolve={isSuperAdmin(me)} canToClient={isSuperAdmin(me) && projHasClient} locale={locale} />
       )}
 
       {/* Нужно действие КЛИЕНТА (зарегистрировать/дать доступ) — клиенту и админу: инструкция + поле + «Готово» */}

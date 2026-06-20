@@ -247,7 +247,7 @@ async function remindSuperAdmin() {
     `SELECT readable_id FROM tasks WHERE approval_status = 'pending' AND created_at < now() - interval '15 minutes' ORDER BY readable_id`,
   )).rows;
   // Задачи «на доработку владельцу» (ops-шаг: деплой/регистрация/токен).
-  const oa = (await pool.query(`SELECT readable_id FROM tasks WHERE owner_action IS NOT NULL ORDER BY readable_id`)).rows;
+  const oa = (await pool.query(`SELECT readable_id FROM tasks WHERE owner_action IS NOT NULL AND resolved_at IS NULL AND status <> 'Done' ORDER BY readable_id`)).rows;
   if (!pc.length && !pt.length && !oa.length) return;
   const lines = ["🔔 <b>Ждут твоей реакции</b>"];
   if (oa.length) lines.push(`🛠 На доработку (твой ops-шаг): <b>${oa.length}</b>`);

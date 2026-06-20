@@ -1,16 +1,18 @@
 "use client";
 
-import { useTransition } from "react";
-import { markOwnerActionDone } from "./actions";
+import { useState, useTransition } from "react";
+import { markOwnerActionDone, handStepToClient } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
 /**
  * Полоса «ручной шаг агентства» (деплой/регистрация/токен) — наш ops-шаг (его делает супер-админ/команда).
  * Видна только команде, НЕ стороне клиента. Супер-админ жмёт «Выполнил» → задача продвигается. Клиент видит «в работе».
+ * canToClient — супер-админ может переназначить шаг КЛИЕНТУ (когда часть/всё — клиентское: зарегистрировать сервис/токен).
  */
-export function OwnerActionBar({ taskId, action, canResolve, locale }: { taskId: string; action: string; canResolve: boolean; locale: Locale }) {
+export function OwnerActionBar({ taskId, action, canResolve, canToClient, locale }: { taskId: string; action: string; canResolve: boolean; canToClient?: boolean; locale: Locale }) {
   const [pending, start] = useTransition();
+  const [err, setErr] = useState<string | null>(null);
   return (
     <div style={{ ...ui.card, marginTop: 12, borderColor: "#e8b339", background: "rgba(232,179,57,0.06)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, ...ui.monoLabel, color: "#e8b339" }}>
@@ -19,10 +21,23 @@ export function OwnerActionBar({ taskId, action, canResolve, locale }: { taskId:
       </div>
       <p style={{ fontSize: 14, lineHeight: 1.6, marginTop: 8, whiteSpace: "pre-wrap" }}>{action}</p>
       {canResolve && (
-        <button onClick={() => start(() => { markOwnerActionDone(taskId); })} disabled={pending} style={{ ...ui.btnAccent, marginTop: 10, opacity: pending ? 0.6 : 1 }}>
-          {pending ? "…" : t(locale, "owner.done")}
-        </button>
+        <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+          <button onClick={() => start(() => { markOwnerActionDone(taskId); })} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.6 : 1 }}>
+            {pending ? "…" : t(locale, "owner.done")}
+          </button>
+          {canToClient && (
+            <button
+              onClick={() => { setErr(null); start(async () => { const r = await handStepToClient(taskId); if (r?.error) setErr(r.error); }); }}
+              disabled={pending}
+              title={t(locale, "owner.toClientHint")}
+              style={{ ...ui.btn, opacity: pending ? 0.6 : 1 }}
+            >
+              {t(locale, "owner.toClient")}
+            </button>
+          )}
+        </div>
       )}
+      {err && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 8 }}>{err}</p>}
     </div>
   );
 }

@@ -82,6 +82,48 @@ export async function classifyHandoff(action: string, opts: { summary?: string; 
   };
 }
 
+const CLIENT_STEP_TOOL: Anthropic.Tool = {
+  name: "client_step",
+  description: "Сформулировать шаг для клиента (что зарегистрировать/дать) простым языком.",
+  input_schema: {
+    type: "object",
+    properties: {
+      short: { type: "string", description: "Короткая суть для пуша (укр.), напр. «зареєструвати Telegram-бота в @BotFather і надіслати токен»." },
+      text: { type: "string", description: "Понятный клиенту текст (укр., без жаргона): ЧТО зарегистрировать/дать и зачем. Только то, что делает КЛИЕНТ." },
+      guide_id: { type: ["integer", "null"], description: "id подходящего гайда из списка или null." },
+    },
+    required: ["short", "text"],
+  },
+};
+
+/**
+ * Ручная переброска ops-шага на клиента: из технического описания (например, owner-шага, который завели,
+ * когда клиента ещё не было) выделяет ИМЕННО клиентскую часть (зарегистрировать сервис/дать доступ/прислать токен)
+ * и формулирует простым языком + подбирает гайд. Инфра-подпункты агентства (env/cron/деплой) отбрасывает.
+ */
+export async function clientStepFromAction(action: string, opts: { summary?: string; projectSpec?: string }): Promise<{ short: string; text: string; guideId: number | null }> {
+  const guides = await listGuides();
+  const guideList = guides.map((g) => `#${g.id}: ${g.title}`).join("\n") || "(пусто)";
+  const sys =
+    "Ты — диспетчер агентства. Шаг ниже передают КЛИЕНТУ (нетехническому человеку). Из технического описания выдели ИМЕННО то, " +
+    "что должен сделать КЛИЕНТ: зарегистрировать сервис/аккаунт (бот, аналитика, домен, платёжка), дать доступ к своему аккаунту, прислать токен/ключ. " +
+    "Опиши простым языком, без жаргона, на украинском — что и зачем. Инфраструктурные подпункты самого агентства (env, cron, деплой, секреты) НЕ включай. " +
+    "Подбери guide_id из списка, если подходящий есть, иначе null.\n\n" +
+    `Доступные гайды:\n${guideList}`;
+  const user = `Шаг (тех. описание): ${action}\n${opts.summary ? `Задача: ${opts.summary}\n` : ""}${opts.projectSpec ? `Контекст: ${opts.projectSpec.slice(0, 1200)}` : ""}`;
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const r = await anthropic.messages.create({ model: MODEL, max_tokens: 1024, system: sys, tools: [CLIENT_STEP_TOOL], tool_choice: { type: "tool", name: "client_step" }, messages: [{ role: "user", content: user }] });
+  await logUsage(MODEL, "client-step", r.usage.input_tokens, r.usage.output_tokens).catch(() => {});
+  const tu = r.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+  const inp = (tu?.input ?? {}) as Record<string, unknown>;
+  const gid = typeof inp.guide_id === "number" ? inp.guide_id : null;
+  return {
+    short: String(inp.short || action.slice(0, 120)),
+    text: String(inp.text || action),
+    guideId: gid && guides.some((g) => g.id === gid) ? gid : null,
+  };
+}
+
 const GUIDE_TOOL: Anthropic.Tool = {
   name: "guide",
   description: "Готовый гайд-инструкция в 3 локалях.",

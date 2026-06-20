@@ -8,7 +8,36 @@ import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
+import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
 import { revalidatePath } from "next/cache";
+
+/**
+ * Переназначить ops-шаг задачи на КЛИЕНТА (супер-админ). Случай: задачу/эскалацию завели, когда клиента ещё не было,
+ * и шаг ушёл владельцу (owner_action), хотя часть — клиентская (зарегистрировать сервис/прислать токен).
+ * Извлекает клиентскую часть простым языком + гайд из каталога + поле для данных, шлёт клиенту, снимает owner-флаг.
+ */
+export async function handStepToClient(taskId: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!isSuperAdmin(me)) return { error: "Нет прав" };
+  try {
+    const be = getBackend();
+    const task = await be.getTask(taskId);
+    const source = (task.ownerAction || task.clientAction || "").trim();
+    if (!source) return { error: "Нет шага для передачи клиенту" };
+    if (!(await projectHasClient(task.projectKey))) return { error: "В проекте нет клиента" };
+    const proj = await getProjectFull(task.projectKey).catch(() => null);
+    const { short, text, guideId } = await clientStepFromAction(source, { summary: task.summary, projectSpec: proj?.meta.spec });
+    const gid = guideId ?? (await generateGuide(short).catch(() => null));
+    await setClientAction(taskId, text, gid);
+    await setOwnerAction(taskId, null); // снять owner-флаг — теперь это действие клиента
+    await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — нижче в задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, false).catch(() => {});
+    await notifyProjectClients(task.projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+    revalidatePath(`/admin/tasks/${taskId}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
 
 export async function addTaskComment(
   id: string,
