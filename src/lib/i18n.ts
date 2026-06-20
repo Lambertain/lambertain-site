@@ -544,6 +544,9 @@ export const DICT: Record<string, Entry> = {
   "deploy.pr": { uk: "Готується", ru: "Готовится", en: "In progress" },
   "deploy.dev": { uk: "На тестовому сайті", ru: "На тестовом сайте", en: "On staging" },
   "deploy.prod": { uk: "Опубліковано", ru: "Опубликовано", en: "Published" },
+  "deploy.hint.pr": { uk: "Над задачею ще працюють — змін на сайті поки немає.", ru: "Над задачей ещё работают — изменений на сайте пока нет.", en: "Still being worked on — nothing on the site yet." },
+  "deploy.hint.dev": { uk: "Зміни можна перевірити на тестовій версії; на робочому сайті їх ще немає.", ru: "Изменения можно проверить на тестовой версии; на рабочем сайте их ещё нет.", en: "Changes are on the test version; not on the live site yet." },
+  "deploy.hint.prod": { uk: "Зміни вже на робочому (живому) сайті.", ru: "Изменения уже на рабочем (живом) сайте.", en: "Changes are live on the production site." },
   "block.owner": { uk: "Чекає на агентство", ru: "Ждёт агентство", en: "Waiting on agency" },
   "block.client": { uk: "Чекає на клієнта", ru: "Ждёт клиента", en: "Waiting on client" },
 
