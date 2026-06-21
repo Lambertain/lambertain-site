@@ -30,6 +30,38 @@ function AccountsEditor({ rows, onChange, locale }: { rows: Account[]; onChange:
   );
 }
 
+/** Вложения, вставленные в markdown-текст: `[name](/api/files/12)` или `![name](/api/files/12)`. */
+type MdAtt = { full: string; label: string; href: string; isImage: boolean };
+function parseAttachments(md: string): MdAtt[] {
+  const out: MdAtt[] = [];
+  for (const m of md.matchAll(/(!?)\[([^\]]*)\]\((\/api\/files\/\d+)\)/g)) {
+    out.push({ full: m[0], label: m[2] || "файл", href: m[3], isImage: m[1] === "!" });
+  }
+  return out;
+}
+
+/** Ряд чипов вложений под текстовым полем (как в задаче/комменте): иконка/превью + имя + удалить. */
+function AttachmentChips({ text, onRemove }: { text: string; onRemove: (full: string) => void }) {
+  const atts = parseAttachments(text);
+  if (!atts.length) return null;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+      {atts.map((a, i) => (
+        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 10px", border: "1px solid var(--border-2)", borderRadius: 6, background: "var(--surface-2)", maxWidth: "100%" }}>
+          {a.isImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={a.href} alt={a.label} style={{ width: 26, height: 26, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+          )}
+          <a href={a.href} target="_blank" rel="noopener noreferrer" download style={{ fontSize: 13, color: "var(--text)", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200 }}>{a.label}</a>
+          <button type="button" onClick={() => onRemove(a.full)} title="Прибрати" style={{ background: "transparent", border: "none", color: "#ff5b5b", cursor: "pointer", fontSize: 15, lineHeight: 1, flexShrink: 0 }}>×</button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const Field = ({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) => (
   <div>
     <label style={ui.fieldLabel}>{label}</label>
@@ -359,6 +391,7 @@ export function MetaForm({
             {uploading ? "…" : t(locale, "chat.attachFile")}
           </button>
         </div>
+        <AttachmentChips text={devInfo} onRemove={(full) => setDevInfo((d) => d.split(full).join("").replace(/\n{3,}/g, "\n\n").replace(/[ \t]+\n/g, "\n"))} />
         <VisToggles field="devInfo" vis={vis} setVis={setVis} locale={locale} />
       </div>
 

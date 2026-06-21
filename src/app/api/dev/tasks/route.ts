@@ -42,9 +42,15 @@ export async function GET(req: Request) {
     const lastClientAnswer = answersAfter.length ? answersAfter[answersAfter.length - 1].text : null;
     // Картинки в ответах: ответ часто ПРИХОДИТ СКРИНОМ. Скачай их (/api/dev/files/<id>) и посмотри — не понимай только по тексту.
     const answerImageIds = [...new Set(answersAfter.flatMap((c) => [...String(c.text).matchAll(/\/api\/files\/(\d+)/g)].map((m) => Number(m[1]))))];
+    // Вложения (задача/комменты/devInfo/спека) хранятся как `/api/files/<id>` — но этот путь требует сессии портала,
+    // которой у Claude разработчика нет. Переписываем на `/api/dev/files/<id>` — он отдаёт файл по токену проекта
+    // (getDevAttachment пускает и задачные, и проектные вложения). Иначе разраб видит ссылку, но скачать не может.
+    const devFiles = <T,>(v: T): T => (typeof v === "string" ? (v.replace(/\/api\/files\/(\d+)/g, "/api/dev/files/$1") as T) : v);
+    const taskOut = task ? { ...task, description: devFiles(task.description) } : task;
+    const commentsOut = comments.map((c) => ({ ...c, text: devFiles(c.text) }));
     // projectSpec — ПОЛНАЯ спека проекта (общий контекст; читай ДО эскалаций — там почти всё).
     // tags: { type, complexity (small|feature), skills:[slug] } — по skills тяни плейбуки из /api/dev/skills.
-    return NextResponse.json({ task, tags, projectSpec: proj?.meta.spec || null, projectInfo: proj?.meta.devInfo || null, comments, awaitingClient, lastClientAnswer, answerImageIds });
+    return NextResponse.json({ task: taskOut, tags, projectSpec: devFiles(proj?.meta.spec || null), projectInfo: devFiles(proj?.meta.devInfo || null), comments: commentsOut, awaitingClient, lastClientAnswer, answerImageIds });
   }
 
   // Список задач проекта.
