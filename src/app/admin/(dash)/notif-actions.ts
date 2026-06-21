@@ -1,7 +1,14 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { listUnreadNotifications, markNotificationRead, markAllNotificationsRead, markTaskNotificationsRead, type Notification } from "@/lib/db";
+import { listUnreadNotifications, markNotificationRead, markAllNotificationsRead, markTaskNotificationsRead, setUserLang, type Notification } from "@/lib/db";
+
+/** Запомнить выбранную локаль за пользователем — чтобы уведомления (напр. о доступах) приходили на его языке. */
+export async function rememberLocale(locale: string): Promise<void> {
+  if (!["uk", "ru", "en"].includes(locale)) return;
+  const me = await getPrincipal();
+  if (me?.tgId) await setUserLang(me.tgId, locale).catch(() => {});
+}
 
 /** Непрочитанные уведомления текущего пользователя (для колокольчика). */
 export async function myNotifications(): Promise<Notification[]> {

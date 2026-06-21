@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { persistLocale, type Locale } from "@/lib/i18n";
+import { rememberLocale } from "./notif-actions";
 import { ui } from "../ui-styles";
 
 const LABELS: Record<Locale, string> = { uk: "UA", ru: "RU", en: "EN" };
@@ -24,6 +25,7 @@ export function LocaleSwitch({ current }: { current: Locale }) {
     setOpen(false);
     if (l === current) return;
     persistLocale(l);
+    void rememberLocale(l); // запомнить за пользователем (для уведомлений на его языке); не блокируем перезагрузку
     location.reload();
   }
 

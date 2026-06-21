@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS project_reads (
 CREATE TABLE IF NOT EXISTS member_projects (
   login TEXT NOT NULL, project_key TEXT NOT NULL, PRIMARY KEY (login, project_key));
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
+ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS lang TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_keys TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS instruction_set_token TEXT;

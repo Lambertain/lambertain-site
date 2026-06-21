@@ -14,10 +14,22 @@ function fmt(ts: string, locale: Locale): string {
   const loc = locale === "ru" ? "ru-RU" : locale === "en" ? "en-US" : "uk-UA";
   return d.toLocaleString(loc, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
-function relPath(n: Notif): string | null {
-  if (n.task_id) return `/admin/tasks/${n.task_id}`;
-  if (n.link) { try { return new URL(n.link).pathname; } catch { return n.link.startsWith("/") ? n.link : null; } }
-  return null;
+/** Куда вести по клику: внутренний путь портала (router.push) ИЛИ внешний URL (новая вкладка). */
+function linkTarget(n: Notif): { path?: string; external?: string } | null {
+  if (n.task_id) return { path: `/admin/tasks/${n.task_id}` };
+  if (!n.link) return null;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  try {
+    const u = new URL(n.link, origin || "https://_");
+    // Наш origin ИЛИ наш путь на старом railway-домене → внутренняя навигация.
+    if ((origin && u.origin === origin) || u.pathname.startsWith("/admin/") || u.pathname.startsWith("/tma")) {
+      return { path: u.pathname + u.search + u.hash };
+    }
+    // Прочее (напр. ссылка на коммит GitHub из авто-доставки) — внешняя: новая вкладка, не суём в роутер (иначе 404).
+    return { external: u.href };
+  } catch {
+    return n.link.startsWith("/") ? { path: n.link } : null;
+  }
 }
 
 export function NotificationBell({ initial, projectNames, locale }: { initial: Notif[]; projectNames: Record<string, string>; locale: Locale }) {
@@ -29,12 +41,20 @@ export function NotificationBell({ initial, projectNames, locale }: { initial: N
     setOpen(true);
     try { setItems(await myNotifications()); } catch { /* keep */ }
   }
+  async function markRead(n: Notif) {
+    try { if (n.task_id) await readTaskNotifications(n.task_id); else await readNotification(n.id); } catch { /* best-effort */ }
+  }
   async function click(n: Notif) {
     setItems((xs) => xs.filter((x) => x.id !== n.id));
-    setOpen(false);
-    try { if (n.task_id) await readTaskNotifications(n.task_id); else await readNotification(n.id); } catch { /* best-effort */ }
-    const path = relPath(n);
-    if (path) router.push(path);
+    await markRead(n);
+    const tgt = linkTarget(n);
+    if (tgt?.path) { setOpen(false); router.push(tgt.path); }
+    else if (tgt?.external) { setOpen(false); window.open(tgt.external, "_blank", "noopener,noreferrer"); }
+  }
+  // Крестик: закрыть уведомление не читая (пометить прочитанным, не переходить).
+  async function dismiss(n: Notif) {
+    setItems((xs) => xs.filter((x) => x.id !== n.id));
+    await markRead(n);
   }
   async function readAll() {
     setItems([]);
@@ -82,14 +102,17 @@ export function NotificationBell({ initial, projectNames, locale }: { initial: N
                     <div style={{ ...ui.monoLabel, color: "var(--accent)" }}>{projectNames[pk] || pk}</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
                       {ns.map((n) => (
-                        <button key={n.id} onClick={() => click(n)} style={{ textAlign: "left", display: "flex", flexDirection: "column", gap: 4, padding: 12, background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 6, cursor: "pointer", color: "var(--text)" }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            {n.task_id && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{n.task_id}</span>}
-                            {n.count > 1 && <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "0 6px", borderRadius: 3, fontWeight: 700 }}>{n.count}</span>}
-                            <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginLeft: "auto" }}>{fmt(n.created_at, locale)}</span>
-                          </div>
-                          <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>{n.title}</div>
-                        </button>
+                        <div key={n.id} style={{ display: "flex", alignItems: "stretch", background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 6, overflow: "hidden" }}>
+                          <button onClick={() => click(n)} style={{ flex: 1, minWidth: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 4, padding: 12, background: "transparent", border: "none", cursor: "pointer", color: "var(--text)" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {n.task_id && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{n.task_id}</span>}
+                              {n.count > 1 && <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "0 6px", borderRadius: 3, fontWeight: 700 }}>{n.count}</span>}
+                              <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginLeft: "auto" }}>{fmt(n.created_at, locale)}</span>
+                            </div>
+                            <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>{n.title}</div>
+                          </button>
+                          <button onClick={() => dismiss(n)} title={t(locale, "notif.dismiss")} aria-label={t(locale, "notif.dismiss")} style={{ flexShrink: 0, width: 36, background: "transparent", border: "none", borderLeft: "1px solid var(--border-2)", color: "var(--muted)", cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+                        </div>
                       ))}
                     </div>
                   </div>

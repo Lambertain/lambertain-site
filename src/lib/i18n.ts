@@ -610,6 +610,8 @@ export const DICT: Record<string, Entry> = {
   "notif.title": { uk: "Сповіщення", ru: "Уведомления", en: "Notifications" },
   "notif.readAll": { uk: "Прочитати все", ru: "Прочитать всё", en: "Read all" },
   "notif.empty": { uk: "Нових сповіщень немає", ru: "Новых уведомлений нет", en: "No new notifications" },
+  "notif.dismiss": { uk: "Закрити", ru: "Закрыть", en: "Dismiss" },
+  "notif.devFieldAdded": { uk: "🔧 {project}: оновлено в налаштуваннях — поле «{fields}». Перевір портал.", ru: "🔧 {project}: обновлено в настройках — поле «{fields}». Проверь портал.", en: "🔧 {project}: settings updated — field “{fields}”. Check the portal." },
   "instr.kicker": { uk: "Посилання на інструкції", ru: "Ссылки на инструкции", en: "Instruction links" },
   "instr.title": { uk: "Набори інструкцій", ru: "Наборы инструкций", en: "Instruction sets" },
   "instr.hint": { uk: "Оберіть потрібні блоки → отримаєте публічне посилання. Надсилайте його лідам чи клієнтам у будь-який месенджер — без реєстрації й без портала.", ru: "Выберите нужные блоки → получите публичную ссылку. Отправляйте её лидам или клиентам в любой мессенджер — без регистрации и без портала.", en: "Pick the blocks → get a public link. Send it to leads or clients in any messenger — no signup, no portal." },

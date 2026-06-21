@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS member_projects (
   PRIMARY KEY (login, project_key)
 );
 ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS project_key TEXT;
+ALTER TABLE tg_links ADD COLUMN IF NOT EXISTS lang TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_key TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS instruction_set_token TEXT;
 CREATE TABLE IF NOT EXISTS contractors (
@@ -1090,6 +1091,24 @@ export async function listUnreadNotifications(recipientTgId: number): Promise<No
      WHERE recipient_tg_id = $1 AND read_at IS NULL ORDER BY created_at DESC LIMIT 100`,
     [recipientTgId],
   );
+}
+
+/** Запомнить выбранную пользователем локаль портала (по его tg-привязке) — чтобы слать уведомления на его языке. */
+export async function setUserLang(tgId: number, lang: string): Promise<void> {
+  await q("UPDATE tg_links SET lang = $2 WHERE tg_id = $1", [tgId, lang]);
+}
+
+/** Разработчики проекта (роль contributor): tg_id + сохранённая локаль. Для уведомлений «добавлено в настройках».
+ *  Учитываем и tg_links.project_key, и member_projects (разраб может вести несколько проектов). */
+export async function devRecipientsForProject(projectKey: string): Promise<{ tgId: number; lang: string | null }[]> {
+  const rows = await q<{ tg_id: number; lang: string | null }>(
+    `SELECT DISTINCT l.tg_id, l.lang FROM tg_links l
+      WHERE l.role = 'contributor'
+        AND ( l.project_key = $1
+              OR EXISTS (SELECT 1 FROM member_projects mp WHERE mp.login = l.youtrack_login AND mp.project_key = $1) )`,
+    [projectKey],
+  );
+  return rows.map((r) => ({ tgId: r.tg_id, lang: r.lang }));
 }
 
 export async function countUnreadNotifications(recipientTgId: number): Promise<number> {
