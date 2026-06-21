@@ -108,7 +108,7 @@ async function remindAssignees() {
       WHERE t.resolved_at IS NULL
         AND t.status NOT IN ('Review', 'Blocked', 'Done')
         AND t.owner_action IS NULL AND t.client_action IS NULL
-        AND m.role NOT IN ('client', 'employee')   -- повторные напоминания только разработчику/админу, не клиенту/сотруднику
+        AND m.role NOT IN ('client', 'employee', 'contributor')   -- повторные напоминания НЕ долбим: ни клиенту, ни сотруднику, ни разработчику (одного уведомления достаточно)
         AND ${ageDays} > t.remind_count   -- наступило новое суточное окно от создания, ещё не напоминали
         -- не долбим за задачи, заблокированные невыполненной зависимостью (исполнитель не может их начать)
         AND NOT EXISTS (
@@ -157,7 +157,7 @@ async function remindCommentReplies() {
        ) lc ON true
        JOIN members cm ON cm.id = lc.author_id AND cm.role = 'client'
       WHERE t.resolved_at IS NULL
-        AND am.role NOT IN ('client', 'employee')   -- ответ на коммент клиента долбим только разработчику/админу, не сотруднику
+        AND am.role NOT IN ('client', 'employee', 'contributor')   -- повторно НЕ долбим (разраб получает первичное уведомление о комменте сразу)
         AND lc.created_at < now() - interval '15 minutes'  -- не дублируем мгновенное уведомление
       ORDER BY l.tg_id, lc.created_at`,
   )).rows;
@@ -192,7 +192,7 @@ async function remindReviewApprovals() {
        JOIN members mr ON mr.id = t.reporter_id
        JOIN tg_links lr ON lr.youtrack_login = mr.login
       WHERE t.status = 'Review' AND t.resolved_at IS NULL
-        AND mr.role NOT IN ('client', 'employee')
+        AND mr.role NOT IN ('client', 'employee', 'contributor')
         AND t.updated_at < now() - interval '24 hours' AND ${NOT_ON_MODERATION}`,
   )).rows;
 
