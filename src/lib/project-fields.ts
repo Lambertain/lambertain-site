@@ -54,6 +54,21 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
   { key: "email", group: "access", label: { uk: "Email", ru: "Email", en: "Email" }, subs: [{ key: "address", label: { uk: "Адреса", ru: "Адрес", en: "Address" }, kind: "text" }, pass] },
   { key: "googleAnalytics", group: "analytics", label: { uk: "Google Analytics", ru: "Google Analytics", en: "Google Analytics" }, subs: [{ key: "id", label: { uk: "Measurement ID", ru: "Measurement ID", en: "Measurement ID" }, kind: "text" }] },
   { key: "domain", group: "hosting", label: { uk: "Домен / реєстратор", ru: "Домен / регистратор", en: "Domain / registrar" }, subs: [url("Домен", "Домен", "Domain"), { key: "registrar", label: { uk: "Реєстратор", ru: "Регистратор", en: "Registrar" }, kind: "text" }, login, pass] },
+  // AI / LLM ключі — потрібні розробнику локально (генерація, агенти). За замовчуванням видно лише розробнику (field-visibility).
+  { key: "aiKeys", group: "access", label: { uk: "AI / LLM ключі", ru: "AI / LLM ключи", en: "AI / LLM keys" }, subs: [
+    { key: "anthropic", label: { uk: "Anthropic API key", ru: "Anthropic API key", en: "Anthropic API key" }, kind: "secret" },
+    { key: "openai", label: { uk: "OpenAI API key", ru: "OpenAI API key", en: "OpenAI API key" }, kind: "secret" },
+    { key: "gemini", label: { uk: "Google Gemini API key", ru: "Google Gemini API key", en: "Google Gemini API key" }, kind: "secret" },
+  ] },
+  // Object storage (Cloudflare R2 / S3) — креди для завантажень/медіа, потрібні розробнику.
+  { key: "objectStorage", group: "hosting", label: { uk: "Object storage (R2/S3)", ru: "Object storage (R2/S3)", en: "Object storage (R2/S3)" }, subs: [
+    { key: "accountId", label: { uk: "Account ID", ru: "Account ID", en: "Account ID" }, kind: "text" },
+    { key: "accessKeyId", label: { uk: "Access Key ID", ru: "Access Key ID", en: "Access Key ID" }, kind: "secret" },
+    { key: "secretAccessKey", label: { uk: "Secret Access Key", ru: "Secret Access Key", en: "Secret Access Key" }, kind: "secret" },
+    { key: "bucket", label: { uk: "Bucket", ru: "Bucket", en: "Bucket" }, kind: "text" },
+    { key: "endpoint", label: { uk: "Endpoint (S3 API)", ru: "Endpoint (S3 API)", en: "Endpoint (S3 API)" }, kind: "text" },
+    { key: "publicUrl", label: { uk: "Public URL", ru: "Public URL", en: "Public URL" }, kind: "url" },
+  ] },
 ];
 
 export function getFieldDef(key: string): ProjectFieldDef | undefined {
