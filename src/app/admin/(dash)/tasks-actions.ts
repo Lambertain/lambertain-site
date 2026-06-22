@@ -111,7 +111,7 @@ export async function setApproval(id: string, status: "approved" | "rejected"): 
       try {
         const task = await getBackend().getTask(id);
         if (task.reporter?.login) {
-          await notifyLogins([task.reporter.login], `↩️ <b>Возвращено на доработку</b> · ${await taskTag(id)}: ${task.summary}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` });
+          await notifyLogins([task.reporter.login], `↩️ <b>Повернуто на доопрацювання</b> · ${await taskTag(id)}: ${task.summary}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` });
         }
       } catch { /* уведомление не критично */ }
     }

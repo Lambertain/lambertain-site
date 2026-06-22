@@ -38,8 +38,8 @@ export async function POST(req: Request) {
   if (!taskId.startsWith(projectKey + "-")) return NextResponse.json({ error: "task not in project" }, { status: 403 });
 
   const be = getBackend();
-  // Кнопка «Открыть задачу» → страница задачи в браузере (где коммент с эскалацией).
-  const openBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
+  // Кнопка «Відкрити задачу» → страница задачи в браузере (где коммент с эскалацией).
+  const openBtn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
   try {
     const [task, comments] = await Promise.all([be.getTask(taskId), be.getComments(taskId)]);
 

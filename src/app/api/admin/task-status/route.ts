@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   let task;
   try { task = await be.getTask(readableId); } catch { return NextResponse.json({ error: `Задача ${readableId} не найдена` }, { status: 404 }); }
   await be.updateStatus(readableId, status);
-  const link = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
+  const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
 
   // Review → постановщику (reporter) на приёмку: комментарий-итог + пуш.
   if (statusBucket(status) === "review") {

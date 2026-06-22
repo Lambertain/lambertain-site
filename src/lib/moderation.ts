@@ -9,7 +9,7 @@ import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag } from "./n
 import { q, getProjectFull } from "./db";
 import { PORTAL_BASE } from "./dev-protocol";
 
-const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
+const taskBtn = (taskId: string) => ({ text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
 
 /**
  * Клиент-видимый коммент от команды → на модерацию супер-админу.

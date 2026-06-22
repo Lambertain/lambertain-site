@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const proj = await getProjectFull(projectKey);
     const hasClient = await projectHasClient(projectKey).catch(() => false);
     const cls = await classifyHandoff(action, { summary: task.summary, projectSpec: proj?.meta.spec, hasClient });
-    const taskBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
+    const taskBtn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
 
     if (cls.kind === "self") {
       // Разработчик может сам — флаги не ставим, возвращаем note (и оставляем внутренний след).

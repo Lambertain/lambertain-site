@@ -31,7 +31,7 @@ export async function handStepToClient(taskId: string): Promise<{ ok?: boolean; 
     await setClientAction(taskId, text, gid);
     await setOwnerAction(taskId, null); // снять owner-флаг — теперь это действие клиента
     await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — під заголовком задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, false).catch(() => {});
-    await notifyProjectClients(task.projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+    await notifyProjectClients(task.projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
     revalidatePath(`/admin/tasks/${taskId}`);
     return { ok: true };
   } catch (e) {
@@ -89,7 +89,7 @@ export async function addTaskComment(
       const task = await getBackend().getTask(id);
       const imgs = attachmentIdsIn(body, task.description);
       const projName = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey)?.name || task.projectKey;
-      const openBtn = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` };
+      const openBtn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` };
       // me.tgId — автор: ему не шлём пуш о СВОЁМ комменте (ни одним из каналов).
       const authorTg = me.tgId;
       if (clientSide) {

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   const visible = b.visibleToClient === true;
   // Коммент от супер-админа (агентства): без member-логина, approved сразу (модерация супер-админа не нужна).
   await be.addComment(readableId, body, visible ? "client" : "internal", undefined, true, false);
-  const link = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
+  const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
   if (visible) {
     await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(readableId)}</b>: ${task.summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), link).catch(() => {});
   }

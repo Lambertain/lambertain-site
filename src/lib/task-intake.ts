@@ -13,8 +13,8 @@ import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { projectHasClient, appendRequestBlocks, assignTask, projectReporterLogin, type ReqBlock } from "@/lib/db";
 import type { DraftTask, Role } from "@/lib/tasks/types";
 
-/** Кнопка «Открыть задачу» (в notify конвертируется в web_app Mini App с диплинком). */
-const taskBtn = (taskId: string) => ({ text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
+/** Кнопка «Відкрити задачу» (в notify конвертируется в web_app Mini App с диплинком). */
+const taskBtn = (taskId: string) => ({ text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -39,14 +39,14 @@ export async function approvalFor(me: Principal, projectKey: string): Promise<{ 
 }
 
 export async function notifyPendingApproval(approver: "client" | "admin", projectKey: string, taskId: string, summary: string): Promise<void> {
-  if (approver === "client") await notifyProjectClients(projectKey, `🟠 <b>Новая задача — нужно подтверждение</b> · ${await taskTag(taskId)}: ${summary}`, [], taskBtn(taskId));
+  if (approver === "client") await notifyProjectClients(projectKey, `🟠 <b>Нова задача — потрібне підтвердження</b> · ${await taskTag(taskId)}: ${summary}`, [], taskBtn(taskId));
   else await notifyAdmin(`🟠 <b>Задача на утверждение</b> · ${await taskTag(taskId)}: ${summary}`, taskBtn(taskId));
 }
 
 /** Уведомить ответственного разработчика о новой задаче (best-effort). */
 export async function notifyNewTask(task: { id: string; summary: string; assignee?: { login: string } | null }): Promise<void> {
   try {
-    if (task.assignee?.login) await notifyLogins([task.assignee.login], `🆕 <b>Новая задача</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id));
+    if (task.assignee?.login) await notifyLogins([task.assignee.login], `🆕 <b>Нова задача</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id));
   } catch {
     // best-effort
   }
@@ -66,7 +66,7 @@ export async function assignProjectDevAndNotify(taskId: string): Promise<void> {
   const dev = task.assignee?.login || project?.meta.defaultAssignee || null;
   if (!dev) return;
   if (!task.assignee?.login) await assignTask(taskId, dev).catch(() => {});
-  await notifyLogins([dev], `🆕 <b>Новая задача</b> · ${await taskTag(taskId)}: ${task.summary}`, [], taskBtn(taskId)).catch(() => {});
+  await notifyLogins([dev], `🆕 <b>Нова задача</b> · ${await taskTag(taskId)}: ${task.summary}`, [], taskBtn(taskId)).catch(() => {});
 }
 
 /**
@@ -121,7 +121,7 @@ export async function createRequestTaskCore(
       if (recipient === "admin") {
         await notifyAdmin(`🔧 <b>Запрос разработчика</b> · ${await taskTag(task.id)}: ${task.summary}`, taskBtn(task.id)).catch(() => {});
       } else {
-        await notifyProjectClients(projectKey, `❓ <b>Вопрос по задаче</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
+        await notifyProjectClients(projectKey, `❓ <b>Питання по задачі</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
       }
       return { id: task.id, url: task.url };
     }

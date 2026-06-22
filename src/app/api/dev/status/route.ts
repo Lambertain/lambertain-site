@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         await advanceStage(taskId, "dev").catch(() => {}); // готово и на дев-мейн → «На тестовому» + коммент клиенту; авто-доставка ниже переведёт в «Опубліковано»
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
-        await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+        await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
         // Авто-доставка на репо клиента (squash-пуш + апрув деплоя/мониторинг; миграция — через preDeploy
         // клиентского деплоя), если настроены ВСЕ креды. Фоном (after) — не блокируем ответ дев-Клоду.
         if (proj?.meta) {
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
                 ).catch(() => {});
               }
             } catch (e) {
-              await notifyAdmin(`⚠️ <b>Авто-доставка не вдалася</b> · ${await taskTag(taskId)}: ${e instanceof Error ? e.message : "помилка"}`, { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+              await notifyAdmin(`⚠️ <b>Авто-доставка не вдалася</b> · ${await taskTag(taskId)}: ${e instanceof Error ? e.message : "помилка"}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
             }
           });
         }
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       // уведомление НЕ шлём: он не должен знать о готовности, пока супер-админ не одобрил итог-коммент на модерации
       // (иначе клиент идёт «проверять» до публикации результата). Он узнает после апрува — через notifyProjectClients.
       if (task.reporter?.login && task.reporter.role !== "client" && task.reporter.role !== "employee") {
-        await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(taskId)}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+        await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(taskId)}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
       }
       return NextResponse.json({ ok: true, status: "Review" });
     }

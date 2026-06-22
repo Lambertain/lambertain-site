@@ -27,7 +27,7 @@ export async function advanceStage(taskId: string, stage: "pr" | "dev" | "prod")
   const task = await be.getTask(taskId).catch(() => null);
   if (!task || task.internal) return;
   if (!(await projectHasClient(task.projectKey).catch(() => false))) return; // только клиентские проекты
-  const link = { text: "Открыть задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
+  const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
   await be.addComment(taskId, note, "client", undefined, true, false).catch(() => {});
   await notifyProjectClients(task.projectKey, `${stage === "prod" ? "🚀" : "✅"} <b>${await taskTag(taskId)}</b>: ${note.replace(/<\/?b>/g, "")}`, [], link).catch(() => {});
 }
