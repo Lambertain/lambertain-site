@@ -114,6 +114,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
       </nav>
 
       <main className="pm-main" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+       <div className="pm-main-inner">
         {principal.realRole === "admin" && (
           <div style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <ViewAs current={principal.role as "admin" | "client" | "contributor" | "employee"} locale={locale} />
@@ -125,6 +126,7 @@ export default async function DashLayout({ children }: { children: React.ReactNo
           </div>
         )}
         {children}
+       </div>
       </main>
     </div>
   );

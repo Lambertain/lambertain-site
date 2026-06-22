@@ -45,6 +45,7 @@ export default async function ContractView({ params }: { params: Promise<{ id: s
         @media print {
           .pm-nav, .no-print { display: none !important; }
           .pm-main { overflow: visible !important; padding: 0 !important; }
+          .pm-main-inner { padding: 0 !important; max-width: none !important; }
           html, body { background: #fff !important; }
           .contract-sheet { box-shadow: none !important; margin: 0 !important; max-width: none !important; padding: 0 !important; }
         }

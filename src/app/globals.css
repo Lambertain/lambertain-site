@@ -146,13 +146,15 @@ body::after {
 .service-tile:hover .service-title { color: var(--accent) !important; }
 
 /* ── PM-портал: адаптив (веб + Telegram Mini App) ─ */
-.pm-main { padding: 32px; max-width: 1000px; margin: 0 auto; width: 100%; overflow-x: hidden; box-sizing: border-box; }
-.pm-main * { max-width: 100%; }
+/* DEV-14: scroll-контейнер на ВСЮ ширину (колесо работает и над боковыми полями), max-width — на внутреннем враппере. */
+.pm-main { width: 100%; overflow-x: hidden; box-sizing: border-box; }
+.pm-main-inner { padding: 32px; max-width: 1000px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+.pm-main-inner * { max-width: 100%; }
 @media (max-width: 700px) {
   .pm-nav { padding: 12px 16px !important; gap: 14px !important; flex-wrap: wrap; }
   .pm-nav-links { gap: 14px !important; flex-wrap: wrap; }
   .pm-nav-right { width: 100%; justify-content: flex-start !important; margin-left: 0 !important; }
-  .pm-main { padding: 18px 16px; }
+  .pm-main-inner { padding: 18px 16px; }
   .pm-grid-2 { grid-template-columns: 1fr !important; }
 }
 
