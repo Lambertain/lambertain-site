@@ -486,6 +486,7 @@ export const DICT: Record<string, Entry> = {
   "tab.notStarted": { uk: "Не розпочаті", ru: "Не начатые", en: "Not started" },
   "tab.blocked": { uk: "Заблоковані", ru: "Заблок.", en: "Blocked" },
   "tab.startHint": { uk: "Клік — взяти в роботу", ru: "Клик — взять в работу", en: "Click — take to work" },
+  "tab.openHint": { uk: "Відкрити задачу", ru: "Открыть задачу", en: "Open task" },
   "tab.allProjects": { uk: "Усі", ru: "Все", en: "All" },
   "feedback.intro": { uk: "Це простір для ваших побажань щодо порталу: напишіть, чого бракує, що покращити, які функції хотіли б бачити.", ru: "Это пространство для ваших пожеланий по порталу: напишите, чего не хватает, что улучшить, какие функции хотели бы видеть.", en: "This is the space for your feedback about the portal: what's missing, what to improve, features you'd like." },
   "recipient.label": { uk: "Кому", ru: "Кому", en: "To" },

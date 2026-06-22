@@ -74,10 +74,6 @@ function Row({
     setStatus("Review");
     start(() => { moveToReview(task.id, ref); });
   }
-  function startWork() {
-    setStatus("In Progress");
-    start(() => { updateTaskStatus(task.id, "In Progress"); });
-  }
 
   return (
     <div style={{ ...ui.card, padding: 14 }}>
@@ -103,16 +99,10 @@ function Row({
         {/* слаг задачи (HH-62) — виден во всех табах, не только при открытии */}
         <span style={{ ...ui.monoLabel, color: "var(--accent)", flexShrink: 0, alignSelf: "center" }}>{task.id}</span>
         <DeployBadge stage={task.deployStage} locale={locale} />
-        {/* название: переход в задачу (или старт в «Не начатых») */}
-        {mode === "start" ? (
-          <button onClick={startWork} title={t(locale, "tab.startHint")} style={{ flex: 1, textAlign: "left", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 15, fontWeight: 600, padding: 0 }}>
-            {task.summary}
-          </button>
-        ) : (
-          <a href={`/admin/tasks/${task.id}`} style={{ flex: 1, color: "var(--text)", fontSize: 15, fontWeight: 600, textDecoration: "none" }}>
-            {task.summary}
-          </a>
-        )}
+        {/* DEV-11: название ВСЕГДА открывает задачу (без авто-смены статуса). Статус разраб ставит вручную, Клод — через API. */}
+        <a href={`/admin/tasks/${task.id}`} title={mode === "start" ? t(locale, "tab.openHint") : undefined} style={{ flex: 1, color: "var(--text)", fontSize: 15, fontWeight: 600, textDecoration: "none" }}>
+          {task.summary}
+        </a>
         <TaskBadge newComments={task.newComments} isNew={task.isNew} />
         {canDelete && (
           <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }}>

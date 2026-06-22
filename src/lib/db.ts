@@ -962,6 +962,15 @@ export async function logNotification(chatId: string | number, text: string, ok:
   ).catch(() => {});
 }
 
+/** DEV-12: схлопывание дублей — отправляли ли уже ЭТОТ ЖЕ текст в этот чат за последние N минут (успешно). */
+export async function wasRecentlyNotified(chatId: string | number, text: string, minutes = 10): Promise<boolean> {
+  const rows = await q<{ n: number }>(
+    "SELECT 1 AS n FROM notifications_log WHERE chat_id = $1 AND text = $2 AND ok = true AND created_at > now() - ($3 || ' minutes')::interval LIMIT 1",
+    [String(chatId), text.slice(0, 1000), String(minutes)],
+  ).catch(() => [] as { n: number }[]);
+  return rows.length > 0;
+}
+
 export interface NotifLogRow {
   chat_id: string;
   login: string | null;

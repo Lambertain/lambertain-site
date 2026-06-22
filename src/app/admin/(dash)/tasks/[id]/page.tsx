@@ -213,7 +213,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         </div>
       )}
 
-      {task.approvalStatus === "pending" && (
+      {/* DEV-13: плашку подтверждения не показываем, если задача уже завершена (авто-Done) — подтверждать нечего. */}
+      {task.approvalStatus === "pending" && statusBucket(task.state) !== "done" && (
         <ApprovalBar id={task.id} canApprove={isSuperAdmin(me) || me.role === "client"} creator={task.reporter?.fullName ?? null} locale={locale} />
       )}
 

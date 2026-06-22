@@ -1,5 +1,5 @@
 /** Отправка уведомлений в Telegram (адресно по ролям + картинки). Server-side only. */
-import { q, getAttachment, logNotification, createNotification } from "./db";
+import { q, getAttachment, logNotification, createNotification, wasRecentlyNotified } from "./db";
 import { PUBLIC_SITE } from "./dev-protocol";
 
 /** Кнопка-ссылка под сообщением. */
@@ -17,9 +17,11 @@ function inlineButton(button: LinkButton): Record<string, unknown> {
 }
 
 /** Отправка текста в произвольный чат Telegram (опц. кнопка). Пишет результат в notifications_log. */
-export async function sendTo(chatId: number | string, text: string, button?: LinkButton): Promise<void> {
+export async function sendTo(chatId: number | string, text: string, button?: LinkButton): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !chatId) return;
+  if (!token || !chatId) return false;
+  // DEV-12: схлопывание дублей — не слать тот же текст в тот же чат повторно за короткое окно.
+  if (await wasRecentlyNotified(chatId, text)) return false;
   let ok = false;
   let error: string | null = null;
   try {
@@ -40,6 +42,7 @@ export async function sendTo(chatId: number | string, text: string, button?: Lin
     error = e instanceof Error ? e.message : "fetch error";
   }
   await logNotification(chatId, text, ok, error);
+  return true;
 }
 
 /** Уведомление админу (Никите). */
@@ -138,8 +141,8 @@ async function sendWithImages(chatIds: number[], text: string, attachmentIds: nu
   // Картинки грузим один раз, шлём каждому.
   const photos = (await Promise.all(attachmentIds.map((id) => getAttachment(id)))).filter(Boolean) as { mime: string | null; data: Buffer }[];
   for (const chatId of targets) {
-    await sendTo(chatId, text, button);
-    for (const p of photos) await sendPhoto(chatId, p.mime, p.data);
+    const sent = await sendTo(chatId, text, button);
+    if (sent) for (const p of photos) await sendPhoto(chatId, p.mime, p.data); // дубль (DEV-12) → фото тоже не шлём
   }
 }
 
