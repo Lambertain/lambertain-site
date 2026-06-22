@@ -31,14 +31,20 @@ async function regen(id: number): Promise<{ id: number; ok: boolean; title?: str
   const topic = g.title || g.title_ru || g.title_en || "інструкція";
   const c = await genGuideContent(topic);
   if (!c) return { id, ok: false };
-  await updateGuide(id, c.title_uk, c.body_uk, g.ord, { title_ru: c.title_ru, body_ru: c.body_ru, title_en: c.title_en, body_en: c.body_en });
+  await updateGuide(id, c.title_uk, c.body_uk, g.ord); // тільки українською (ru/en обнуляються)
   return { id, ok: true, title: c.title_uk };
 }
 
 export async function POST(req: Request) {
   if (!ok(req)) return NextResponse.json({ error: "invalid token" }, { status: 401 });
-  let b: { guideId?: number; all?: boolean };
+  let b: { guideId?: number; all?: boolean; stripAll?: boolean };
   try { b = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
+  // stripAll — оставить уже корректный uk, обнулить ru/en у ВСЕХ гайдов (без LLM): все видят украинский.
+  if (b.stripAll) {
+    const guides = await listGuides();
+    for (const g of guides) await updateGuide(g.id, g.title, g.body, g.ord); // loc не передаём → ru/en = null
+    return NextResponse.json({ ok: true, stripped: guides.map((g) => ({ id: g.id, title: g.title })) });
+  }
   if (b.all) {
     const guides = await listGuides();
     const res = [];

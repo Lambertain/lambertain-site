@@ -147,11 +147,10 @@ const GUIDE_TOOL: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
-      title_uk: { type: "string", description: "Заголовок УКРАЇНСЬКОЮ мовою (тільки українська, не російська)." }, body_uk: { type: "string", description: "Тіло гайда УКРАЇНСЬКОЮ мовою." },
-      title_ru: { type: "string", description: "Заголовок на РУССКОМ языке." }, body_ru: { type: "string", description: "Тело гайда на РУССКОМ языке." },
-      title_en: { type: "string", description: "Title in ENGLISH." }, body_en: { type: "string", description: "Guide body in ENGLISH." },
+      title_uk: { type: "string", description: "Короткий зрозумілий заголовок УКРАЇНСЬКОЮ мовою." },
+      body_uk: { type: "string", description: "Тіло гайда УКРАЇНСЬКОЮ мовою (markdown, по кроках)." },
     },
-    required: ["title_uk", "body_uk", "title_ru", "body_ru", "title_en", "body_en"],
+    required: ["title_uk", "body_uk"],
   },
 };
 
@@ -164,7 +163,7 @@ export async function genGuideContent(topic: string): Promise<Record<string, str
   const sys =
     "Ты пишешь инструкцию для НЕтехнического клиента: как самостоятельно зарегистрировать/настроить сервис и где взять данные (токен/ключ/логин). " +
     "Подробно, по шагам, простым языком, markdown (заголовки, нумерованные шаги). Без жаргона. " +
-    "Дай ОДИН и тот же гайд в трёх локалях. КРИТИЧНО: каждое поле — строго на своём языке: title_uk/body_uk — УКРАЇНСЬКОЮ (основна мова порталу, НЕ російською), title_ru/body_ru — на русском, title_en/body_en — на английском. Не дублируй русский текст в украинские поля. Заголовок — короткий и понятный.";
+    "Пиши инструкцию ТОЛЬКО УКРАЇНСЬКОЮ мовою (основна мова порталу) — і заголовок, і тіло. Не пиши російською/англійською. Заголовок — короткий і зрозумілий.";
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const r = await anthropic.messages.create({
     model: MODEL,
@@ -185,6 +184,6 @@ export async function generateGuide(topic: string): Promise<number | null> {
   const g = await genGuideContent(topic);
   if (!g) return null;
   const slug = (g.title_uk.toLowerCase().replace(/[^a-z0-9а-яіїєґ]+/gi, "-").replace(/^-|-$/g, "").slice(0, 32) || "guide") + "-" + randomBytes(3).toString("hex");
-  const res = await createGuide(slug, g.title_uk, g.body_uk, 100, { title_ru: g.title_ru, body_ru: g.body_ru, title_en: g.title_en, body_en: g.body_en });
+  const res = await createGuide(slug, g.title_uk, g.body_uk, 100); // тільки українською; ru/en не генеруємо
   return res.id ?? null;
 }
