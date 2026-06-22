@@ -147,9 +147,9 @@ const GUIDE_TOOL: Anthropic.Tool = {
   input_schema: {
     type: "object",
     properties: {
-      title_uk: { type: "string" }, body_uk: { type: "string" },
-      title_ru: { type: "string" }, body_ru: { type: "string" },
-      title_en: { type: "string" }, body_en: { type: "string" },
+      title_uk: { type: "string", description: "Заголовок УКРАЇНСЬКОЮ мовою (тільки українська, не російська)." }, body_uk: { type: "string", description: "Тіло гайда УКРАЇНСЬКОЮ мовою." },
+      title_ru: { type: "string", description: "Заголовок на РУССКОМ языке." }, body_ru: { type: "string", description: "Тело гайда на РУССКОМ языке." },
+      title_en: { type: "string", description: "Title in ENGLISH." }, body_en: { type: "string", description: "Guide body in ENGLISH." },
     },
     required: ["title_uk", "body_uk", "title_ru", "body_ru", "title_en", "body_en"],
   },
@@ -159,11 +159,12 @@ const GUIDE_TOOL: Anthropic.Tool = {
  * Сгенерировать гайд-инструкцию «как зарегистрировать X» на понятном клиенту языке в 3 локалях (uk/ru/en),
  * сохранить в библиотеку гайдов и вернуть его id. Используется, когда подходящего гайда нет.
  */
-export async function generateGuide(topic: string): Promise<number | null> {
+/** Сгенерировать контент гайда в 3 локалях (uk/ru/en) — без сохранения. null, если модель не дала uk. */
+export async function genGuideContent(topic: string): Promise<Record<string, string> | null> {
   const sys =
     "Ты пишешь инструкцию для НЕтехнического клиента: как самостоятельно зарегистрировать/настроить сервис и где взять данные (токен/ключ/логин). " +
     "Подробно, по шагам, простым языком, markdown (заголовки, нумерованные шаги). Без жаргона. " +
-    "Дай ОДИН и тот же гайд в трёх локалях: украинской (uk), русской (ru), английской (en). Заголовок — короткий и понятный.";
+    "Дай ОДИН и тот же гайд в трёх локалях. КРИТИЧНО: каждое поле — строго на своём языке: title_uk/body_uk — УКРАЇНСЬКОЮ (основна мова порталу, НЕ російською), title_ru/body_ru — на русском, title_en/body_en — на английском. Не дублируй русский текст в украинские поля. Заголовок — короткий и понятный.";
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const r = await anthropic.messages.create({
     model: MODEL,
@@ -176,7 +177,13 @@ export async function generateGuide(topic: string): Promise<number | null> {
   await logUsage(MODEL, "generate-guide", r.usage.input_tokens, r.usage.output_tokens).catch(() => {});
   const tu = r.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
   const g = (tu?.input ?? {}) as Record<string, string>;
-  if (!g.title_uk || !g.body_uk) return null;
+  return g.title_uk && g.body_uk ? g : null;
+}
+
+/** Сгенерировать гайд и сохранить в каталог инструкций. Возвращает id или null. */
+export async function generateGuide(topic: string): Promise<number | null> {
+  const g = await genGuideContent(topic);
+  if (!g) return null;
   const slug = (g.title_uk.toLowerCase().replace(/[^a-z0-9а-яіїєґ]+/gi, "-").replace(/^-|-$/g, "").slice(0, 32) || "guide") + "-" + randomBytes(3).toString("hex");
   const res = await createGuide(slug, g.title_uk, g.body_uk, 100, { title_ru: g.title_ru, body_ru: g.body_ru, title_en: g.title_en, body_en: g.body_en });
   return res.id ?? null;
