@@ -120,7 +120,7 @@ export async function saveMeta(
     const additions = devVisibleAdditions(prev?.meta ?? {}, meta);
     if (additions.length) {
       after(async () => {
-        const recipients = await devRecipientsForProject(key).catch(() => []);
+        const recipients = await devRecipientsForProject(key, meta.defaultAssignee ? [meta.defaultAssignee] : []).catch(() => []);
         const link = `${PUBLIC_SITE}/admin/projects/${key}`;
         for (const r of recipients) {
           const loc: Locale = r.lang === "ru" || r.lang === "en" ? r.lang : "uk";

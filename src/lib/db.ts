@@ -1100,13 +1100,17 @@ export async function setUserLang(tgId: number, lang: string): Promise<void> {
 
 /** Разработчики проекта (роль contributor): tg_id + сохранённая локаль. Для уведомлений «добавлено в настройках».
  *  Учитываем и tg_links.project_key, и member_projects (разраб может вести несколько проектов). */
-export async function devRecipientsForProject(projectKey: string): Promise<{ tgId: number; lang: string | null }[]> {
+export async function devRecipientsForProject(projectKey: string, extraLogins: string[] = []): Promise<{ tgId: number; lang: string | null }[]> {
+  // Ответственный разработчик задаётся через meta.defaultAssignee (его tg-привязка может висеть на ДРУГОМ проекте),
+  // поэтому матчим: явные логины (assignee) — всегда; ИЛИ контрибьюторы, привязанные к проекту (tg_links/member_projects).
+  const logins = extraLogins.filter(Boolean);
   const rows = await q<{ tg_id: number; lang: string | null }>(
     `SELECT DISTINCT l.tg_id, l.lang FROM tg_links l
-      WHERE l.role = 'contributor'
-        AND ( l.project_key = $1
-              OR EXISTS (SELECT 1 FROM member_projects mp WHERE mp.login = l.youtrack_login AND mp.project_key = $1) )`,
-    [projectKey],
+      WHERE l.youtrack_login = ANY($2::text[])
+         OR ( l.role = 'contributor'
+              AND ( l.project_key = $1
+                    OR EXISTS (SELECT 1 FROM member_projects mp WHERE mp.login = l.youtrack_login AND mp.project_key = $1) ) )`,
+    [projectKey, logins],
   );
   return rows.map((r) => ({ tgId: r.tg_id, lang: r.lang }));
 }
