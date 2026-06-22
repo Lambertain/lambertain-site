@@ -10,13 +10,13 @@ export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: 
   const [preview, setPreview] = useState<DeliveryPreview | null>(null);
   const [branch, setBranch] = useState("");
   const [schemaOk, setSchemaOk] = useState(false);
-  const [result, setResult] = useState<DeliverResultUI | null>(null);
+  const [results, setResults] = useState<DeliverResultUI[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, startLoad] = useTransition();
   const [running, startRun] = useTransition();
 
   function open() {
-    setError(null); setResult(null); setSchemaOk(false);
+    setError(null); setResults(null); setSchemaOk(false);
     startLoad(async () => {
       const r = await previewDeliver(projectKey);
       if (r.error) setError(r.error);
@@ -33,7 +33,7 @@ export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: 
     startRun(async () => {
       const r = await runDeliver(projectKey, branch, schemaOk);
       if (r.error) setError(r.error);
-      else { setResult(r.result ?? null); setPreview(null); }
+      else { setResults(r.results ?? null); setPreview(null); }
     });
   }
 
@@ -44,7 +44,7 @@ export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: 
       <div style={ui.monoLabel}>{t(locale, "deliver.title")}</div>
       <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 6 }}>{t(locale, "deliver.hint")}</p>
 
-      {!preview && !result && (
+      {!preview && !results && (
         <button onClick={open} disabled={loading} style={{ ...ui.btnAccent, marginTop: 12, opacity: loading ? 0.5 : 1 }}>
           {loading ? t(locale, "common.processing") : t(locale, "deliver.open")}
         </button>
@@ -94,25 +94,30 @@ export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: 
         </div>
       )}
 
-      {result && (
+      {results && results.length > 0 && (
         <div style={{ marginTop: 14, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
-          <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)" }}>
-            {t(locale, "deliver.done", { n: String(result.files), branch: result.branch })}
-          </p>
-          <a href={result.commitUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>
-            {t(locale, "deliver.commit")} →
-          </a>
-          {result.prUrl && (
-            <a href={result.prUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btnAccent, display: "inline-block", marginTop: 8, marginLeft: 8, textDecoration: "none" }}>
-              {t(locale, "deliver.pr")} →
-            </a>
-          )}
-          {result.deploy && (
-            <p style={{ ...ui.monoLabel, textTransform: "none", marginTop: 10, color: result.deploy.status === "SUCCESS" ? "var(--accent)" : "#e8b339" }}>
-              {t(locale, "deliver.deploy")}: {result.deploy.status} ({result.deploy.commit})
-            </p>
-          )}
-          <button onClick={() => setResult(null)} style={{ ...ui.btn, display: "block", marginTop: 12 }}>{t(locale, "common.cancel")}</button>
+          {results.map((result, i) => (
+            <div key={result.clientRepo + i} style={{ marginTop: i ? 14 : 0, paddingTop: i ? 14 : 0, borderTop: i ? "1px solid var(--border)" : "none" }}>
+              <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{result.clientRepo}</div>
+              <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)", marginTop: 4 }}>
+                {t(locale, "deliver.done", { n: String(result.files), branch: result.branch })}
+              </p>
+              <a href={result.commitUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>
+                {t(locale, "deliver.commit")} →
+              </a>
+              {result.prUrl && (
+                <a href={result.prUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btnAccent, display: "inline-block", marginTop: 8, marginLeft: 8, textDecoration: "none" }}>
+                  {t(locale, "deliver.pr")} →
+                </a>
+              )}
+              {result.deploy && (
+                <p style={{ ...ui.monoLabel, textTransform: "none", marginTop: 10, color: result.deploy.status === "SUCCESS" ? "var(--accent)" : "#e8b339" }}>
+                  {t(locale, "deliver.deploy")}: {result.deploy.status} ({result.deploy.commit})
+                </p>
+              )}
+            </div>
+          ))}
+          <button onClick={() => setResults(null)} style={{ ...ui.btn, display: "block", marginTop: 12 }}>{t(locale, "common.cancel")}</button>
         </div>
       )}
 

@@ -392,32 +392,42 @@ export async function approveClientDeploy(cd: ClientDeploy, waitMs = 90000): Pro
 }
 
 /**
- * Авто-доставка dev→client при «авто-готово» (autoApprove/autoDone): если настроены ВСЕ креды
- * (devGit + clientGit + Railway-токен ИЛИ Vercel-токен) — squash-пуш в дефолтную ветку клиента и
- * апрув деплоя (Railway) / мониторинг (Vercel). Миграция на клиентскую БД накатывается сама через
- * preDeploy клиентского деплоя (apply при апруве). Возвращает результат или null (креды не настроены).
+ * Авто-доставка dev→client при «авто-готово» (autoApprove/autoDone). Доставляет по ВСЕМ парам репо
+ * проекта (основная devGit/clientGit + meta.extraRepos: backend+frontend тощо).
+ * - PR-режим (meta.clientDeliverPR): открывает PR в каждый client-репо (дев клиента мержит) — деплой-креды НЕ нужны.
+ * - Прямой режим (squash в main): нужны Railway/Vercel-креды для апрува деплоя; миграция накатывается через preDeploy.
+ * Возвращает массив результатов (по паре на репо) или null (нет пар / в прямом режиме нет деплой-кредов).
  */
-export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(DeliverResult & { deploy: DeployStatus | null }) | null> {
-  const hasRepos = !!(meta.devGit && meta.clientGit);
+export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(DeliverResult & { deploy: DeployStatus | null })[] | null> {
+  const pairs = [{ dev: meta.devGit, client: meta.clientGit }, ...(meta.extraRepos ?? [])]
+    .filter((p): p is { dev: string; client: string } => !!p.dev && !!p.client);
+  if (!pairs.length) return null;
+  const asPR = !!meta.clientDeliverPR;
   const hasDeploy = !!(meta.clientDeploy?.railwayToken || meta.clientVercel?.token);
-  if (!hasRepos || !hasDeploy) return null; // нужны все креды — иначе авто-доставку не запускаем
-  const preview = await previewDelivery({ devGit: meta.devGit, clientGit: meta.clientGit });
-  const res = await deliverDevToClient({
-    devGit: meta.devGit,
-    clientGit: meta.clientGit,
-    targetBranch: preview.clientDefaultBranch,
-    message: `Lambertain auto-delivery — ${new Date().toISOString().slice(0, 10)}`,
-    asPR: meta.clientDeliverPR,
-  });
-  let deploy: DeployStatus | null = null;
-  if (res.toDefault) {
-    if (meta.clientDeploy?.railwayToken) {
-      await new Promise((r) => setTimeout(r, 4000)); // дать Railway создать деплой из пуша
-      deploy = await approveClientDeploy(meta.clientDeploy).catch(() => null);
-    } else if (meta.clientVercel?.token) {
-      await new Promise((r) => setTimeout(r, 6000)); // Vercel катит сам — мониторим статус
-      deploy = await vercelDeployStatus(meta.clientVercel).catch(() => null);
+  if (!asPR && !hasDeploy) return null; // прямой режим без деплой-кредов — авто-доставку не запускаем
+  const date = new Date().toISOString().slice(0, 10);
+  const out: (DeliverResult & { deploy: DeployStatus | null })[] = [];
+  for (const p of pairs) {
+    const preview = await previewDelivery({ devGit: p.dev, clientGit: p.client });
+    const res = await deliverDevToClient({
+      devGit: p.dev,
+      clientGit: p.client,
+      targetBranch: preview.clientDefaultBranch,
+      message: `Lambertain auto-delivery — ${date}`,
+      asPR,
+    });
+    let deploy: DeployStatus | null = null;
+    // Деплой/апрув — только в прямом режиме (push в main триггерит деплой). В PR-режиме деплоить нечего (мержит дев клиента).
+    if (!asPR && res.toDefault) {
+      if (meta.clientDeploy?.railwayToken) {
+        await new Promise((r) => setTimeout(r, 4000));
+        deploy = await approveClientDeploy(meta.clientDeploy).catch(() => null);
+      } else if (meta.clientVercel?.token) {
+        await new Promise((r) => setTimeout(r, 6000));
+        deploy = await vercelDeployStatus(meta.clientVercel).catch(() => null);
+      }
     }
+    out.push({ ...res, deploy });
   }
-  return { ...res, deploy };
+  return out;
 }

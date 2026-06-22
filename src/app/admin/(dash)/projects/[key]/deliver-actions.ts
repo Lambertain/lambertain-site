@@ -37,44 +37,50 @@ export async function runDeliver(
   key: string,
   targetBranch: string,
   schemaConfirmed: boolean,
-): Promise<{ result?: DeliverResultUI; error?: string }> {
+): Promise<{ results?: DeliverResultUI[]; error?: string }> {
   try {
     await requireAdmin();
     const proj = await getProjectFull(key);
     if (!proj) return { error: "Проект не найден" };
 
-    const preview = await previewDelivery({ devGit: proj.meta.devGit, clientGit: proj.meta.clientGit });
-    // Подтверждение не требуется, если деплой САМ накатывает миграции — обнаружено в коде (migratesOnDeploy)
-    // или включён флаг проекта (clientAutoMigrate). Иначе — нужен ручной schemaConfirmed.
-    if (preview.schemaChanges.length > 0 && !schemaConfirmed && !proj.meta.clientAutoMigrate && !preview.migratesOnDeploy) {
-      return { error: `Схема БД изменилась (${preview.schemaChanges.length}). Накати миграцию на клиентскую БД и подтверди.` };
-    }
+    const asPR = !!proj.meta.clientDeliverPR;
+    // Доставляем по ВСЕМ парам репо проекта (основная + extraRepos: backend+frontend тощо).
+    const pairs = [{ dev: proj.meta.devGit, client: proj.meta.clientGit }, ...(proj.meta.extraRepos ?? [])]
+      .filter((p): p is { dev: string; client: string } => !!p.dev && !!p.client);
+    if (!pairs.length) return { error: "Не заданы репозитории проекта (devGit/clientGit)" };
 
-    const res = await deliverDevToClient({
-      devGit: proj.meta.devGit,
-      clientGit: proj.meta.clientGit,
-      targetBranch: targetBranch || preview.clientDefaultBranch,
-      message: `Lambertain delivery — ${new Date().toISOString().slice(0, 10)}`,
-      asPR: proj.meta.clientDeliverPR,
-    });
-
-    // Доставка в дефолтную ветку клиента = публикация в прод → все 'dev'-задачи проекта становятся 'prod' + коммент клиенту.
-    if (res.toDefault) await publishProjectToProd(key).catch(() => {});
-
-    let deploy: DeployStatus | null = null;
-    if (res.toDefault) {
-      if (proj.meta.clientDeploy?.railwayToken) {
-        // Railway: дать секунду создать деплой из пуша, затем апрув + мониторинг.
-        await new Promise((r) => setTimeout(r, 4000));
-        deploy = await approveClientDeploy(proj.meta.clientDeploy).catch(() => null);
-      } else if (proj.meta.clientVercel?.token) {
-        // Vercel сам катит из пуша (апрув не нужен) — ждём создания деплоя и мониторим статус.
-        await new Promise((r) => setTimeout(r, 6000));
-        deploy = await vercelDeployStatus(proj.meta.clientVercel).catch(() => null);
+    const date = new Date().toISOString().slice(0, 10);
+    const results: DeliverResultUI[] = [];
+    for (let i = 0; i < pairs.length; i++) {
+      const p = pairs[i];
+      const preview = await previewDelivery({ devGit: p.dev, clientGit: p.client });
+      // Подтверждение схемы не нужно, если деплой сам накатывает миграции или включён clientAutoMigrate.
+      if (preview.schemaChanges.length > 0 && !schemaConfirmed && !proj.meta.clientAutoMigrate && !preview.migratesOnDeploy) {
+        return { error: `Схема БД изменилась (${p.client}: ${preview.schemaChanges.length}). Накати миграцию и подтверди.` };
       }
+      const res = await deliverDevToClient({
+        devGit: p.dev,
+        clientGit: p.client,
+        targetBranch: i === 0 && targetBranch ? targetBranch : preview.clientDefaultBranch,
+        message: `Lambertain delivery — ${date}`,
+        asPR,
+      });
+      let deploy: DeployStatus | null = null;
+      // Деплой/апрув — только в прямом режиме (push в main). В PR-режиме мержит дев клиента.
+      if (!asPR && res.toDefault) {
+        if (proj.meta.clientDeploy?.railwayToken) {
+          await new Promise((r) => setTimeout(r, 4000));
+          deploy = await approveClientDeploy(proj.meta.clientDeploy).catch(() => null);
+        } else if (proj.meta.clientVercel?.token) {
+          await new Promise((r) => setTimeout(r, 6000));
+          deploy = await vercelDeployStatus(proj.meta.clientVercel).catch(() => null);
+        }
+      }
+      results.push({ ...res, deploy });
     }
-
-    return { result: { ...res, deploy } };
+    // Прямая доставка в main = публикация в прод. В PR-режиме — нет (ждём мержа дева клиента).
+    if (results.some((r) => r.toDefault)) await publishProjectToProd(key).catch(() => {});
+    return { results };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }

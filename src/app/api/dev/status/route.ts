@@ -56,14 +56,14 @@ export async function POST(req: Request) {
           const meta = proj.meta;
           after(async () => {
             try {
-              const d = await autoDeliverIfConfigured(meta);
-              if (d) {
-                if (d.toDefault) await publishProjectToProd(projectKey).catch(() => {}); // опубликовано в прод → dev-задачи → prod + коммент клиенту
-                await notifyAdmin(
-                  `🚀 <b>Авто-доставка</b> · ${await taskTag(taskId)}\nКлієнт: ${d.clientRepo} (${d.branch}), файлів: ${d.files}` +
-                    (d.deploy ? `\nДеплой: ${d.deploy.status}${d.deploy.commit ? ` · ${d.deploy.commit}` : ""}` : ""),
-                  { text: "Коммит", url: d.commitUrl },
-                ).catch(() => {});
+              const ds = await autoDeliverIfConfigured(meta);
+              if (ds && ds.length) {
+                // toDefault только в прямом режиме (squash в main). В PR-режиме — PR, задача не «опубликована» до мержа.
+                if (ds.some((d) => d.toDefault)) await publishProjectToProd(projectKey).catch(() => {});
+                const lines = ds.map((d) => `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${d.deploy ? ` · деплой: ${d.deploy.status}` : ""}`).join("\n");
+                const first = ds[0];
+                const btn = first.prUrl ? { text: "Pull Request", url: first.prUrl } : { text: "Коммит", url: first.commitUrl };
+                await notifyAdmin(`🚀 <b>Авто-доставка</b> · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
               }
             } catch (e) {
               await notifyAdmin(`⚠️ <b>Авто-доставка не вдалася</b> · ${await taskTag(taskId)}: ${e instanceof Error ? e.message : "помилка"}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});

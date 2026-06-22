@@ -4,7 +4,7 @@
  * GET /api/dev/protocol
  * Авторизация: Authorization: Bearer <project_token>
  */
-import { getProjectKeyByToken } from "@/lib/db";
+import { getProjectKeyByToken, getProjectFull } from "@/lib/db";
 import { protocolBody, PORTAL_BASE } from "@/lib/dev-protocol";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,9 @@ export async function GET(req: Request) {
   const projectKey = await getProjectKeyByToken(token);
   if (!projectKey) return new Response("invalid token", { status: 403 });
 
-  return new Response(protocolBody(token, projectKey, PORTAL_BASE), {
+  // Совместная разработка через PR (meta.clientDeliverPR) → добавляем секцию про подтягивание client main каждой сессией.
+  const proj = await getProjectFull(projectKey).catch(() => null);
+  return new Response(protocolBody(token, projectKey, PORTAL_BASE, { collaborative: !!proj?.meta.clientDeliverPR }), {
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
