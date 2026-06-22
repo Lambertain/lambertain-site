@@ -1,8 +1,10 @@
 /**
- * Настроить клиентский Railway-деплой проекта (meta.clientDeploy) — чтобы портал апрувил/мониторил деплой клиента.
+ * Настроить клиентский деплой проекта (meta.clientDeploy / clientVercel) и автодоставку.
  * POST /api/admin/project/deploy-config
- *   { projectKey, railwayToken?, projectId?, environmentId?, serviceId?, pgServiceId? }
- * Заданные поля мёржатся в meta.clientDeploy (пустые/отсутствующие — не трогаются).
+ *   { projectKey, railwayToken?, projectId?, environmentId?, serviceId?, pgServiceId?,
+ *     vercelToken?, vercelProjectId?, vercelTeamId?, autoApprove? }
+ * Заданные поля мёржатся в meta (пустые/отсутствующие — не трогаются). autoApprove (булев) ставится, если передан:
+ * с ним готовая задача сразу Done и автодоставляется в client (autoDeliverIfConfigured) без ручного апрува.
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse } from "next/server";
@@ -20,7 +22,7 @@ export async function POST(req: Request) {
   if (!expected) return NextResponse.json({ error: "ADMIN_API_TOKEN not configured" }, { status: 503 });
   if (bearer(req) !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
-  let body: { projectKey?: string; railwayToken?: string; projectId?: string; environmentId?: string; serviceId?: string; pgServiceId?: string; vercelToken?: string; vercelProjectId?: string; vercelTeamId?: string };
+  let body: { projectKey?: string; railwayToken?: string; projectId?: string; environmentId?: string; serviceId?: string; pgServiceId?: string; vercelToken?: string; vercelProjectId?: string; vercelTeamId?: string; autoApprove?: boolean };
   try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   if (!projectKey) return NextResponse.json({ error: "projectKey required" }, { status: 400 });
@@ -44,11 +46,16 @@ export async function POST(req: Request) {
   };
   setV("vercelToken", "token"); setV("vercelProjectId", "projectId"); setV("vercelTeamId", "teamId");
 
-  await setProjectMeta(projectKey, proj.name, { ...proj.meta, clientDeploy: cd, clientVercel: cv });
+  // autoApprove (автодоставка без ручного апрува) — ставим, только если поле передано явно.
+  const meta = { ...proj.meta, clientDeploy: cd, clientVercel: cv };
+  if (typeof body.autoApprove === "boolean") meta.autoApprove = body.autoApprove;
+
+  await setProjectMeta(projectKey, proj.name, meta);
   revalidatePath(`/admin/projects/${projectKey}`);
 
   return NextResponse.json({
     ok: true, projectKey,
+    devGit: meta.devGit ?? null, clientGit: meta.clientGit ?? null, autoApprove: !!meta.autoApprove,
     clientDeploy: { railwayToken: cd.railwayToken ? "set" : "—", projectId: cd.projectId ?? null, environmentId: cd.environmentId ?? null, serviceId: cd.serviceId ?? null, pgServiceId: cd.pgServiceId ?? null },
     clientVercel: { token: cv.token ? "set" : "—", projectId: cv.projectId ?? null, teamId: cv.teamId ?? null },
   });
