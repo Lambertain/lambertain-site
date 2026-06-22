@@ -85,6 +85,9 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS auto_done BOOLEAN NOT NULL DEFAULT fa
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS owner_action TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action_guide INT;
+-- Целевое поле каталога (project-fields) для client_action, формат "fieldKey.subKey" (напр. "aiKeys.anthropic"):
+-- значение, введённое клиентом, ляжет в structured meta.customFields[fieldKey][subKey], а не в legacy-секрет.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action_field TEXT;
 -- Сколько суточных окон (от created_at) по задаче уже напомнили исполнителю — чтобы слать максимум 1 раз в 24 ч.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS remind_count INT NOT NULL DEFAULT 0;
 -- Деплой-стадия задачи (независимо от Open/Review/Done): pr → dev → prod. pr_url — PR от разработчика.

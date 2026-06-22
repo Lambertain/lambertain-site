@@ -841,8 +841,32 @@ export async function setOwnerAction(readableId: string, action: string | null):
   await q("UPDATE tasks SET owner_action = $2, updated_at = now() WHERE readable_id = $1", [readableId, action]);
 }
 /** «Нужно действие клиента» (зарегистрировать сервис/дать доступ) + id гайда-инструкции. null = снять. */
-export async function setClientAction(readableId: string, action: string | null, guideId: number | null = null): Promise<void> {
-  await q("UPDATE tasks SET client_action = $2, client_action_guide = $3, updated_at = now() WHERE readable_id = $1", [readableId, action, guideId]);
+export async function setClientAction(readableId: string, action: string | null, guideId: number | null = null, field: string | null = null): Promise<void> {
+  await q("UPDATE tasks SET client_action = $2, client_action_guide = $3, client_action_field = $4, updated_at = now() WHERE readable_id = $1", [readableId, action, guideId, field]);
+}
+
+/** Включить поле каталога (project-fields) в проекте + записать значение подполя в structured customFields. */
+export async function enableProjectFieldValue(projectKey: string, fieldKey: string, subKey: string, value: string): Promise<void> {
+  const proj = await getProjectFull(projectKey);
+  if (!proj) return;
+  const meta = { ...proj.meta };
+  meta.enabledFields = Array.from(new Set([...(meta.enabledFields ?? []), fieldKey]));
+  if (value) {
+    const cf = { ...(meta.customFields ?? {}) };
+    cf[fieldKey] = { ...(cf[fieldKey] ?? {}), [subKey]: value };
+    meta.customFields = cf;
+  }
+  await setProjectMeta(projectKey, proj.name, meta);
+}
+
+/** Только включить поле каталога в проекте (без значения) — чтобы оно появилось в настройках и /api/dev/secrets. */
+export async function enableProjectField(projectKey: string, fieldKey: string): Promise<void> {
+  const proj = await getProjectFull(projectKey);
+  if (!proj) return;
+  const enabled = new Set(proj.meta.enabledFields ?? []);
+  if (enabled.has(fieldKey)) return;
+  enabled.add(fieldKey);
+  await setProjectMeta(projectKey, proj.name, { ...proj.meta, enabledFields: [...enabled] });
 }
 export async function getTaskAiStatus(readableId: string): Promise<string | null> {
   const rows = await q<{ ai_status: string | null }>("SELECT ai_status FROM tasks WHERE readable_id = $1", [readableId]);

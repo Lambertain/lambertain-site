@@ -5,7 +5,7 @@ import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny, makeCommentClientVisible } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask } from "@/lib/db";
+import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
@@ -131,11 +131,17 @@ export async function markClientActionDone(taskId: string, data: string): Promis
   const projectKey = taskId.split("-")[0];
   const proj = await getProjectFull(projectKey);
   const value = (data || "").trim();
-  // Данные (токен/логины), которые ввёл клиент → в секреты проекта (видит админ + Claude-код разработчика).
+  // Данные (токен/логины), которые ввёл клиент → деву (видит админ + Claude-код в /api/dev/secrets).
   if (value) {
-    await upsertSecret(projectKey, { name: `Реєстрація · ${taskId}`, value, note: task.clientAction.slice(0, 300), filledBy: "client" });
+    const fk = task.clientActionField; // "fieldKey.subKey" — если задан, кладём в structured-поле каталога
+    if (fk && fk.includes(".")) {
+      const [k, s] = fk.split(".");
+      await enableProjectFieldValue(projectKey, k, s, value);
+    } else {
+      await upsertSecret(projectKey, { name: `Реєстрація · ${taskId}`, value, note: task.clientAction.slice(0, 300), filledBy: "client" });
+    }
   }
-  await setClientAction(taskId, null, null);
+  await setClientAction(taskId, null, null, null);
   await be.addComment(taskId, `✅ <b>Клієнт виконав реєстрацію.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
   // Возвращаем разработчику: уведомляем ответственного, он продолжает (данные — в /api/dev/secrets).
   const dev = proj?.meta.defaultAssignee;

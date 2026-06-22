@@ -7,8 +7,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { randomBytes } from "node:crypto";
 import { listGuides, logUsage, createGuide } from "./db";
+import { PROJECT_FIELD_DEFS } from "./project-fields";
 
 const MODEL = process.env.STRUCTURER_MODEL || "claude-opus-4-8";
+
+// Каталог известных полей-кредов для матчинга (fieldKey.subKey → подпись).
+const FIELD_CATALOG = PROJECT_FIELD_DEFS.flatMap((f) => f.subs.map((s) => `${f.key}.${s.key}: ${f.label.uk} · ${s.label.uk}`)).join("\n");
 
 export interface HandoffClassification {
   kind: "self" | "client" | "owner";
@@ -17,6 +21,8 @@ export interface HandoffClassification {
   clientText?: string;    // полный понятный клиенту текст: что и зачем зарегистрировать
   ownerText?: string;     // что нужно сделать владельцу
   guideId?: number | null; // id подходящего гайда из библиотеки (или null)
+  fieldKey?: string | null; // совпавшее поле каталога "fieldKey.subKey" (напр. "aiKeys.anthropic") или null
+  recurringCost?: boolean;  // true — клиенту нужно ОПЛАТИТЬ платный/подписочный сервис (нужен апрув стоимости)
 }
 
 const TOOL: Anthropic.Tool = {
@@ -31,6 +37,8 @@ const TOOL: Anthropic.Tool = {
       client_text: { type: "string", description: "Если client: понятный клиенту текст — ЧТО зарегистрировать/дать и зачем (без тех-жаргона), на украинском." },
       owner_text: { type: "string", description: "Если owner: что нужно сделать владельцу агентства." },
       guide_id: { type: ["integer", "null"], description: "id подходящего гайда из списка (как это зарегистрировать) или null." },
+      field_key: { type: ["string", "null"], description: "Если шаг — про токен/ключ/доступ, совпадающий с полем КАТАЛОГА полей (см. список), верни его ключ в формате \"fieldKey.subKey\" (напр. \"aiKeys.anthropic\"). Если подходящего поля в каталоге нет — null." },
+      recurring_cost: { type: "boolean", description: "true, если клиенту нужно ОПЛАТИТЬ платный/подписочный сервис (Anthropic/OpenAI API, платный тариф тощо) — тогда нужен апрув стоимости. false — если это бесплатная регистрация/выдача существующего доступа." },
     },
     required: ["kind", "reason"],
   },
@@ -52,7 +60,10 @@ export async function classifyHandoff(action: string, opts: { summary?: string; 
     "• owner — инфра АГЕНТСТВА: наш хостинг/деплой (Railway), наш биллинг, публикация в сторы, наши общие токены/ключи.\n" +
     `ВАЖНО: ${clientRule}\n` +
     "Если client — сформулируй для клиента понятный текст (что и зачем, без жаргона, на украинском) и короткую суть для пуша. " +
-    "Подбери guide_id из списка гайдов, если подходящий есть (как это зарегистрировать), иначе null.\n\n" +
+    "Подбери guide_id из списка гайдов, если подходящий есть (как это зарегистрировать), иначе null.\n" +
+    "Если шаг — про ТОКЕН/КЛЮЧ/ДОСТУП (client или owner), сопоставь с КАТАЛОГОМ полей ниже и верни field_key=\"fieldKey.subKey\" (иначе null). " +
+    "Поставь recurring_cost=true, если клиенту нужно ОПЛАТИТЬ платный/подписочный сервис (напр. Anthropic/OpenAI API-ключ, платный тариф), иначе false.\n\n" +
+    `Каталог полей (fieldKey.subKey: підпис):\n${FIELD_CATALOG}\n\n` +
     `Доступные гайды:\n${guideList}`;
   const user = `Шаг от разработчика: ${action}\n${opts.summary ? `Задача: ${opts.summary}\n` : ""}${opts.projectSpec ? `Контекст проекта (фрагмент): ${opts.projectSpec.slice(0, 1500)}` : ""}`;
 
@@ -72,6 +83,10 @@ export async function classifyHandoff(action: string, opts: { summary?: string; 
   // Нет клиента → регистрировать на стороне клиента некому: client коерсим в owner. Есть клиент → owner-регистрацию НЕ трогаем (только инфра агентства — owner, это решает модель).
   if (!opts.hasClient && kind === "client") kind = "owner";
   const gid = typeof inp.guide_id === "number" ? inp.guide_id : null;
+  // Валидируем field_key против каталога (только реально существующее поле.подполе).
+  const fkRaw = inp.field_key ? String(inp.field_key) : "";
+  const [fk, sk] = fkRaw.split(".");
+  const fieldValid = !!fk && !!sk && PROJECT_FIELD_DEFS.some((f) => f.key === fk && f.subs.some((s) => s.key === sk));
   return {
     kind,
     reason: String(inp.reason || ""),
@@ -79,6 +94,8 @@ export async function classifyHandoff(action: string, opts: { summary?: string; 
     clientText: inp.client_text ? String(inp.client_text) : undefined,
     ownerText: inp.owner_text ? String(inp.owner_text) : undefined,
     guideId: gid && guides.some((g) => g.id === gid) ? gid : null,
+    fieldKey: fieldValid ? fkRaw : null,
+    recurringCost: inp.recurring_cost === true,
   };
 }
 

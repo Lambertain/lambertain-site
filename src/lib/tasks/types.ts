@@ -141,6 +141,8 @@ export interface Task {
   clientAction?: string | null;
   /** id гайда-инструкции к действию клиента (как зарегистрировать). */
   clientActionGuide?: number | null;
+  /** Целевое поле каталога (project-fields) для введённого клиентом значения, формат "fieldKey.subKey". */
+  clientActionField?: string | null;
   /** Деплой-стадия (независимо от статуса задачи): pr — готовится (PR), dev — на тестовом, prod — опубликовано. */
   deployStage?: "pr" | "dev" | "prod" | null;
   /** Ссылка на PR разработчика по задаче (источник деплой-стадии). */

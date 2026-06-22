@@ -7,11 +7,12 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull, projectHasClient } from "@/lib/db";
+import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull, projectHasClient, enableProjectField } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { classifyHandoff, generateGuide } from "@/lib/handoff-classify";
+import { submitForModeration } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -52,11 +53,22 @@ export async function POST(req: Request) {
       // Гайда нет — генерим его сразу (подробно, для клиента, в 3 локалях) и привязываем.
       let guideId = cls.guideId ?? null;
       if (guideId == null) guideId = await generateGuide(short).catch(() => null);
-      await setClientAction(taskId, full, guideId);
-      await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — під заголовком задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, true).catch(() => {});
+      // Поле для значения: если креды совпали с полем каталога — включаем его проекту и связываем с задачей,
+      // чтобы введённое клиентом значение легло в structured customFields (видно деву в /api/dev/secrets).
+      const fieldKey = cls.fieldKey ?? null;
+      if (fieldKey) await enableProjectField(projectKey, fieldKey.split(".")[0]).catch(() => {});
+      await setClientAction(taskId, full, guideId, fieldKey);
       if (task.state && /open|новая/i.test(task.state)) await be.updateStatus(taskId, "In Progress").catch(() => {});
+      if (cls.recurringCost) {
+        // Платный/подписочный сервис — клиентское сообщение НЕ шлём напрямую, а на модерацию супер-админу
+        // (одобрение расходов). После апрува клиент увидит коммент и уведомление; поле/инструкция уже готовы.
+        await submitForModeration(taskId, `🔑 <b>Потрібно оплатити платний доступ:</b> ${short}\n\nІнструкція та поле для даних — під заголовком задачі. Після оплати/реєстрації впишіть дані та натисніть «Готово».`, { taskSummary: task.summary, devAuthored: true }).catch(() => {});
+        await be.updateStatus(taskId, "Blocked").catch(() => {});
+        return NextResponse.json({ ok: true, handedOff: "client", paidApproval: true, fieldKey, needGuide: cls.guideId == null, note: "Платный сервис: запрос с полем+инструкцией готов, клиентское сообщение ушло владельцу на модерацию (одобрение стоимости). Бери следующую незаблокированную задачу." });
+      }
+      await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — під заголовком задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, true).catch(() => {});
       await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => {});
-      return NextResponse.json({ ok: true, handedOff: "client", needGuide: cls.guideId == null, note: "Запрос ушёл клиенту с инструкцией. Бери следующую незаблокированную задачу." });
+      return NextResponse.json({ ok: true, handedOff: "client", fieldKey, needGuide: cls.guideId == null, note: "Запрос ушёл клиенту с инструкцией и полем. Бери следующую незаблокированную задачу." });
     }
 
     // owner

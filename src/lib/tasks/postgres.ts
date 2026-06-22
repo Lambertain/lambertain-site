@@ -35,6 +35,7 @@ interface TaskRow {
   created_by_role: string | null;
   client_action: string | null;
   client_action_guide: number | null;
+  client_action_field: string | null;
   deploy_stage: string | null;
   pr_url: string | null;
 }
@@ -42,7 +43,7 @@ interface TaskRow {
 const TASK_SELECT = `
   SELECT t.readable_id, p.key AS project_key, t.title, t.description, t.status, t.priority,
          t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal, t.auto_done, t.owner_action, t.created_by_role,
-         t.client_action, t.client_action_guide, t.deploy_stage, t.pr_url,
+         t.client_action, t.client_action_guide, t.client_action_field, t.deploy_stage, t.pr_url,
          a.login AS assignee_login, a.full_name AS assignee_name,
          r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role,
          (SELECT count(*) FROM comments c WHERE c.task_id = t.id AND c.approved) AS comment_count,
@@ -78,6 +79,7 @@ function rowToTask(t: TaskRow): Task {
     createdByRole: t.created_by_role ?? null,
     clientAction: t.client_action ?? null,
     clientActionGuide: t.client_action_guide ?? null,
+    clientActionField: t.client_action_field ?? null,
     deployStage: (t.deploy_stage as Task["deployStage"]) ?? null,
     prUrl: t.pr_url ?? null,
   };
