@@ -18,7 +18,6 @@ export type PanelUser = {
 const DATE_LOC: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
 
 function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; locale: Locale }) {
-  const single = user.role === "client"; // клиент — один проект; сотрудник/разраб — несколько
   const [open, setOpen] = useState(false);
   const [keys, setKeys] = useState<string[]>(user.projectKeys);
   const [alias, setAlias] = useState(user.alias ?? "");
@@ -41,7 +40,6 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
 
   function toggle(key: string) {
     setSavedP(false);
-    if (single) { setKeys((c) => (c.includes(key) ? [] : [key])); return; }
     setKeys((c) => (c.includes(key) ? c.filter((k) => k !== key) : [...c, key]));
   }
   function saveProjects() {
@@ -98,7 +96,7 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
           {/* проекты */}
           <label style={{ ...ui.fieldLabel, marginTop: 14 }}>
             {t(locale, "field.project")}
-            {!single && <span style={{ textTransform: "none", color: "var(--muted)" }}> · {t(locale, "invite.projectsHint")}</span>}
+            <span style={{ textTransform: "none", color: "var(--muted)" }}> · {t(locale, "invite.projectsHint")}</span>
           </label>
           {projects.length === 0 ? (
             <p style={{ color: "var(--muted)", fontSize: 13 }}>{t(locale, "deps.none")}</p>

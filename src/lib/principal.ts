@@ -54,18 +54,19 @@ export async function getPrincipal(): Promise<Principal | null> {
     }
     const link = await getLinkByTgId(tgId);
     if (!link) return null; // не привязан — нужен инвайт
-    // Сотрудник может вести несколько проектов (member_projects); fallback — project_key из связки.
-    const projectKeys =
-      link.role === "employee"
+    // Клиент и сотрудник могут быть в нескольких проектах (member_projects) + primary из связки.
+    const multiProjects =
+      link.role === "employee" || link.role === "client"
         ? (await getMemberProjects(link.youtrack_login)) || []
-        : undefined;
+        : [];
+    const allKeys = Array.from(new Set([...multiProjects, ...(link.project_key ? [link.project_key] : [])]));
     return {
       source: "telegram",
       role: link.role,
       realRole: link.role,
       youtrackLogin: link.youtrack_login,
       projectKey: link.project_key ?? undefined,
-      projectKeys: projectKeys && projectKeys.length ? projectKeys : link.project_key ? [link.project_key] : undefined,
+      projectKeys: allKeys.length ? allKeys : undefined,
       tgId,
       fullName: link.full_name || link.youtrack_login,
     };

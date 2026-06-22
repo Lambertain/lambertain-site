@@ -96,7 +96,9 @@ export async function setApproval(id: string, status: "approved" | "rejected"): 
   if (!isSuperAdmin(me)) {
     if (me.role !== "client") return { error: "Нет прав" };
     const task = await getBackend().getTask(id);
-    if (task.projectKey !== me.projectKey) return { error: "Нет прав" };
+    // Клиент может быть в нескольких проектах — задача должна быть в одном из них.
+    const myKeys = me.projectKeys?.length ? me.projectKeys : me.projectKey ? [me.projectKey] : [];
+    if (!myKeys.includes(task.projectKey)) return { error: "Нет прав" };
   }
   try {
     await setTaskApproval(id, status);

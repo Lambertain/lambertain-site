@@ -65,8 +65,9 @@ export async function approveAccess(
     const login = username ? username.toLowerCase() : `tg${tgId}`;
     await upsertMember(login, fullName || login, role, tgId);
     await upsertLink({ tg_id: tgId, youtrack_login: login, role, full_name: fullName || login, project_key: projectKey || null });
-    // Разработчик → ответственный на проекте (попадает на дашборд); клиент/сотрудник → его project_key.
+    // Разработчик → ответственный на проекте (попадает на дашборд); клиент/сотрудник → членство в member_projects (+ primary в tg_links выше).
     if (role === "contributor" && projectKey) await setDevProjects(login, [projectKey]);
+    else if ((role === "client" || role === "employee") && projectKey) await setMemberProjects(login, [projectKey]);
     await deleteAccessRequest(tgId);
     await sendTo(tgId, "✅ Доступ открыт. Откройте PM-портал через меню бота — теперь вы авторизованы.");
     // Онбординг по проекту: разработчику — задачи в работе; клиенту/сотруднику — что уже выполнено.
@@ -79,7 +80,7 @@ export async function approveAccess(
   }
 }
 
-/** Сохранить проекты пользователя: разработчик → ответственный на наборе; клиент/сотрудник → один проект. */
+/** Сохранить проекты пользователя: разработчик → ответственный на наборе; клиент/сотрудник → набор (member_projects). */
 export async function saveUserProjects(login: string, keys: string[]): Promise<{ ok?: boolean; error?: string }> {
   try {
     await requireAdmin();
@@ -89,7 +90,8 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
     // Проекты ДО изменения — чтобы уведомлять только о НОВЫХ (добавленных), а не о всех при каждом сохранении.
     const before = await getUserProjectKeys(login).catch(() => [] as string[]);
     if (user?.role === "client") {
-      await setLinkProject(login, keys[0] ?? null);
+      await setMemberProjects(login, keys); // клиент — несколько проектов (как сотрудник)
+      await setLinkProject(login, keys[0] ?? null); // primary-проект (онбординг/легаси-читатели)
     } else if (user?.role === "employee") {
       await setMemberProjects(login, keys); // сотрудник — несколько проектов
     } else {

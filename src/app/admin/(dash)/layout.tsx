@@ -45,8 +45,9 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   // Таб «Инструкция» у клиента — только если онбординг для его проекта ВКЛЮЧЕН (иначе не показываем по умолчанию).
   let nav = NAV[principal.role] ?? [];
   if (principal.role === "client") {
-    const myProj = principal.projectKey ? allProjects.find((p) => p.key === principal.projectKey) : undefined;
-    const onboardingOn = !!(myProj?.meta.showOnboarding || myProj?.meta.onboardingSetToken);
+    // Клиент может быть в нескольких проектах — таб показываем, если онбординг включён хотя бы у одного.
+    const myKeys = principal.projectKeys?.length ? principal.projectKeys : principal.projectKey ? [principal.projectKey] : [];
+    const onboardingOn = allProjects.some((p) => myKeys.includes(p.key) && (p.meta.showOnboarding || p.meta.onboardingSetToken));
     if (!onboardingOn) nav = nav.filter((n) => n.key !== "nav.onboarding");
   }
 

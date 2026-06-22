@@ -2,7 +2,7 @@
  * Видимость проектов по роли:
  * - admin — все;
  * - contributor — где он ответственный (defaultAssignee); дев может вести несколько проектов;
- * - client/employee — их единственный проект.
+ * - client/employee — их проекты (member_projects; могут быть в нескольких).
  */
 import type { Project } from "./tasks/types";
 import type { Principal } from "./principal";
@@ -18,7 +18,7 @@ export function visibleProjects(me: Principal, all: Project[]): Project[] {
   // Фидбек-проект виден всем (каждый пишет фидбек по порталу).
   const fb = (p: Project) => !!p.meta.feedback;
   if (me.role === "contributor") return all.filter((p) => fb(p) || isDevOfProject(me.youtrackLogin, p));
-  // Сотрудник — несколько проектов (member_projects); клиент — один.
-  if (me.role === "employee" && me.projectKeys?.length) return all.filter((p) => fb(p) || me.projectKeys!.includes(p.key));
+  // Клиент и сотрудник — несколько проектов (member_projects + primary).
+  if ((me.role === "employee" || me.role === "client") && me.projectKeys?.length) return all.filter((p) => fb(p) || me.projectKeys!.includes(p.key));
   return all.filter((p) => fb(p) || p.key === me.projectKey);
 }

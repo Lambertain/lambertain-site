@@ -25,14 +25,13 @@ export function InviteForm({ projects, locale, sets = [] }: { projects: Proj[]; 
   const [addErr, setAddErr] = useState<string | null>(null);
 
   const sorted = useMemo(() => [...list].sort((a, b) => a.name.localeCompare(b.name)), [list]);
-  const multi = role === "contributor" || role === "employee"; // разраб/сотрудник — несколько; клиент — один
+  const multi = role === "contributor" || role === "employee" || role === "client"; // все, кроме админа — несколько проектов
   const needsProject = role === "client" || role === "employee";
 
   function changeRole(r: typeof role) {
     setLink(null);
     setRole(r);
-    // клиент — максимум один проект; админ — без проектов
-    if (r === "client") setSelected((cur) => cur.slice(0, 1));
+    // админ — без проектов; остальные роли (вкл. клиента) — можно несколько
     if (r === "admin") setSelected([]);
   }
 

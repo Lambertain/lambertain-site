@@ -54,12 +54,12 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   const fullName = user.firstName || user.username || login;
   const keys = (inv.project_keys || inv.project_key || "").split(",").map((k) => k.trim()).filter(Boolean);
   await upsertMember(login, fullName, inv.role, user.id);
-  // Клиент/сотрудник привязан к одному проекту (project_key); разработчик — ответственный на всех выбранных.
+  // tg_links.project_key — primary; полный набор проектов — в member_projects (клиент/сотрудник — несколько); разработчик — ответственный на всех выбранных.
   await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: keys[0] ?? null });
   if (inv.role === "contributor" && keys.length) await setDevProjects(login, keys);
-  if (inv.role === "employee" && keys.length) await setMemberProjects(login, keys); // сотрудник — несколько проектов
-  // Клиент привязался к клиентскому проекту → задачи, поставленные мной (kickoff/от меня), переводим на него постановщиком.
-  if (inv.role === "client" && keys[0]) await reassignNullReporterToClient(keys[0]).catch(() => {});
+  if ((inv.role === "employee" || inv.role === "client") && keys.length) await setMemberProjects(login, keys); // несколько проектов
+  // Клиент привязался к клиентским проектам → задачи, поставленные мной (kickoff/от меня), переводим на него постановщиком — по каждому проекту.
+  if (inv.role === "client") for (const k of keys) await reassignNullReporterToClient(k).catch(() => {});
   // Клиент с флагом онбординга — пометить его проект, чтобы показать инструкцию при входе.
   if (inv.role === "client" && inv.show_onboarding && keys[0]) await setProjectShowOnboarding(keys[0], true);
   // Клиент с привязанным набором инструкций — показать его при входе (баннер на /i/<token>).

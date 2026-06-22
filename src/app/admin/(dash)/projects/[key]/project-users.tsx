@@ -17,7 +17,7 @@ function UserRow({ user, projectKey, locale }: { user: PanelUser; projectKey: st
   const isTgId = /^tg\d+$/.test(user.login);
 
   function removeFromProject() {
-    // Убираем только этот проект из набора (клиент → проектов не остаётся; сотрудник/разраб → остальные сохраняются).
+    // Убираем только этот проект из набора; остальные проекты пользователя (включая клиента) сохраняются.
     const keys = user.projectKeys.filter((k) => k !== projectKey);
     start(async () => { const r = await saveUserProjects(user.login, keys); if (!r.error) setGone(true); });
   }
@@ -79,8 +79,8 @@ export function ProjectUsersPanel({
     if (!addLogin) return;
     const u = candidates.find((c) => c.login === addLogin);
     if (!u) return;
-    // Клиент — один проект (заменяем); сотрудник/разработчик — добавляем к существующим.
-    const keys = u.role === "client" ? [projectKey] : Array.from(new Set([...u.projectKeys, projectKey]));
+    // Любая роль (клиент/сотрудник/разработчик) — добавляем проект к существующим, не заменяем.
+    const keys = Array.from(new Set([...u.projectKeys, projectKey]));
     startAdd(async () => { const r = await saveUserProjects(addLogin, keys); if (!r.error) { setAddLogin(""); location.reload(); } });
   }
   function invite() {

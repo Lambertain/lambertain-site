@@ -80,12 +80,10 @@ export default async function HomePage() {
   let tasks, reads, projectSeen;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    // Разработчик/сотрудник — ВСЕ задачи их проектов (включая исторические/выполненные, а не только назначенные
-    // ему лично — новый участник проекта должен видеть всю историю); клиент — его единственный проект.
+    // Разработчик/сотрудник/клиент — ВСЕ задачи их проектов (включая исторические/выполненные, а не только
+    // назначенные лично — новый участник проекта должен видеть всю историю). Клиент может быть в нескольких проектах.
     let filter: TaskFilter = { order: "updated_desc", limit: 300 };
-    if (me.role === "client" && me.projectKey) {
-      filter = { projectKey: me.projectKey, order: "updated_desc", limit: 300 };
-    } else if (me.role === "contributor" || me.role === "employee") {
+    if (me.role === "client" || me.role === "contributor" || me.role === "employee") {
       filter = { projectKeys: [...visibleKeys], order: "updated_desc", limit: 300 };
     }
     [tasks, reads, projectSeen] = await Promise.all([be.listTasks(filter), getReads(readKey), getProjectReads(readKey)]);
@@ -211,7 +209,11 @@ export default async function HomePage() {
   const projectCards: Record<string, React.ReactNode> = Object.fromEntries(
     clientProjects.map((p) => [p.key, <ProjectInfoCard key={p.key} project={p} now={now} locale={locale} />]),
   );
-  const clientGuides = me.role === "client" && me.projectKey ? await getEnabledGuides(me.projectKey) : [];
+  // Гайды по ВСЕМ клиентским проектам (клиент может быть в нескольких), без дублей по id.
+  const clientGuides = me.role === "client"
+    ? (await Promise.all(clientProjects.map((p) => getEnabledGuides(p.key).catch(() => []))))
+        .flat().filter((g, i, a) => a.findIndex((x) => x.id === g.id) === i)
+    : [];
 
   return (
     <div>

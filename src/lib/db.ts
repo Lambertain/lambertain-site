@@ -243,7 +243,7 @@ export async function renameMember(login: string, alias: string | null): Promise
   await q("UPDATE members SET alias = $2 WHERE login = $1", [login, alias || null]);
 }
 
-/** Сменить проект клиента (его единственный проект). */
+/** Основной (primary) проект клиента в tg_links. Полный набор проектов клиента — в member_projects. */
 export async function setLinkProject(login: string, projectKey: string | null): Promise<void> {
   await q("UPDATE tg_links SET project_key = $2 WHERE youtrack_login = $1", [login, projectKey || null]);
 }
@@ -270,10 +270,16 @@ export async function setMemberProjects(login: string, keys: string[]): Promise<
   }
 }
 
-/** Есть ли у проекта привязанный клиент (member роли client, привязанный по tg_link к этому проекту). */
+/**
+ * Есть ли у проекта привязанный клиент (role=client, состоит в проекте). Клиент может быть в НЕСКОЛЬКИХ
+ * проектах — членство в member_projects; tg_links.project_key — primary (для обратной совместимости).
+ */
 export async function projectHasClient(projectKey: string): Promise<boolean> {
   const rows = await q<{ n: number }>(
-    "SELECT count(*)::int AS n FROM tg_links WHERE project_key = $1 AND role = 'client'",
+    `SELECT count(*)::int AS n FROM tg_links l
+      WHERE l.role = 'client'
+        AND ( l.project_key = $1
+              OR EXISTS (SELECT 1 FROM member_projects mp WHERE mp.login = l.youtrack_login AND mp.project_key = $1) )`,
     [projectKey],
   );
   return (rows[0]?.n ?? 0) > 0;
@@ -282,7 +288,11 @@ export async function projectHasClient(projectKey: string): Promise<boolean> {
 /** Логин клиента проекта (постановщик «от клиента» / получатель приёмки). null — клиент не привязан. */
 export async function getProjectClientLogin(projectKey: string): Promise<string | null> {
   const rows = await q<{ youtrack_login: string }>(
-    "SELECT youtrack_login FROM tg_links WHERE project_key = $1 AND role = 'client' ORDER BY linked_at LIMIT 1",
+    `SELECT l.youtrack_login FROM tg_links l
+      WHERE l.role = 'client'
+        AND ( l.project_key = $1
+              OR EXISTS (SELECT 1 FROM member_projects mp WHERE mp.login = l.youtrack_login AND mp.project_key = $1) )
+      ORDER BY l.linked_at LIMIT 1`,
     [projectKey],
   );
   return rows[0]?.youtrack_login ?? null;
