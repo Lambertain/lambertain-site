@@ -108,6 +108,8 @@ export const RichComposer = forwardRef<RichComposerHandle, {
     r.deleteContents();
     r.insertNode(node);
     placeCaretAfter(node);
+    // DEV-16: после вставки картинки/файла (element-узел) прокрутить редактор к ней, чтобы видеть последнюю вставку без ручного скролла.
+    if (node.nodeType === 1) requestAnimationFrame(() => (node as HTMLElement).scrollIntoView?.({ block: "nearest" }));
   }
 
   /** Вставить текст в позицию курсора (голос/таблица/ссылка). */
@@ -230,6 +232,14 @@ export const RichComposer = forwardRef<RichComposerHandle, {
     // вставляем как ПЛОСКИЙ текст (без чужого HTML-форматирования)
     const text = e.clipboardData.getData("text/plain");
     if (text) { e.preventDefault(); insertText(text); }
+  }
+  // DEV-14: Enter ВСЕГДА вставляет перенос строки (в т.ч. когда курсор сразу после картинки — там дефолтный
+  // contentEditable «залипает» и Enter не опускал строку). Отправка — только кнопкой (Enter не отправляет).
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey && !(e.nativeEvent as { isComposing?: boolean }).isComposing) {
+      e.preventDefault();
+      insertText("\n");
+    }
   }
   function onDrop(e: React.DragEvent) {
     const files = Array.from(e.dataTransfer.files);
@@ -386,6 +396,7 @@ export const RichComposer = forwardRef<RichComposerHandle, {
         data-placeholder={placeholder}
         onInput={emit}
         onClick={onEditorClick}
+        onKeyDown={onKeyDown}
         onPaste={onPaste}
         onDrop={onDrop}
         onDragOver={onDragOver}

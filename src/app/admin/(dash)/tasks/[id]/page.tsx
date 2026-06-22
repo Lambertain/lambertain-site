@@ -108,7 +108,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <BackButton
           fallbackHref={taskBackHref}
           label={t(locale, "task.backPrev")}
-          style={{ ...ui.monoLabel, display: "inline-flex", alignItems: "center", color: "var(--muted)", textDecoration: "none", background: "rgba(8,8,8,0.85)", backdropFilter: "blur(8px)", border: "1px solid var(--border-2)", borderRadius: 999, padding: "6px 12px", cursor: "pointer" }}
+          style={{ ...ui.monoLabel, display: "inline-flex", alignItems: "center", color: "var(--accent)", textDecoration: "none", background: "rgba(8,8,8,0.9)", backdropFilter: "blur(8px)", border: "1px solid var(--accent-line)", borderRadius: 999, padding: "7px 14px", cursor: "pointer", fontWeight: 600 }}
         />
       </div>
 

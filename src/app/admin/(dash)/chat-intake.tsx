@@ -13,7 +13,7 @@ type Created = { id: string; url: string };
 // (Деплой больше не форсит перезагрузку: отправка идёт fetch-ом, а не Server Action.) Картинки в черновик не пишем.
 const DRAFT_KEY = "lamb:intake-draft";
 
-export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, feedbackKey, lockedProject }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; isAdmin?: boolean; feedbackKey?: string; lockedProject?: string }) {
+export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, feedbackKey, lockedProject, onCreated }: { projects: Proj[]; locale: Locale; fill?: boolean; isContributor?: boolean; isAdmin?: boolean; feedbackKey?: string; lockedProject?: string; onCreated?: (id: string, url: string) => void }) {
   // lockedProject — проект уже выбран явным шагом до формы; иначе дефолт — первый НЕ-фидбек проект.
   const [projectKey, setProjectKey] = useState(lockedProject ?? (projects.find((p) => p.key !== feedbackKey) ?? projects[0])?.key ?? "");
   const [recipient, setRecipient] = useState<"admin" | "client">("admin");
@@ -82,9 +82,11 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
         const res = (await r.json().catch(() => ({}))) as { id?: string; url?: string; error?: string };
         if (res.error) setError(res.error);
         else if (res.id && res.url) {
-          setCreated({ id: res.id, url: res.url });
           setTitle(""); setBodyText(""); composerRef.current?.clear();
           try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+          // DEV-15: не показываем зелёную плашку — сразу возврат в список (родитель закроет модалку + тост «Створено»).
+          if (onCreated) onCreated(res.id, res.url);
+          else setCreated({ id: res.id, url: res.url });
         } else {
           setError(t(locale, "request.sendFailed"));
         }

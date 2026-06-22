@@ -163,6 +163,7 @@ export const DICT: Record<string, Entry> = {
   // — новая задача —
   "newtask.kicker": { uk: "Постановка", ru: "Постановка", en: "New" },
   "newtask.title": { uk: "Нова задача", ru: "Новая задача", en: "New task" },
+  "toast.taskCreated": { uk: "Задачу створено", ru: "Задача создана", en: "Task created" },
   "newtask.short": { uk: "Задача", ru: "Задача", en: "Task" },
   "newproject.title": { uk: "Проєкт", ru: "Проект", en: "Project" },
   "newproject.heading": { uk: "Новий проєкт", ru: "Новый проект", en: "New project" },

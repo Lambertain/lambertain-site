@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChatIntake } from "./chat-intake";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
@@ -13,9 +14,18 @@ export function ChatModal({ projects, locale, isContributor, isAdmin, feedbackKe
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);   // выбран в picker
   const [confirmed, setConfirmed] = useState(false);            // перешёл к форме
+  const [toast, setToast] = useState(false);                    // DEV-15: тост «створено» после создания
+  const router = useRouter();
 
   const single = projects.length === 1;
   function close() { setOpen(false); setChosen(null); setConfirmed(false); }
+  // DEV-15: после создания задачи не показываем плашку — закрываем форму, обновляем список, краткий тост.
+  function handleCreated() {
+    close();
+    setToast(true);
+    router.refresh();
+    setTimeout(() => setToast(false), 3000);
+  }
   const formProject = single ? projects[0]?.key : chosen;
 
   // Подпись по роли пользователя в выбранном проекте.
@@ -78,8 +88,16 @@ export function ChatModal({ projects, locale, isContributor, isAdmin, feedbackKe
               )}
             </div>
           ) : (
-            <ChatIntake projects={projects} locale={locale} fill isContributor={isContributor} isAdmin={isAdmin} feedbackKey={feedbackKey} lockedProject={formProject ?? undefined} />
+            <ChatIntake projects={projects} locale={locale} fill isContributor={isContributor} isAdmin={isAdmin} feedbackKey={feedbackKey} lockedProject={formProject ?? undefined} onCreated={handleCreated} />
           )}
+        </div>
+      )}
+
+      {/* DEV-15: краткий тост-подтверждение вместо зелёной плашки */}
+      {toast && (
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", zIndex: 1100, display: "flex", alignItems: "center", gap: 8, background: "var(--surface)", border: "1px solid var(--accent-line)", color: "var(--text)", padding: "10px 16px", borderRadius: 8, boxShadow: "0 6px 24px rgba(0,0,0,0.4)", fontSize: 14, fontWeight: 600 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          {t(locale, "toast.taskCreated")}
         </div>
       )}
     </>
