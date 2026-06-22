@@ -25,8 +25,10 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
   const [bodyText, setBodyText] = useState(""); // плоский текст из редактора — для предупреждения о роде и черновика
   const [created, setCreated] = useState<Created | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [titleInvalid, setTitleInvalid] = useState(false); // подсветить поле заголовка красным, если создавали без него
   const [pending, start] = useTransition();
   const composerRef = useRef<RichComposerHandle>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
 
   // —— восстановление черновика (текст) после монтирования: сначала читаем, потом монтируем редактор ——
   const [ready, setReady] = useState(false);
@@ -57,10 +59,16 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
   const femWords = showRecipient && recipient === "client" ? detectFeminine(title + " " + bodyText) : [];
 
   function createTask() {
-    if (!title.trim()) { setError(t(locale, "request.titleRequired")); return; }
+    if (!title.trim()) {
+      setError(t(locale, "request.titleRequired"));
+      setTitleInvalid(true);
+      titleRef.current?.focus(); // курсор сразу в поле — видно, чего не хватает
+      return;
+    }
     if (!projectKey) return;
     const blocks = composerRef.current?.getContent().blocks ?? [];
     setError(null);
+    setTitleInvalid(false);
     start(async () => {
       const rcpt = showRecipient ? recipient : showSelf && selfTask ? "self" : showSelf && clientTask ? "client" : showSelf && fromClientTask ? "from_client" : undefined;
       const wantInternal = showSelf && internalTask && !selfTask && !clientTask && !fromClientTask; // задача разработчику, скрытая от клиента
@@ -159,16 +167,23 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
 
       {/* заголовок */}
       <input
+        ref={titleRef}
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => { setTitle(e.target.value); if (titleInvalid && e.target.value.trim()) { setTitleInvalid(false); setError(null); } }}
         placeholder={t(locale, "request.titlePh")}
-        style={{ background: "transparent", border: "none", borderBottom: "1px solid var(--border)", color: "var(--text)", fontSize: 20, fontWeight: 600, padding: "14px 16px", outline: "none" }}
+        aria-invalid={titleInvalid}
+        style={{ background: titleInvalid ? "rgba(255,91,91,0.06)" : "transparent", border: "none", borderBottom: `2px solid ${titleInvalid ? "#ff5b5b" : "var(--border)"}`, color: "var(--text)", fontSize: 20, fontWeight: 600, padding: "14px 16px", outline: "none", transition: "border-color 120ms, background 120ms" }}
       />
 
       {femWords.length > 0 && (
         <p style={{ fontSize: 13, color: "#e8b339", padding: "8px 16px 0", lineHeight: 1.5 }}>⚠️ {t(locale, "gender.warn", { words: femWords.join(", ") })}</p>
       )}
-      {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", padding: "8px 16px 0" }}>{error}</p>}
+      {error && (
+        <div role="alert" style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px 16px 0", padding: "10px 12px", fontSize: 14, fontWeight: 500, lineHeight: 1.45, color: "#ff8a8a", background: "rgba(255,91,91,0.12)", border: "1px solid rgba(255,91,91,0.45)", borderLeft: "3px solid #ff5b5b", borderRadius: 4 }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#ff5b5b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* тело — WYSIWYG: текст + картинки/файлы инлайн, тулбар, скрепка/микрофон и кнопка отправки */}
       {ready && (

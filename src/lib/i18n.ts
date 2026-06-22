@@ -222,7 +222,7 @@ export const DICT: Record<string, Entry> = {
   "chat.empty": { uk: "Опишіть задачу. Затисніть кнопку відправки для голосового вводу. Скрін — через Ctrl+V або скріпку.", ru: "Опишите задачу. Зажмите кнопку отправки для голосового ввода. Скрин — через Ctrl+V или скрепку.", en: "Describe the task. Hold the send button for voice input. Paste a screenshot with Ctrl+V or the clip." },
   "request.placeholder": { uk: "Введіть або вставте опис задачі…", ru: "Введите или вставьте описание задачи…", en: "Type or paste the task description…" },
   "request.titlePh": { uk: "Введіть заголовок", ru: "Введите заголовок", en: "Enter a title" },
-  "request.titleRequired": { uk: "Вкажіть заголовок", ru: "Укажите заголовок", en: "Enter a title" },
+  "request.titleRequired": { uk: "Задачу не створено: спершу вкажіть заголовок вгорі", ru: "Задача не создана: сначала укажите заголовок вверху", en: "Task not created: enter a title at the top first" },
   "request.staleVersion": { uk: "Вийшла нова версія порталу. Оновіть сторінку (F5) і надішліть ще раз — текст збережено.", ru: "Вышла новая версия портала. Обновите страницу (F5) и отправьте ещё раз — текст сохранён.", en: "A new portal version was released. Refresh the page (F5) and submit again — your text is saved." },
   "request.sendFailed": { uk: "Не вдалося надіслати. Спробуйте ще раз — текст збережено.", ru: "Не удалось отправить. Попробуйте ещё раз — текст сохранён.", en: "Couldn't submit. Try again — your text is saved." },
   "request.submit": { uk: "Створити задачу", ru: "Создать задачу", en: "Create task" },
