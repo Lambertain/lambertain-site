@@ -23,7 +23,9 @@ export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: 
       else if (r.preview) { setPreview(r.preview); setBranch(r.preview.clientDefaultBranch); }
     });
   }
-  const schemaBlocks = (p: DeliveryPreview) => p.schemaChanges.length > 0 && !autoMigrate && !schemaOk;
+  // Авто-накат: флаг проекта ИЛИ обнаружено в коде, что деплой сам катит миграции (migratesOnDeploy).
+  const autoMig = (p: DeliveryPreview) => !!autoMigrate || p.migratesOnDeploy;
+  const schemaBlocks = (p: DeliveryPreview) => p.schemaChanges.length > 0 && !autoMig(p) && !schemaOk;
   function deliver() {
     if (!preview) return;
     if (schemaBlocks(preview)) return;
@@ -55,11 +57,13 @@ export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: 
           </div>
 
           {preview.schemaChanges.length > 0 && (
-            <div style={{ ...ui.card, padding: 12, marginTop: 10, borderColor: autoMigrate ? "var(--accent-line)" : "#ff5b5b" }}>
-              <div style={{ ...ui.monoLabel, color: autoMigrate ? "var(--accent)" : "#ff5b5b" }}>{t(locale, "deliver.schemaChanged", { n: String(preview.schemaChanges.length) })}</div>
+            <div style={{ ...ui.card, padding: 12, marginTop: 10, borderColor: autoMig(preview) ? "var(--accent-line)" : "#ff5b5b" }}>
+              <div style={{ ...ui.monoLabel, color: autoMig(preview) ? "var(--accent)" : "#ff5b5b" }}>{t(locale, "deliver.schemaChanged", { n: String(preview.schemaChanges.length) })}</div>
               <div style={{ ...ui.monoLabel, textTransform: "none", marginTop: 6, whiteSpace: "pre-wrap" }}>{preview.schemaChanges.join("\n")}</div>
-              {autoMigrate ? (
-                <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 8 }}>{t(locale, "deliver.schemaAuto")}</p>
+              {autoMig(preview) ? (
+                <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 8 }}>
+                  {preview.migratesOnDeploy ? t(locale, "deliver.schemaAutoDetected", { mech: preview.migrateMechanism || "" }) : t(locale, "deliver.schemaAuto")}
+                </p>
               ) : (
                 <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, cursor: "pointer", fontSize: 13 }}>
                   <input type="checkbox" checked={schemaOk} onChange={(e) => setSchemaOk(e.target.checked)} style={{ width: 15, height: 15, accentColor: "var(--accent)" }} />

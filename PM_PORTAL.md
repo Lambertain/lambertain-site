@@ -105,8 +105,12 @@ Event-driven из server actions (`notify.ts`): tg_id резолвится из 
 
 `deliver.ts` + панель (только при заданных dev/client git): squash-пуш состояния dev-репо одним коммитом
 в client-репо в выбранную ветку (дефолтная — авто-деплой клиента; отдельная — клиент мержит сам), через GitHub API.
-**Перед пушем — проверка схемы БД** (diff schema/migration-файлов dev↔client): если менялась, требует
-подтверждения (миграцию на клиентскую БД накатываешь вручную). Для проектов с `clientDeploy` (Railway-токен+IDs
+**Перед пушем — проверка схемы БД** (diff schema/migration-файлов dev↔client): если менялась —
+портал **сам определяет авто-накат** (`detectMigrateOnDeploy`: ищет `prisma migrate deploy`/`drizzle-kit
+migrate`/`migrate.mjs` и т.п. в `package.json` scripts start/build/release или в railway/nixpacks-конфиге репо).
+Если деплой сам катит миграцию (`migratesOnDeploy`) — предупреждение зелёное и НЕ блокирует (миграция —
+неотъемлемая часть деплоя). Иначе — красное, требует ручного подтверждения. Флаг `clientAutoMigrate` —
+принудительный оверрайд на случай, если детект не сработал. Для проектов с `clientDeploy` (Railway-токен+IDs
 в meta) — апрув клиентского деплоя и мониторинг статуса.
 
 ## Claude Code разработчика ↔ портал (протокол + эскалация)

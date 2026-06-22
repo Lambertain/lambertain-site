@@ -81,6 +81,46 @@ export interface DeliveryPreview {
   fileCount: number;
   /** Schema/миграционные файлы, отличающиеся между dev и client (по содержимому). */
   schemaChanges: string[];
+  /** true, если клиентский деплой САМ накатывает миграции (start/build/release-команда или preDeploy в конфиге репо). */
+  migratesOnDeploy: boolean;
+  /** Где именно обнаружен авто-накат (для подсказки в UI), напр. "start: prisma migrate deploy". */
+  migrateMechanism?: string;
+}
+
+// Признак того, что деплой САМ накатывает миграции (а не мы вручную перед доставкой).
+const MIGRATE_ON_DEPLOY_RE = /(prisma\s+migrate\s+deploy|drizzle-kit\s+(migrate|push)|migrate\.(mjs|cjs|js|ts)\b|migrate:deploy|db:(migrate|deploy)|knex\s+migrate\s+latest|sequelize\s+db:migrate|atlas\s+migrate\s+apply|alembic\s+upgrade|php\s+artisan\s+migrate|rails\s+db:migrate|node\s+ace\s+migration:run)/i;
+
+/** Прочитать содержимое blob по path из дерева репо (или null, если файла нет). */
+async function readRepoBlob(repo: string, entries: TreeEntry[], path: string): Promise<string | null> {
+  const e = entries.find((x) => x.path === path && x.type === "blob" && x.sha);
+  if (!e?.sha) return null;
+  const blob = await ghJson<{ content: string; encoding: string }>(`/repos/${repo}/git/blobs/${e.sha}`);
+  return Buffer.from(blob.content, (blob.encoding as BufferEncoding) || "base64").toString("utf-8");
+}
+
+/**
+ * Автодетект: накатывает ли клиентский деплой миграции САМ. Доставляем код dev-репо как есть —
+ * значит и команды деплоя берём из него. Смотрим package.json (start/build/release/postinstall и т.п.)
+ * и railway/nixpacks/Procfile-конфиг репо. Если миграция — часть деплоя, ручное подтверждение не нужно.
+ */
+async function detectMigrateOnDeploy(repo: string, entries: TreeEntry[]): Promise<{ on: boolean; mechanism?: string }> {
+  const pkgRaw = await readRepoBlob(repo, entries, "package.json").catch(() => null);
+  if (pkgRaw) {
+    try {
+      const scripts = (JSON.parse(pkgRaw) as { scripts?: Record<string, string> }).scripts || {};
+      for (const [name, cmd] of Object.entries(scripts)) {
+        if (!/^(start|build|release|deploy|postinstall|prestart|prod)/i.test(name)) continue;
+        const m = String(cmd).match(MIGRATE_ON_DEPLOY_RE);
+        if (m) return { on: true, mechanism: `${name}: ${m[0]}` };
+      }
+    } catch { /* битый package.json — пропускаем */ }
+  }
+  for (const cfg of ["railway.json", "railway.toml", "nixpacks.toml", "Procfile"]) {
+    const raw = await readRepoBlob(repo, entries, cfg).catch(() => null);
+    const m = raw?.match(MIGRATE_ON_DEPLOY_RE);
+    if (m) return { on: true, mechanism: `${cfg}: ${m[0]}` };
+  }
+  return { on: false };
 }
 
 /** Превью доставки: количество файлов и изменения схемы БД (для подтверждения перед пушем). */
@@ -104,12 +144,18 @@ export async function previewDelivery(input: { devGit?: string; clientGit?: stri
     if (isSchemaFile(path) && !devBlobs.some((e) => e.path === path && e.sha === sha)) changed.add(path);
   }
 
+  const schemaChanges = [...changed].sort();
+  // Авто-накат проверяем только когда схема реально менялась (иначе лишние запросы к GitHub).
+  const det = schemaChanges.length > 0 ? await detectMigrateOnDeploy(devRepo, dev.entries).catch(() => ({ on: false as const, mechanism: undefined })) : { on: false as const, mechanism: undefined };
+
   return {
     devRepo,
     clientRepo,
     clientDefaultBranch: client.defaultBranch,
     fileCount: devBlobs.length,
-    schemaChanges: [...changed].sort(),
+    schemaChanges,
+    migratesOnDeploy: det.on,
+    migrateMechanism: det.mechanism,
   };
 }
 
