@@ -1,12 +1,21 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { previewDeliver, runDeliver, type DeliverResultUI } from "./deliver-actions";
+import { previewDeliver, runDeliver, setAutoDeliver, type DeliverResultUI } from "./deliver-actions";
 import type { DeliveryPreview } from "@/lib/deliver";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
-export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: string; locale: Locale; autoMigrate?: boolean }) {
+export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver }: { projectKey: string; locale: Locale; autoMigrate?: boolean; autoDeliver?: boolean }) {
+  const [auto, setAuto] = useState(!!autoDeliver);
+  const [, startAuto] = useTransition();
+  function toggleAuto(next: boolean) {
+    setAuto(next); // оптимистично
+    startAuto(async () => {
+      const r = await setAutoDeliver(projectKey, next);
+      if (r.error) setAuto(!next); // откат при ошибке
+    });
+  }
   const [preview, setPreview] = useState<DeliveryPreview | null>(null);
   const [branch, setBranch] = useState("");
   const [schemaOk, setSchemaOk] = useState(false);
@@ -43,6 +52,14 @@ export function DeliverPanel({ projectKey, locale, autoMigrate }: { projectKey: 
     <div style={{ ...ui.card, marginTop: 16 }}>
       <div style={ui.monoLabel}>{t(locale, "deliver.title")}</div>
       <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 6 }}>{t(locale, "deliver.hint")}</p>
+
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 12, cursor: "pointer" }}>
+        <input type="checkbox" checked={auto} onChange={(e) => toggleAuto(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />
+        <span>
+          <span style={{ fontSize: 14 }}>{t(locale, "deliver.auto")}</span>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "deliver.autoHint")}</span>
+        </span>
+      </label>
 
       {!preview && !results && (
         <button onClick={open} disabled={loading} style={{ ...ui.btnAccent, marginTop: 12, opacity: loading ? 0.5 : 1 }}>

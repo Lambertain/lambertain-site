@@ -1,9 +1,24 @@
 "use server";
 
 import { requireAdmin } from "@/lib/principal";
-import { getProjectFull } from "@/lib/db";
+import { getProjectFull, setProjectMeta } from "@/lib/db";
 import { publishProjectToProd } from "@/lib/deploy-stage";
 import { previewDelivery, deliverDevToClient, approveClientDeploy, clientDeployStatus, vercelDeployStatus, type DeliveryPreview, type DeployStatus } from "@/lib/deliver";
+import { revalidatePath } from "next/cache";
+
+/** Вкл/выкл автодоставку проекта (meta.autoDeliver): при приёмке задачи код доставляется клиенту сам. */
+export async function setAutoDeliver(key: string, value: boolean): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    const proj = await getProjectFull(key);
+    if (!proj) return { error: "Проект не найден" };
+    await setProjectMeta(key, proj.name, { ...proj.meta, autoDeliver: value || undefined });
+    revalidatePath(`/admin/projects/${key}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
 
 /** Превью доставки: число файлов + изменения схемы БД + дефолтная ветка клиента. */
 export async function previewDeliver(key: string): Promise<{ preview?: DeliveryPreview; error?: string }> {

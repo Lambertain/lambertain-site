@@ -9,12 +9,12 @@
  */
 import { NextResponse, after } from "next/server";
 import { getProjectKeyByToken, getProjectFull, setDeployStage } from "@/lib/db";
-import { advanceStage, publishProjectToProd } from "@/lib/deploy-stage";
+import { advanceStage } from "@/lib/deploy-stage";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
-import { autoDeliverIfConfigured } from "@/lib/deliver";
+import { autoDeliverAndNotify } from "@/lib/auto-deliver";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -50,25 +50,11 @@ export async function POST(req: Request) {
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
-        // Авто-доставка на репо клиента (squash-пуш + апрув деплоя/мониторинг; миграция — через preDeploy
-        // клиентского деплоя), если настроены ВСЕ креды. Фоном (after) — не блокируем ответ дев-Клоду.
-        if (proj?.meta) {
+        // Авто-доставка на репо клиента (squash-пуш/PR + апрув деплоя/мониторинг; миграция — через preDeploy
+        // клиентского деплоя) — только если включён флаг autoDeliver. Фоном (after) — не блокируем ответ дев-Клоду.
+        if (proj?.meta?.autoDeliver) {
           const meta = proj.meta;
-          after(async () => {
-            try {
-              const ds = await autoDeliverIfConfigured(meta);
-              if (ds && ds.length) {
-                // toDefault только в прямом режиме (squash в main). В PR-режиме — PR, задача не «опубликована» до мержа.
-                if (ds.some((d) => d.toDefault)) await publishProjectToProd(projectKey).catch(() => {});
-                const lines = ds.map((d) => `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${d.deploy ? ` · деплой: ${d.deploy.status}` : ""}`).join("\n");
-                const first = ds[0];
-                const btn = first.prUrl ? { text: "Pull Request", url: first.prUrl } : { text: "Коммит", url: first.commitUrl };
-                await notifyAdmin(`🚀 <b>Авто-доставка</b> · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
-              }
-            } catch (e) {
-              await notifyAdmin(`⚠️ <b>Авто-доставка не вдалася</b> · ${await taskTag(taskId)}: ${e instanceof Error ? e.message : "помилка"}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
-            }
-          });
+          after(() => autoDeliverAndNotify(projectKey, meta, taskId));
         }
         return NextResponse.json({ ok: true, status: "Done" });
       }

@@ -9,7 +9,9 @@ import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upse
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
+import { autoDeliverAndNotify } from "@/lib/auto-deliver";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 /**
  * Переназначить ops-шаг задачи на КЛИЕНТА (супер-админ). Случай: задачу/эскалацию завели, когда клиента ещё не было,
@@ -297,6 +299,12 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
     if (accept) {
       await be.updateStatus(id, "Done");
       if (task.assignee?.login) await notifyLogins([task.assignee.login], `✅ <b>Принято</b> · ${await taskTag(id)}: ${task.summary}`).catch(() => {});
+      // Автодоставка dev→client при приёмке (если включён флаг проекта). Фоном — не блокируем экшен.
+      const proj = await getProjectFull(task.projectKey).catch(() => null);
+      if (proj?.meta?.autoDeliver) {
+        const meta = proj.meta;
+        after(() => autoDeliverAndNotify(task.projectKey, meta, id));
+      }
     } else {
       await be.updateStatus(id, "Rework");
       if (note?.trim()) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${note.trim()}`, "internal");
