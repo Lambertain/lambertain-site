@@ -1,0 +1,5 @@
+# Аддитивная настройка сборки Railway/Nixpacks: автодетект Node остаётся, лишь
+# гарантируем наличие git в рантайме — он нужен /api/dev/sync (зеркалирование
+# клиентских репо client → dev через git push, см. src/lib/sync-client.ts).
+[phases.setup]
+aptPkgs = ["git"]
