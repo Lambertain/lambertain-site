@@ -412,7 +412,7 @@ export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(Deliv
     const res = await deliverDevToClient({
       devGit: p.dev,
       clientGit: p.client,
-      targetBranch: preview.clientDefaultBranch,
+      targetBranch: meta.deliverBranch?.trim() || preview.clientDefaultBranch,
       message: `Lambertain auto-delivery — ${date}`,
       asPR,
     });

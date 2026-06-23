@@ -43,6 +43,8 @@ export interface ProjectMeta {
   deploy?: { prodBranch?: string; devBranch?: string };
   /** Доставка клиенту через Pull Request: не пушить в дефолтную ветку клиента, а открывать PR (клиент мержит сам). */
   clientDeliverPR?: boolean;
+  /** Целевая ветка доставки в клиентских репо (для всех пар проекта). Пусто = дефолтная ветка клиента. Для gitflow — develop. */
+  deliverBranch?: string;
   /** Схема накатывается на клиентскую БД автоматически (preDeploy клиентского деплоя) — предупреждение о схеме при доставке не блокирует. */
   clientAutoMigrate?: boolean;
   /** Конвенции/правила проекта (легаси; основной источник — CLAUDE.md дев-репо). */

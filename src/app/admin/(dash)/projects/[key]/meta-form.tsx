@@ -69,6 +69,25 @@ const Field = ({ label, value, onChange }: { label: string; value: string; onCha
   </div>
 );
 
+/** owner/repo из git-URL (чистый парсер для клиента). */
+const shortRepo = (url?: string): string => {
+  const m = (url || "").match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?(?:$|[/?#])/i);
+  return m ? m[1] : "";
+};
+
+/** Визуальный поток кода под парой репо: куда доставляем (→) и что синкаем (←). Чтобы видеть, что настроено верно. */
+function RepoFlow({ dev, client, deliverBranch, deliverPR, locale }: { dev?: string; client?: string; deliverBranch: string; deliverPR: boolean; locale: Locale }) {
+  const d = shortRepo(dev), c = shortRepo(client);
+  if (!d || !c) return null;
+  const branch = deliverBranch.trim() || t(locale, "flow.clientDefault");
+  return (
+    <div style={{ ...ui.monoLabel, textTransform: "none", background: "var(--surface-2)", border: "1px solid var(--border-2)", borderRadius: 6, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4, lineHeight: 1.5 }}>
+      <span><span style={{ color: "var(--accent)" }}>→ {t(locale, "flow.deliver")}:</span> {d} → {c} · {deliverPR ? "PR" : "push"} · {t(locale, "flow.branch")}: {branch}</span>
+      <span><span style={{ color: "#7aa2ff" }}>← {t(locale, "flow.sync")}:</span> {c} → client-sync/* @ {d}</span>
+    </div>
+  );
+}
+
 /** Чекбокс «видно роли» под полем карточки «Детали и доступы». */
 function VisToggles({ field, vis, setVis, locale }: { field: string; vis: Record<string, FieldVis>; setVis: (f: (v: Record<string, FieldVis>) => Record<string, FieldVis>) => void; locale: Locale }) {
   const d = FIELD_VIS_DEFAULTS[field] ?? { client: true, dev: true };
@@ -131,6 +150,7 @@ export function MetaForm({
   const [devInfo, setDevInfo] = useState(m.devInfo ?? "");
   const [autoApprove, setAutoApprove] = useState(!!m.autoApprove);
   const [deliverPR, setDeliverPR] = useState(!!m.clientDeliverPR);
+  const [deliverBranch, setDeliverBranch] = useState(m.deliverBranch ?? "");
   const [autoMigrate, setAutoMigrate] = useState(!!m.clientAutoMigrate);
   const [vis, setVis] = useState<Record<string, FieldVis>>(m.fieldVisibility ?? {});
   const [prodAccounts, setProdAccounts] = useState<Account[]>(m.prodAccounts ?? []);
@@ -196,6 +216,7 @@ export function MetaForm({
       apps: { prod: { url: prodUrl || undefined, host: "" }, dev: { url: devUrl || undefined, host: "" } },
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
       clientDeliverPR: deliverPR || undefined,
+      deliverBranch: deliverBranch.trim() || undefined,
       clientAutoMigrate: autoMigrate || undefined,
       design: design || undefined,
       spec: spec || undefined,
@@ -301,6 +322,7 @@ export function MetaForm({
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Field label={t(locale, "projects.clientGit")} value={clientGit} onChange={setClientGit} />
         <Field label={t(locale, "projects.devGit")} value={devGit} onChange={setDevGit} />
+        <RepoFlow dev={devGit} client={clientGit} deliverBranch={deliverBranch} deliverPR={deliverPR} locale={locale} />
 
         {/* Доп. репозитории парами dev→client (когда у проекта несколько репо: backend + frontend и т.п.). */}
         {extraRepos.map((r, i) => (
@@ -317,6 +339,7 @@ export function MetaForm({
               <label style={ui.fieldLabel}>{t(locale, "projects.devGit")}</label>
               <input value={r.dev ?? ""} onChange={(e) => setExtraRepos(extraRepos.map((x, j) => (j === i ? { ...x, dev: e.target.value } : x)))} style={ui.input} />
             </div>
+            <RepoFlow dev={r.dev} client={r.client} deliverBranch={deliverBranch} deliverPR={deliverPR} locale={locale} />
           </div>
         ))}
         <button onClick={() => setExtraRepos([...extraRepos, {}])} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "1px dashed var(--border-2)", padding: "8px 12px", cursor: "pointer", borderRadius: 2, alignSelf: "flex-start" }}>+ {t(locale, "projects.addRepo")}</button>
@@ -350,6 +373,11 @@ export function MetaForm({
       <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Field label={t(locale, "projects.prodBranch")} value={prodBranch} onChange={setProdBranch} />
         <Field label={t(locale, "projects.devBranch")} value={devBranch} onChange={setDevBranch} />
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <label style={ui.fieldLabel}>{t(locale, "projects.deliverBranch")}</label>
+        <input value={deliverBranch} onChange={(e) => setDeliverBranch(e.target.value)} placeholder="develop" style={{ ...ui.input, maxWidth: 320 }} />
+        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 4 }}>{t(locale, "projects.deliverBranchHint")}</span>
       </div>
       <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginTop: 10 }}>
         <input type="checkbox" checked={deliverPR} onChange={(e) => setDeliverPR(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />

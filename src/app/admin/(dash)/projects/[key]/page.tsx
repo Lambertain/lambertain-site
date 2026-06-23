@@ -70,7 +70,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
       </div>
 
       {/* Доставка dev→client — первым блоком (частое действие). */}
-      {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} autoMigrate={!!proj.meta.clientAutoMigrate} autoDeliver={!!proj.meta.autoDeliver} />}
+      {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} autoMigrate={!!proj.meta.clientAutoMigrate} autoDeliver={!!proj.meta.autoDeliver} deliverBranch={proj.meta.deliverBranch} />}
 
       <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
 

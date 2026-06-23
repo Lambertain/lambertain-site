@@ -76,7 +76,7 @@ export async function runDeliver(
       const res = await deliverDevToClient({
         devGit: p.dev,
         clientGit: p.client,
-        targetBranch: i === 0 && targetBranch ? targetBranch : preview.clientDefaultBranch,
+        targetBranch: i === 0 && targetBranch ? targetBranch : (proj.meta.deliverBranch?.trim() || preview.clientDefaultBranch),
         message: `Lambertain delivery — ${date}`,
         asPR,
       });

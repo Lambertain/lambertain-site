@@ -6,7 +6,7 @@ import type { DeliveryPreview } from "@/lib/deliver";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
-export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver }: { projectKey: string; locale: Locale; autoMigrate?: boolean; autoDeliver?: boolean }) {
+export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver, deliverBranch }: { projectKey: string; locale: Locale; autoMigrate?: boolean; autoDeliver?: boolean; deliverBranch?: string }) {
   const [auto, setAuto] = useState(!!autoDeliver);
   const [, startAuto] = useTransition();
   function toggleAuto(next: boolean) {
@@ -29,7 +29,7 @@ export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver }: {
     startLoad(async () => {
       const r = await previewDeliver(projectKey);
       if (r.error) setError(r.error);
-      else if (r.preview) { setPreview(r.preview); setBranch(r.preview.clientDefaultBranch); }
+      else if (r.preview) { setPreview(r.preview); setBranch(deliverBranch?.trim() || r.preview.clientDefaultBranch); }
     });
   }
   // Авто-накат: флаг проекта ИЛИ обнаружено в коде, что деплой сам катит миграции (migratesOnDeploy).
