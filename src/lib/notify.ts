@@ -93,6 +93,21 @@ async function sendPhoto(chatId: number | string, mime: string | null, data: Buf
   }
 }
 
+/** Отправить НЕСКОЛЬКО картинок одним альбомом (2..10), чтобы не флудить отдельным сообщением на каждое фото (DEV-20). */
+async function sendMediaGroup(chatId: number | string, photos: { mime: string | null; data: Buffer }[]): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return;
+  try {
+    const form = new FormData();
+    form.append("chat_id", String(chatId));
+    form.append("media", JSON.stringify(photos.map((_, i) => ({ type: "photo", media: `attach://p${i}` }))));
+    photos.forEach((p, i) => form.append(`p${i}`, new Blob([new Uint8Array(p.data)], { type: p.mime || "image/png" }), `image${i}.png`));
+    await fetch(`https://api.telegram.org/bot${token}/sendMediaGroup`, { method: "POST", body: form });
+  } catch {
+    // best-effort
+  }
+}
+
 /** tg_id по логинам (привязанные к боту). */
 async function tgIdsForLogins(logins: string[]): Promise<number[]> {
   const arr = logins.filter(Boolean);
@@ -142,7 +157,13 @@ async function sendWithImages(chatIds: number[], text: string, attachmentIds: nu
   const photos = (await Promise.all(attachmentIds.map((id) => getAttachment(id)))).filter(Boolean) as { mime: string | null; data: Buffer }[];
   for (const chatId of targets) {
     const sent = await sendTo(chatId, text, button);
-    if (sent) for (const p of photos) await sendPhoto(chatId, p.mime, p.data); // дубль (DEV-12) → фото тоже не шлём
+    if (!sent) continue; // дубль (DEV-12) → фото тоже не шлём
+    // Фото — одним альбомом на каждые 10 (Telegram-лимит), а не отдельным сообщением на каждое (DEV-20).
+    for (let i = 0; i < photos.length; i += 10) {
+      const chunk = photos.slice(i, i + 10);
+      if (chunk.length === 1) await sendPhoto(chatId, chunk[0].mime, chunk[0].data);
+      else await sendMediaGroup(chatId, chunk);
+    }
   }
 }
 
