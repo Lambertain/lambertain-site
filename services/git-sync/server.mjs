@@ -43,17 +43,20 @@ function git(args, cwd) {
   });
 }
 
-const httpsUrl = (repo) => `https://github.com/${repo}.git`;
+// GitHub git-over-HTTPS принимает токен как Basic (x-access-token:token) в URL — Bearer тут НЕ работает.
+const authUrl = (repo) => `https://x-access-token:${GITHUB_TOKEN}@github.com/${repo}.git`;
+// Убрать токен из текста (логи/ошибки git могут эхать URL с токеном).
+const redact = (s) => String(s).split(GITHUB_TOKEN).join("***");
 
 /** Какие клиентские ветки зеркалить: дефолтная + develop (если существует). Без ручных флагов. */
-async function pickBranches(dir, clientUrl, hdr) {
-  const sym = await git([...hdr, "ls-remote", "--symref", clientUrl, "HEAD"], dir);
-  const def = sym.stdout.match(/ref:\s+refs\/heads\/(\S+)\s+HEAD/)?.[1] || "main";
-  const heads = await git([...hdr, "ls-remote", "--heads", clientUrl], dir);
+async function pickBranches(dir, clientUrl) {
+  const heads = await git(["ls-remote", "--symref", "--heads", clientUrl], dir);
+  if (heads.code !== 0) return { error: `ls-remote client: ${redact(heads.stderr).slice(0, 200)}` };
+  const def = heads.stdout.match(/ref:\s+refs\/heads\/(\S+)\s+HEAD/)?.[1] || "main";
   const existing = new Set(
-    heads.stdout.split("\n").map((l) => l.split(/\s+/)[1]).filter(Boolean).map((r) => r.replace("refs/heads/", "")),
+    heads.stdout.split("\n").map((l) => l.split(/\s+/)[1]).filter((r) => r && r.startsWith("refs/heads/")).map((r) => r.replace("refs/heads/", "")),
   );
-  return [...new Set([def, "develop"])].filter((b) => existing.has(b));
+  return { branches: [...new Set([def, "develop"])].filter((b) => existing.has(b)) };
 }
 
 /** Зеркалировать одну пару репо client → dev. */
@@ -63,29 +66,30 @@ async function syncPair(devGit, clientGit) {
   if (!devRepo || !clientRepo) {
     return { devRepo: devRepo || "?", clientRepo: clientRepo || "?", branches: [], error: "не распознан dev/client репозиторий" };
   }
-  const hdr = ["-c", `http.extraHeader=Authorization: Bearer ${GITHUB_TOKEN}`];
-  const devUrl = httpsUrl(devRepo);
-  const clientUrl = httpsUrl(clientRepo);
+  const devUrl = authUrl(devRepo);
+  const clientUrl = authUrl(clientRepo);
   const dir = await mkdtemp(join(tmpdir(), "lmb-sync-"));
   try {
     const init = await git(["init", "-q", "--initial-branch=main"], dir);
     if (init.code === 127) return { devRepo, clientRepo, branches: [], error: "git не найден в рантайме" };
 
-    const wanted = await pickBranches(dir, clientUrl, hdr);
+    const picked = await pickBranches(dir, clientUrl);
+    if (picked.error) return { devRepo, clientRepo, branches: [], error: picked.error };
+    const wanted = picked.branches;
     if (!wanted.length) return { devRepo, clientRepo, branches: [], error: "у клиента нет веток main/develop" };
 
     // Полная история нужна разработчику для merge-base при локальном мерже.
     const fetchRes = await git(
-      [...hdr, "fetch", "--no-tags", clientUrl, ...wanted.map((b) => `+refs/heads/${b}:refs/remotes/client/${b}`)],
+      ["fetch", "--no-tags", clientUrl, ...wanted.map((b) => `+refs/heads/${b}:refs/remotes/client/${b}`)],
       dir,
     );
-    if (fetchRes.code !== 0) return { devRepo, clientRepo, branches: [], error: `fetch client: ${fetchRes.stderr.slice(0, 200)}` };
+    if (fetchRes.code !== 0) return { devRepo, clientRepo, branches: [], error: `fetch client: ${redact(fetchRes.stderr).slice(0, 200)}` };
 
     const pushRes = await git(
-      [...hdr, "push", "--force", devUrl, ...wanted.map((b) => `refs/remotes/client/${b}:refs/heads/${SYNC_PREFIX}${b}`)],
+      ["push", "--force", devUrl, ...wanted.map((b) => `refs/remotes/client/${b}:refs/heads/${SYNC_PREFIX}${b}`)],
       dir,
     );
-    if (pushRes.code !== 0) return { devRepo, clientRepo, branches: [], error: `push dev: ${pushRes.stderr.slice(0, 200)}` };
+    if (pushRes.code !== 0) return { devRepo, clientRepo, branches: [], error: `push dev: ${redact(pushRes.stderr).slice(0, 200)}` };
 
     const branches = [];
     for (const b of wanted) {
