@@ -53,6 +53,12 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
   { key: "viber", group: "messenger", label: { uk: "Viber", ru: "Viber", en: "Viber" }, subs: [{ key: "phone", label: { uk: "Номер", ru: "Номер", en: "Phone" }, kind: "text" }] },
   { key: "email", group: "access", label: { uk: "Email", ru: "Email", en: "Email" }, subs: [{ key: "address", label: { uk: "Адреса", ru: "Адрес", en: "Address" }, kind: "text" }, pass] },
   { key: "googleAnalytics", group: "analytics", label: { uk: "Google Analytics", ru: "Google Analytics", en: "Google Analytics" }, subs: [{ key: "id", label: { uk: "Measurement ID", ru: "Measurement ID", en: "Measurement ID" }, kind: "text" }] },
+  // Trello — таск-трекер клиента (портал тянет/синкает задачи с доски). Нужен разработчику/порталу.
+  { key: "trello", group: "other", label: { uk: "Trello", ru: "Trello", en: "Trello" }, subs: [
+    { key: "key", label: { uk: "API Key", ru: "API Key", en: "API Key" }, kind: "secret" },
+    { key: "token", label: { uk: "API Token", ru: "API Token", en: "API Token" }, kind: "secret" },
+    { key: "board", label: { uk: "Дошка (ID/URL)", ru: "Доска (ID/URL)", en: "Board (ID/URL)" }, kind: "text" },
+  ] },
   { key: "domain", group: "hosting", label: { uk: "Домен / реєстратор", ru: "Домен / регистратор", en: "Domain / registrar" }, subs: [url("Домен", "Домен", "Domain"), { key: "registrar", label: { uk: "Реєстратор", ru: "Регистратор", en: "Registrar" }, kind: "text" }, login, pass] },
   // AI / LLM ключі — потрібні розробнику локально (генерація, агенти). За замовчуванням видно лише розробнику (field-visibility).
   { key: "aiKeys", group: "access", label: { uk: "AI / LLM ключі", ru: "AI / LLM ключи", en: "AI / LLM keys" }, subs: [
