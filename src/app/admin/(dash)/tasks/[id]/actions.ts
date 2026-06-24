@@ -296,7 +296,10 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
   try {
     const task = await be.getTask(id);
     const isReporter = !!me.youtrackLogin && task.reporter?.login === me.youtrackLogin;
-    if (me.realRole !== "admin" && !isReporter) return { error: "Нет прав" };
+    // Приймати/повертати може будь-який клієнт/співробітник цього проєкту, не лише точний постановник.
+    const taskKey = id.split("-")[0];
+    const isProjectClientSide = (me.role === "client" || me.role === "employee") && (me.projectKey === taskKey || (me.projectKeys?.includes(taskKey) ?? false));
+    if (me.realRole !== "admin" && !isReporter && !isProjectClientSide) return { error: "Нет прав" };
     if (accept) {
       await be.updateStatus(id, "Done");
       if (task.assignee?.login) await notifyLogins([task.assignee.login], `✅ <b>Принято</b> · ${await taskTag(id)}: ${task.summary}`).catch(() => {});

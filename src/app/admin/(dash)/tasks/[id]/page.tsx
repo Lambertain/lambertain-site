@@ -40,6 +40,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const isAdmin = me.realRole === "admin";
   const canEditStatus = isAdmin || me.role === "contributor";
   const backHref = isAdmin ? "/admin/tasks" : "/admin";
+  const taskKey = id.split("-")[0];
+  // Приймати/повертати задачу може будь-який клієнт/співробітник ЦЬОГО проєкту, а не лише точний постановник
+  // (на боці клієнта буває кілька людей — задачу створив один, перевіряє інший).
+  const isProjectClientSide = (me.role === "client" || me.role === "employee") && (me.projectKey === taskKey || (me.projectKeys?.includes(taskKey) ?? false));
 
   let task, comments, deps, reads, users, tags, projects;
   const readKey = me.youtrackLogin || me.fullName || "admin";
@@ -221,7 +225,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       {/* Постановщик (или админ) проверяет результат в «Ревью» → принять/на доработку.
           Клиенту-постановщику показываем ТОЛЬКО когда итог уже одобрен (не висит на модерации) —
           иначе его зовут принимать до того, как агентство опубликовало результат. Админ-модератор видит всегда. */}
-      {statusBucket(task.state) === "review" && (isAdmin || (!!me.youtrackLogin && task.reporter?.login === me.youtrackLogin && !pendingClientResult)) && (
+      {statusBucket(task.state) === "review" && (isAdmin || ((isProjectClientSide || (!!me.youtrackLogin && task.reporter?.login === me.youtrackLogin)) && !pendingClientResult)) && (
         <ReviewActions id={task.id} locale={locale} />
       )}
 
