@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { updateTaskStatus, markProjectOpened, deleteTask, moveToReview } from "./tasks-actions";
 import { DeployBadge } from "./deploy-badge";
+import { AddresseeBadge } from "./addressee-badge";
 import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
+import type { AddresseeKey } from "@/lib/task-addressee";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
 
@@ -26,6 +28,7 @@ export type BoardTask = {
   ownerAction?: string | null; // ждёт ops-шага агентства (владельца)
   clientAction?: string | null; // ждёт действия клиента
   deployStage?: string | null; // pr → dev → prod (деплой-стадия, простыми словами для клиента)
+  addressee?: AddresseeKey | null; // кому адресована (бейдж для команды; null — не показывать)
 };
 
 type Proj = { key: string; name: string; hasNew?: boolean };
@@ -98,6 +101,7 @@ function Row({
         </div>
         {/* слаг задачи (HH-62) — виден во всех табах, не только при открытии */}
         <span style={{ ...ui.monoLabel, color: "var(--accent)", flexShrink: 0, alignSelf: "center" }}>{task.id}</span>
+        <AddresseeBadge addressee={task.addressee} locale={locale} />
         <DeployBadge stage={task.deployStage} locale={locale} />
         {/* DEV-11: название ВСЕГДА открывает задачу (без авто-смены статуса). Статус разраб ставит вручную, Клод — через API. */}
         <a href={`/admin/tasks/${task.id}`} title={mode === "start" ? t(locale, "tab.openHint") : undefined} style={{ flex: 1, color: "var(--text)", fontSize: 15, fontWeight: 600, textDecoration: "none" }}>

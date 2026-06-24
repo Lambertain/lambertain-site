@@ -19,6 +19,8 @@ import { MoveTask } from "./move-task";
 import { StatusPicker } from "./status-picker";
 import { BackButton } from "./back-button";
 import { DeployBadge } from "../../deploy-badge";
+import { AddresseeBadge } from "../../addressee-badge";
+import { taskAddressee } from "@/lib/task-addressee";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
@@ -137,6 +139,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           task.state && <span style={ui.monoLabel}>{task.state}</span>
         )}
         {task.priority && <span style={ui.monoLabel}>· {task.priority}</span>}
+        {/* Кому адресована — только команде (клиенту не показываем). */}
+        {me.role !== "client" && <AddresseeBadge addressee={taskAddressee(task)} locale={locale} />}
         <DeployBadge stage={task.deployStage} locale={locale} />
         {/* Редактирование задачи — иконка-карандаш в правом верхнем углу (только админ). */}
         {isAdmin && (

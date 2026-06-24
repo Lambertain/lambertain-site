@@ -9,6 +9,7 @@ import { getReads, getProjectReads, getDepsFor } from "@/lib/db";
 import { mergeFeedback } from "@/lib/feedback";
 import { visibleProjects } from "@/lib/scope";
 import { statusBucket, BUCKET_ORDER, type Bucket } from "@/lib/statuses";
+import { taskAddressee } from "@/lib/task-addressee";
 import { TaskList } from "../task-card";
 import { TaskTabs, type BoardTask } from "../task-tabs";
 import { nowMs } from "@/lib/now";
@@ -78,6 +79,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         ownerAction: tk.ownerAction,
         clientAction: tk.clientAction,
         deployStage: tk.deployStage,
+        addressee: taskAddressee(tk),
       };
     });
     const fbSet = new Set(projectsList.filter((p) => p.meta.feedback).map((p) => p.key));
@@ -156,6 +158,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         assignee: tk.assignee?.fullName ?? null, unread,
         blocked: blockers.length > 0, blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
         ownerAction: tk.ownerAction, clientAction: tk.clientAction, deployStage: tk.deployStage,
+        addressee: taskAddressee(tk),
       };
     });
     const projectsWithNew = visible
