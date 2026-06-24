@@ -5,7 +5,7 @@
  * После апрува/правки коммент публикуется и клиент получает уведомление. Server-side only.
  */
 import { getBackend } from "./tasks";
-import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag } from "./notify";
+import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag, warnClientUnreachable } from "./notify";
 import { q, getProjectFull } from "./db";
 import { PORTAL_BASE } from "./dev-protocol";
 
@@ -24,7 +24,10 @@ export async function submitForModeration(taskId: string, body: string, opts?: {
   if (proj?.meta.autoApprove) {
     // Доверенный разработчик — без модерации: публикуем клиенту сразу.
     await getBackend().addComment(taskId, body, "client", opts?.authorLogin, true, dev);
-    if (task) await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(taskId)}</b>: ${summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), taskBtn(taskId)).catch(() => {});
+    if (task) {
+      const reached = await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(taskId)}</b>: ${summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), taskBtn(taskId)).catch(() => 0);
+      if (!reached) await warnClientUnreachable(task.projectKey, taskId, summary, proj?.meta.defaultAssignee).catch(() => {});
+    }
     return;
   }
   await getBackend().addComment(taskId, body, "client", opts?.authorLogin, false, dev);
@@ -47,12 +50,16 @@ export async function approveModeratedComment(commentId: string): Promise<{ task
   const r = await commentInfo(commentId);
   if (!r) return { error: "not found" };
   await q("UPDATE comments SET approved = true WHERE id = $1", [commentId]);
-  await notifyProjectClients(
+  const reached = await notifyProjectClients(
     r.project_key,
     `💬 <b>${r.project_name} · ${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
     attachmentIdsIn(r.body),
     taskBtn(r.readable_id),
-  ).catch(() => {});
+  ).catch(() => 0);
+  if (!reached) {
+    const p = await getProjectFull(r.project_key).catch(() => null);
+    await warnClientUnreachable(r.project_key, r.readable_id, r.summary, p?.meta.defaultAssignee).catch(() => {});
+  }
   return { taskId: r.readable_id };
 }
 

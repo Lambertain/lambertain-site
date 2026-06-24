@@ -8,7 +8,7 @@ import { isSuperAdmin } from "@/lib/principal";
 import type { Principal } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { structureTask } from "@/lib/structurer";
-import { notifyLogins, notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
+import { notifyLogins, notifyAdmin, notifyProjectClients, taskTag, warnClientUnreachable } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { projectHasClient, appendRequestBlocks, assignTask, projectReporterLogin, type ReqBlock } from "@/lib/db";
 import type { DraftTask, Role } from "@/lib/tasks/types";
@@ -121,7 +121,8 @@ export async function createRequestTaskCore(
       if (recipient === "admin") {
         await notifyAdmin(`🔧 <b>Запрос разработчика</b> · ${await taskTag(task.id)}: ${task.summary}`, taskBtn(task.id)).catch(() => {});
       } else {
-        await notifyProjectClients(projectKey, `❓ <b>Питання по задачі</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
+        const reached = await notifyProjectClients(projectKey, `❓ <b>Питання по задачі</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => 0);
+        if (!reached) await warnClientUnreachable(projectKey, task.id, task.summary, me.youtrackLogin).catch(() => {});
       }
       return { id: task.id, url: task.url };
     }
@@ -139,7 +140,8 @@ export async function createRequestTaskCore(
         internal: false, // клиент видит
       });
       await appendRequestBlocks(task.id, blocks);
-      await notifyProjectClients(projectKey, `❓ <b>Питання/задача</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
+      const reachedQ = await notifyProjectClients(projectKey, `❓ <b>Питання/задача</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => 0);
+      if (!reachedQ) await warnClientUnreachable(projectKey, task.id, task.summary, project?.meta.defaultAssignee).catch(() => {});
       return { id: task.id, url: task.url };
     }
 
@@ -159,7 +161,8 @@ export async function createRequestTaskCore(
       await appendRequestBlocks(task.id, blocks);
       await assignProjectDevAndNotify(task.id); // сразу разработчику — он сам разберёт по коду (без триажа)
       // Клиент — постановщик: уведомляем его, что в проекте появилась новая задача (он её ведёт/принимает).
-      await notifyProjectClients(projectKey, `🆕 <b>Нова задача у вашому проєкті</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
+      const reachedFC = await notifyProjectClients(projectKey, `🆕 <b>Нова задача у вашому проєкті</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => 0);
+      if (!reachedFC) await warnClientUnreachable(projectKey, task.id, task.summary, project?.meta.defaultAssignee).catch(() => {});
       return { id: task.id, url: task.url };
     }
 

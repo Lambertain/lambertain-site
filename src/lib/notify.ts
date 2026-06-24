@@ -1,6 +1,6 @@
 /** Отправка уведомлений в Telegram (адресно по ролям + картинки). Server-side only. */
 import { q, getAttachment, logNotification, createNotification, wasRecentlyNotified } from "./db";
-import { PUBLIC_SITE } from "./dev-protocol";
+import { PUBLIC_SITE, PORTAL_BASE } from "./dev-protocol";
 
 /** Кнопка-ссылка под сообщением. */
 export interface LinkButton { text: string; url: string }
@@ -148,10 +148,11 @@ async function recordNotifications(targets: number[], text: string, button?: Lin
   }
 }
 
-async function sendWithImages(chatIds: number[], text: string, attachmentIds: number[], button?: LinkButton, excludeTgId?: number): Promise<void> {
+/** Возвращает число получателей (привязанных к боту), которым реально ушло уведомление. 0 → доставить было некому. */
+async function sendWithImages(chatIds: number[], text: string, attachmentIds: number[], button?: LinkButton, excludeTgId?: number): Promise<number> {
   // Исключаем автора действия — он не должен получать пуш/уведомление о собственном комменте/задаче.
   const targets = excludeTgId != null ? chatIds.filter((id) => id !== excludeTgId) : chatIds;
-  if (!targets.length) return;
+  if (!targets.length) return 0;
   await recordNotifications(targets, text, button);
   // Картинки грузим один раз, шлём каждому.
   const photos = (await Promise.all(attachmentIds.map((id) => getAttachment(id)))).filter(Boolean) as { mime: string | null; data: Buffer }[];
@@ -165,14 +166,31 @@ async function sendWithImages(chatIds: number[], text: string, attachmentIds: nu
       else await sendMediaGroup(chatId, chunk);
     }
   }
+  return targets.length;
 }
 
-/** Уведомить по логинам (разработчик/сотрудник/клиент) с картинками и опц. кнопкой-ссылкой. excludeTgId — автор, ему не слать. */
-export async function notifyLogins(logins: string[], text: string, attachmentIds: number[] = [], button?: LinkButton, excludeTgId?: number): Promise<void> {
-  await sendWithImages(await tgIdsForLogins(logins), text, attachmentIds, button, excludeTgId);
+/** Уведомить по логинам (разработчик/сотрудник/клиент). Возвращает число получателей. excludeTgId — автор, ему не слать. */
+export async function notifyLogins(logins: string[], text: string, attachmentIds: number[] = [], button?: LinkButton, excludeTgId?: number): Promise<number> {
+  return sendWithImages(await tgIdsForLogins(logins), text, attachmentIds, button, excludeTgId);
 }
 
-/** Уведомить клиента/сотрудника проекта с картинками и опц. кнопкой-ссылкой. excludeTgId — автор, ему не слать. */
-export async function notifyProjectClients(projectKey: string, text: string, attachmentIds: number[] = [], button?: LinkButton, excludeTgId?: number): Promise<void> {
-  await sendWithImages(await tgIdsForProject(projectKey, ["client", "employee"]), text, attachmentIds, button, excludeTgId);
+/** Уведомить клиента/сотрудника проекта. Возвращает число получателей (0 → клиент не подключён к боту). */
+export async function notifyProjectClients(projectKey: string, text: string, attachmentIds: number[] = [], button?: LinkButton, excludeTgId?: number): Promise<number> {
+  return sendWithImages(await tgIdsForProject(projectKey, ["client", "employee"]), text, attachmentIds, button, excludeTgId);
+}
+
+/** Привязан ли к боту хоть один клиент/сотрудник проекта (т.е. дойдёт ли до клиента уведомление). */
+export async function hasLinkedClient(projectKey: string): Promise<boolean> {
+  return (await tgIdsForProject(projectKey, ["client", "employee"])).length > 0;
+}
+
+/**
+ * Предупредить команду (постановщика-разработчика + админа), что клиентское уведомление НЕ доставлено —
+ * клиент проекта не подключён к боту. Иначе разработчик ждёт ответа по задаче, которую клиент не видел.
+ */
+export async function warnClientUnreachable(projectKey: string, taskId: string, summary: string, devLogin?: string | null): Promise<void> {
+  const btn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
+  const msg = `⚠️ <b>Клієнт не отримав сповіщення</b> · ${await taskTag(taskId)}: ${summary}\nКлієнт проєкту «${projectKey}» не підключений до бота — повідомлення не доставлено. Зв'яжіться з ним напряму.`;
+  await notifyAdmin(msg, btn).catch(() => {});
+  if (devLogin) await notifyLogins([devLogin], msg, [], btn).catch(() => {});
 }

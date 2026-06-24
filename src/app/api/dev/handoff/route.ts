@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken, setOwnerAction, setClientAction, getProjectFull, projectHasClient, enableProjectField } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { notifyAdmin, notifyProjectClients, taskTag } from "@/lib/notify";
+import { notifyAdmin, notifyProjectClients, taskTag, warnClientUnreachable } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { classifyHandoff, generateGuide } from "@/lib/handoff-classify";
 import { submitForModeration } from "@/lib/moderation";
@@ -67,8 +67,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, handedOff: "client", paidApproval: true, fieldKey, needGuide: cls.guideId == null, note: "Платный сервис: запрос с полем+инструкцией готов, клиентское сообщение ушло владельцу на модерацию (одобрение стоимости). Бери следующую незаблокированную задачу." });
       }
       await be.addComment(taskId, `🔑 <b>Потрібно зареєструвати / надати доступ:</b> ${short}\n\nІнструкція та поле для даних — під заголовком задачі. Після реєстрації впишіть дані та натисніть «Готово».`, "client", undefined, true, true).catch(() => {});
-      await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => {});
-      return NextResponse.json({ ok: true, handedOff: "client", fieldKey, needGuide: cls.guideId == null, note: "Запрос ушёл клиенту с инструкцией и полем. Бери следующую незаблокированную задачу." });
+      const reached = await notifyProjectClients(projectKey, `🔑 <b>Потрібна ваша дія</b> · ${await taskTag(taskId)}\nПотрібно зареєструвати: ${short}\nВідкрийте задачу — там покрокова інструкція і поле для даних.`, [], taskBtn).catch(() => 0);
+      // Клиент не подключён к боту → уведомление не доставлено: предупреждаем команду, иначе ждём «молчания».
+      if (!reached) await warnClientUnreachable(projectKey, taskId, task.summary, proj?.meta.defaultAssignee).catch(() => {});
+      return NextResponse.json({ ok: true, handedOff: "client", clientNotified: reached > 0, fieldKey, needGuide: cls.guideId == null, note: reached > 0 ? "Запрос ушёл клиенту с инструкцией и полем. Бери следующую незаблокированную задачу." : "ВНИМАНИЕ: клиент не подключён к боту — уведомление не доставлено. Запрос/поле созданы, но свяжись с клиентом другим каналом или сообщи владельцу. Бери следующую незаблокированную задачу." });
     }
 
     // owner
