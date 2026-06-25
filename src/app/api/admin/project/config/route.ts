@@ -65,6 +65,19 @@ export async function POST(req: Request) {
     if (typeof b[f] === "boolean") { meta[f] = (b[f] as boolean) || undefined; set[f] = b[f]; }
   }
   if (typeof b.deliverBranch === "string") { meta.deliverBranch = (b.deliverBranch as string).trim() || undefined; set.deliverBranch = meta.deliverBranch ?? null; }
+  // Клиентский Railway-деплой (для авто-апрува деплоя порталом): railwayToken + projectId/environmentId/serviceId (+ pgServiceId).
+  if (b.clientDeploy && typeof b.clientDeploy === "object") {
+    const cd = b.clientDeploy as Record<string, unknown>;
+    const prev = meta.clientDeploy ?? {};
+    meta.clientDeploy = {
+      railwayToken: cd.railwayToken ? String(cd.railwayToken) : prev.railwayToken,
+      projectId: cd.projectId ? String(cd.projectId) : prev.projectId,
+      environmentId: cd.environmentId ? String(cd.environmentId) : prev.environmentId,
+      serviceId: cd.serviceId ? String(cd.serviceId) : prev.serviceId,
+      pgServiceId: cd.pgServiceId ? String(cd.pgServiceId) : prev.pgServiceId,
+    };
+    set.clientDeploy = { railwayToken: !!meta.clientDeploy.railwayToken, projectId: meta.clientDeploy.projectId, serviceId: meta.clientDeploy.serviceId };
+  }
   await setProjectMeta(key, proj.name, meta);
   return NextResponse.json({ ok: true, projectKey: key, set });
 }
