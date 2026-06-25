@@ -917,6 +917,32 @@ export async function getProjectEmployees(projectKey: string): Promise<{ login: 
   );
   return rows.map((r) => ({ login: r.login, fullName: r.full_name || r.login }));
 }
+/** Админы/супер-админы (для делегирования разработчиком — DEV-30: задача требует прав вне доступа разраба). */
+export async function getAdmins(): Promise<{ login: string; fullName: string }[]> {
+  const rows = await q<{ login: string; full_name: string | null }>(
+    `SELECT login, full_name FROM members WHERE role = 'admin' AND login IS NOT NULL ORDER BY full_name`,
+  );
+  return rows.map((r) => ({ login: r.login, fullName: r.full_name || r.login }));
+}
+/** Аудит постановщика: проекты, где login — reporter, и ВСЕ reporter-логины в этих проектах (для поиска
+ *  старого YouTrack-ника при миграции — DEV-27). */
+export async function reporterAudit(login: string): Promise<{ key: string; name: string; reporters: { login: string | null; fullName: string | null; count: number }[] }[]> {
+  const rows = await q<{ key: string; name: string; login: string | null; full_name: string | null; cnt: number }>(
+    `WITH cli AS (SELECT DISTINCT t.project_id FROM tasks t JOIN members m ON t.reporter_id = m.id WHERE m.login = $1)
+     SELECT p.key, p.name, m.login, m.full_name, count(*)::int AS cnt
+       FROM tasks t JOIN projects p ON t.project_id = p.id LEFT JOIN members m ON t.reporter_id = m.id
+      WHERE t.project_id IN (SELECT project_id FROM cli)
+      GROUP BY p.key, p.name, m.login, m.full_name
+      ORDER BY p.key, cnt DESC`,
+    [login],
+  );
+  const map = new Map<string, { key: string; name: string; reporters: { login: string | null; fullName: string | null; count: number }[] }>();
+  for (const r of rows) {
+    const e = map.get(r.key) ?? map.set(r.key, { key: r.key, name: r.name, reporters: [] }).get(r.key)!;
+    e.reporters.push({ login: r.login, fullName: r.full_name, count: r.cnt });
+  }
+  return [...map.values()];
+}
 /** Назначить исполнителя по логину. Статус НЕ меняем — «В работе» ставит сам разработчик, коли реально взяв задачу. */
 export async function assignTask(readableId: string, login: string): Promise<void> {
   await q(

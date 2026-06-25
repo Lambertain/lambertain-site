@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, projectHasClient } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, projectHasClient } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -14,6 +14,7 @@ import { OwnerActionBar } from "./owner-action-bar";
 import { ClientActionBar } from "./client-action-bar";
 import { DeleteOwnTask } from "./delete-own-task";
 import { DelegateBar } from "./delegate-bar";
+import { EscalateBar } from "./escalate-bar";
 import { TaskEdit } from "./task-edit";
 import { MoveTask } from "./move-task";
 import { StatusPicker } from "./status-picker";
@@ -76,6 +77,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const clientGuide = cg ? guideText(cg, locale) : null;
   // Клиент может делегировать задачу сотруднику своего проекта (если такие есть).
   const employees = me.role === "client" ? await getProjectEmployees(id.split("-")[0]) : [];
+  // DEV-30: разработчику — список админов/супер-админов, кому можно передать задачу (нужны права вне его доступа).
+  const admins = me.role === "contributor" ? await getAdmins() : [];
   // Сотрудник в проекте БЕЗ клиента приравнивается к клиенту (пользователь/постановщик): пишет клиент-видимые
   // комменты без выбора видимости и без гендер-предупреждения — как клиент.
   const projHasClient = await projectHasClient(id.split("-")[0]);
@@ -202,6 +205,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       {/* Клиент делегирует задачу своему сотруднику (если в проекте есть сотрудники) */}
       {me.role === "client" && employees.length > 0 && !task.internal && (
         <DelegateBar taskId={task.id} employees={employees} locale={locale} />
+      )}
+
+      {/* DEV-30: разработчик передаёт задачу выбранному админу/супер-админу, если нужны права вне его доступа */}
+      {me.role === "contributor" && admins.length > 0 && (
+        <EscalateBar taskId={task.id} admins={admins} locale={locale} />
       )}
 
       {/* Теги триажа (тип/сложность/скилы) — команде, не клиенту */}

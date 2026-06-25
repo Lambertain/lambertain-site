@@ -5,7 +5,7 @@ import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny, makeCommentClientVisible } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue } from "@/lib/db";
+import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
@@ -170,6 +170,21 @@ export async function delegateTask(taskId: string, employeeLogin: string): Promi
   const task = await be.getTask(taskId).catch(() => null);
   await notifyLogins([employeeLogin], `📋 <b>Вам делеговано задачу</b> · ${await taskTag(taskId)}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
   await be.addComment(taskId, `➡️ <i>Делеговано співробітнику: ${emp.fullName}.</i>`, "internal").catch(() => {});
+  revalidatePath(`/admin/tasks/${taskId}`);
+  return { ok: true };
+}
+
+/** DEV-30: разработчик передаёт задачу выбранному админу/супер-админу (когда нужны права вне его доступа). */
+export async function delegateToAdmin(taskId: string, adminLogin: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.role !== "contributor") return { error: "Нет прав" };
+  const admin = (await getAdmins()).find((a) => a.login === adminLogin);
+  if (!admin) return { error: "Адмін не знайдений" };
+  await assignTask(taskId, adminLogin);
+  const be = getBackend();
+  const task = await be.getTask(taskId).catch(() => null);
+  await notifyLogins([adminLogin], `📋 <b>Вам передано задачу</b> · ${await taskTag(taskId)}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
+  await be.addComment(taskId, `➡️ <i>Передано адміну: ${admin.fullName} (потрібні права поза доступом розробника).</i>`, "internal").catch(() => {});
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
 }
