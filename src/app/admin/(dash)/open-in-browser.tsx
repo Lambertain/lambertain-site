@@ -25,10 +25,19 @@ export function OpenInBrowser({ label }: { label: string }) {
       const data = await res.json().catch(() => ({}));
       if (data.ok && data.token) {
         // Открываем в браузере ту же страницу, на которой пользователь был в апке.
-        const next = window.location.pathname + window.location.search;
-        const url = `${window.location.origin}/api/auth/web?token=${data.token}&next=${encodeURIComponent(next)}`;
+        let next = window.location.pathname + window.location.search;
         // @ts-expect-error — SDK Telegram
         const wa = window.Telegram?.WebApp;
+        // DEV-22: апку открыли по deep-link с целевым путём (login проносит next через startapp=auth_<base64url>)
+        // — после входа вернуть браузер на эту цель (задачу), а не на текущую страницу апки.
+        const sp: string = wa?.initDataUnsafe?.start_param || "";
+        if (sp.startsWith("auth_")) {
+          try {
+            const p = atob(sp.slice(5).replace(/-/g, "+").replace(/_/g, "/"));
+            if (p.startsWith("/admin") && !p.startsWith("//")) next = p;
+          } catch { /* ignore */ }
+        }
+        const url = `${window.location.origin}/api/auth/web?token=${data.token}&next=${encodeURIComponent(next)}`;
         if (wa?.openLink) wa.openLink(url);
         else window.open(url, "_blank");
       }

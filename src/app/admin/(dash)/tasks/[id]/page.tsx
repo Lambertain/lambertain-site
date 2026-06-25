@@ -34,8 +34,9 @@ function fmt(ms: number | undefined, locale: Locale): string {
 
 export default async function TaskPage({ params }: { params: Promise<{ id: string }> }) {
   const me = await getPrincipal();
-  if (!me) redirect("/admin/login");
   const { id } = await params;
+  // DEV-22: не теряем цель — после логина вернёмся на эту задачу (next проносится через Telegram-вход).
+  if (!me) redirect(`/admin/login?next=${encodeURIComponent(`/admin/tasks/${id}`)}`);
   const locale = await getLocale();
   const be = getBackend();
 

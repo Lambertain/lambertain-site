@@ -11,12 +11,20 @@ export default function LoginPage() {
   const [state, action, pending] = useActionState(login, undefined);
   const [showPass, setShowPass] = useState(false);
   const [locale, setLocale] = useState<Locale>("uk");
+  const [botLink, setBotLink] = useState(BOT_LINK);
 
   useEffect(() => {
     // Локаль читаем из браузера ТОЛЬКО после монтирования: lazy-init в useState дал бы hydration mismatch
     // (сервер не знает navigator/localStorage и отрендерил бы дефолт).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocale(detectClientLocale());
+    // DEV-22: если пришли на логин с ?next=<путь> (напр. по уведомлению на задачу), проносим путь через Telegram
+    // (startapp=auth_<base64url>), чтобы после входа апка открыла браузер именно на этой странице, а не на дашборде.
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next && next.startsWith("/admin") && !next.startsWith("//")) {
+      const enc = btoa(next).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      setBotLink(`https://t.me/LambDev_bot?startapp=auth_${enc}`);
+    }
   }, []);
 
   return (
@@ -29,7 +37,7 @@ export default function LoginPage() {
           </h1>
         </div>
 
-        <a href={BOT_LINK} target="_blank" rel="noreferrer" style={{ ...ui.btnAccent, textAlign: "center", textDecoration: "none" }}>
+        <a href={botLink} target="_blank" rel="noreferrer" style={{ ...ui.btnAccent, textAlign: "center", textDecoration: "none" }}>
           {t(locale, "login.viaTelegram")}
         </a>
         <p style={{ ...ui.monoLabel, textTransform: "none", lineHeight: 1.5 }}>{t(locale, "login.hint")}</p>
