@@ -269,6 +269,21 @@ export async function setMemberProjects(login: string, keys: string[]): Promise<
     if (k) await q("INSERT INTO member_projects (login, project_key) VALUES ($1,$2) ON CONFLICT DO NOTHING", [login, k]);
   }
 }
+/** Карточка участника: роль, Telegram-ник, проекты — для всплывающего окна по постановщику/исполнителю. */
+export async function memberCard(login: string): Promise<{ login: string; fullName: string; role: string | null; telegram: string | null; tgId: string | null; projects: string[] } | null> {
+  const m = await q<{ full_name: string | null; role: string | null }>("SELECT full_name, role FROM members WHERE login = $1", [login]);
+  const tg = await q<{ username: string | null; tg_id: string | null; role: string | null; full_name: string | null }>(
+    "SELECT username, tg_id::text AS tg_id, role, full_name FROM tg_links WHERE youtrack_login = $1 LIMIT 1", [login]);
+  if (!m[0] && !tg[0]) return null;
+  return {
+    login,
+    fullName: m[0]?.full_name || tg[0]?.full_name || login,
+    role: m[0]?.role || tg[0]?.role || null,
+    telegram: tg[0]?.username || null,
+    tgId: tg[0]?.tg_id || null,
+    projects: await getMemberProjects(login),
+  };
+}
 
 /**
  * Есть ли у проекта привязанный клиент (role=client, состоит в проекте). Клиент может быть в НЕСКОЛЬКИХ

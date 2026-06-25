@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, projectHasClient } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, memberCard, projectHasClient } from "@/lib/db";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -20,6 +20,7 @@ import { MoveTask } from "./move-task";
 import { StatusPicker } from "./status-picker";
 import { BackButton } from "./back-button";
 import { ScrollTop } from "./scroll-top";
+import { ReporterHover } from "./reporter-hover";
 import { DeployBadge } from "../../deploy-badge";
 import { AddresseeBadge } from "../../addressee-badge";
 import { taskAddressee } from "@/lib/task-addressee";
@@ -110,6 +111,9 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   }));
   // DEV-7: коммент Клода (dev_authored) разработчик/админ может править/удалять из UI (супер-админ — через модерацию).
   const canManageDev = isAdmin || me.role === "contributor";
+  // DEV-31: всплывающее окно по постановщику (роль + Telegram + проекты) — только команде, не клиенту.
+  const projNames: Record<string, string> = Object.fromEntries((projects ?? []).map((p) => [p.key, p.name]));
+  const reporterCard = task.reporter && me.role !== "client" ? await memberCard(task.reporter.login) : null;
   const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal" && c.approved).length : viewComments.length;
 
   return (
@@ -176,7 +180,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           const show = task.reporter
             ? me.role !== "client" || task.reporter.role === "client" || task.reporter.role === "employee"
             : me.role !== "client";
-          return show ? <span>{t(locale, "card.from", { name })}</span> : null;
+          if (!show) return null;
+          // DEV-31: команде — постановщик с всплывающим окном (роль/Telegram/проекты); клиенту — обычный текст.
+          return reporterCard
+            ? <ReporterHover text={t(locale, "card.from", { name })} role={reporterCard.role} projects={reporterCard.projects} telegram={reporterCard.telegram} projectNames={projNames} locale={locale} />
+            : <span>{t(locale, "card.from", { name })}</span>;
         })()}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
       </div>
