@@ -30,9 +30,18 @@ Project: \`${projectKey}\` · Token: \`${token}\` (в публичный код 
 }
 
 /** ПОЛНЫЙ текст протокола (отдаётся через /api/dev/protocol; единый живой источник). */
-export function protocolBody(token: string, projectKey: string, base = PORTAL_BASE, opts: { collaborative?: boolean } = {}): string {
-  // Секция для проектов в режиме совместной разработки через PR (meta.clientDeliverPR): тянуть свежий client main каждой сессией.
-  const collab = opts.collaborative
+export function protocolBody(token: string, projectKey: string, base = PORTAL_BASE, opts: { collaborative?: boolean; gitflow?: boolean } = {}): string {
+  const k = projectKey.toLowerCase();
+  // gitflow-режим (meta.gitflowDelivery): працюєш у нашому форку, портал сам відкриває PR у develop клієнта.
+  const collab = opts.gitflow
+    ? `\n🔀 **GITFLOW ЧЕРЕЗ ПОРТАЛ (цей проєкт).** Працюєш ТІЛЬКИ в нашому форку; доставку в клієнтський репо (PR у \`develop\`) робить портал. Прямого доступу до клієнтського репо в тебе НЕМАЄ. Порядок по КОЖНІЙ задачі:
+1. **Підтягни свіжий клієнтський код:** \`curl -s -X POST -H "Authorization: Bearer ${token}" "${base}/api/dev/sync"\` → портал дзеркалить клієнтський \`develop\` у наш форк як гілку \`client-sync/develop\` (ті самі SHA).
+2. **Створи робочу гілку від неї:** \`git fetch origin && git checkout -b feature/${k}-<N>-<slug> origin/client-sync/develop\` (назва — \`feature/...\` або \`fix/...\` + номер задачі, напр. \`feature/${k}-14-invoice-number\`).
+3. Роби задачу, комість у цю гілку і **запуш її в наш форк:** \`git push -u origin feature/${k}-<N>-<slug>\`.
+4. **Здаючи задачу — передай імʼя гілки** у статус (тіло у UTF-8 файл, як завжди): \`{"taskId":"${projectKey}-<N>","status":"review","summary":"<для клієнта>","branch":"feature/${k}-<N>-<slug>"}\` → \`POST ${base}/api/dev/status\`. Портал сам запушить гілку в клієнтський репо й відкриє **PR у \`develop\`**; його рев'ює і мержить розробник клієнта.
+- НЕ пуш у клієнтський репо і НЕ відкривай PR вручну — це робить портал. Працюй лише у нашому форку.
+- Перед здачею ще раз виклич \`/api/dev/sync\`, щоб гілка була від свіжого \`develop\` (інакше портал попередить, що потрібен ребейз).\n`
+    : opts.collaborative
     ? `\n🔀 **СПІЛЬНА РОЗРОБКА ЧЕРЕЗ PR (цей проєкт).** Над клієнтськими репозиторіями працює ще й розробник клієнта — він мерджить Pull Request'и. Тому:
 - **На ПОЧАТКУ КОЖНОЇ сесії, ДО будь-яких змін, підтягни свіжий клієнтський код.** Прямого доступу до клієнтських репо в тебе НЕМАЄ — їх тягне портал. Виклич:
   \`curl -s -X POST -H "Authorization: Bearer ${token}" "${base}/api/dev/sync"\`

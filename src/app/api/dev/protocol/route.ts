@@ -18,7 +18,7 @@ export async function GET(req: Request) {
 
   // Совместная разработка через PR (meta.clientDeliverPR) → добавляем секцию про подтягивание client main каждой сессией.
   const proj = await getProjectFull(projectKey).catch(() => null);
-  return new Response(protocolBody(token, projectKey, PORTAL_BASE, { collaborative: !!proj?.meta.clientDeliverPR }), {
+  return new Response(protocolBody(token, projectKey, PORTAL_BASE, { collaborative: !!proj?.meta.clientDeliverPR, gitflow: !!proj?.meta.gitflowDelivery }), {
     headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
   });
 }
