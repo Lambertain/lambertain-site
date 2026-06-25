@@ -8,13 +8,16 @@ import { assignProjectDevAndNotify } from "@/lib/task-intake";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients, notifyLogins, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
+import { syncTaskToTrello } from "@/lib/trello";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 export async function updateTaskStatus(id: string, status: string): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
   try {
     await getBackend().updateStatus(id, status);
+    after(() => syncTaskToTrello(id, status)); // Trello: подвинуть связанную карточку под новый статус
     // Деплой-стадия от статуса: взял в работу → «Готується» (pr); на ревью → «На тестовому» (dev). prod ставит доставка.
     const bucket = statusBucket(status);
     if (bucket === "inProgress") await setDeployStage(id, "pr").catch(() => {});
@@ -78,6 +81,7 @@ export async function moveToReview(id: string, ref: string): Promise<{ ok?: bool
   if (me.role !== "contributor" && me.realRole !== "admin") return { error: "Нет прав" };
   try {
     await getBackend().updateStatus(id, "Review");
+    after(() => syncTaskToTrello(id, "Review")); // Trello: карточку → колонка тестирования
     await setReviewRef(id, ref.trim() || null);
     await advanceStage(id, "dev").catch(() => {}); // на ревью = на дев-мейн → «На тестовому сайті» + коммент клиенту
     revalidatePath("/admin");

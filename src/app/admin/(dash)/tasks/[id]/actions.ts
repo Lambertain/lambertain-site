@@ -10,6 +10,7 @@ import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskT
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
 import { autoDeliverAndNotify } from "@/lib/auto-deliver";
+import { syncTaskToTrello } from "@/lib/trello";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
@@ -302,6 +303,7 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
     if (me.realRole !== "admin" && !isReporter && !isProjectClientSide) return { error: "Нет прав" };
     if (accept) {
       await be.updateStatus(id, "Done");
+      after(() => syncTaskToTrello(id, "Done")); // Trello: карточку → «Виконано»
       if (task.assignee?.login) await notifyLogins([task.assignee.login], `✅ <b>Принято</b> · ${await taskTag(id)}: ${task.summary}`).catch(() => {});
       // Автодоставка dev→client при приёмке (если включён флаг проекта). Фоном — не блокируем экшен.
       const proj = await getProjectFull(task.projectKey).catch(() => null);
@@ -311,6 +313,7 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
       }
     } else {
       await be.updateStatus(id, "Rework");
+      after(() => syncTaskToTrello(id, "Rework")); // Trello: карточку → назад в работу
       if (note?.trim()) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${note.trim()}`, "internal");
       if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${await taskTag(id)}: ${task.summary}${note?.trim() ? `\n${note.trim().slice(0, 300)}` : ""}`).catch(() => {});
     }

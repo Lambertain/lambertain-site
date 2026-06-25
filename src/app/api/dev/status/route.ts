@@ -15,6 +15,7 @@ import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
 import { autoDeliverAndNotify, deliverGitflowAndNotify } from "@/lib/auto-deliver";
+import { syncTaskToTrello } from "@/lib/trello";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
       // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
       if (task.autoDone || proj?.meta.autoApprove) {
         await be.updateStatus(taskId, "Done");
+        after(() => syncTaskToTrello(taskId, "Done")); // Trello: карточку → «Виконано»
         await advanceStage(taskId, "dev").catch(() => {}); // готово и на дев-мейн → «На тестовому» + коммент клиенту; авто-доставка ниже переведёт в «Опубліковано»
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
       await be.updateStatus(taskId, "Review");
+      after(() => syncTaskToTrello(taskId, "Review")); // Trello: карточку → колонка тестирования
       await advanceStage(taskId, "dev").catch(() => {}); // сдал на ревью = на дев-мейн → «На тестовому сайті» + коммент клиенту
       // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
       if (summary) {
@@ -86,6 +89,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, status: "Review", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : "none" });
     }
     await be.updateStatus(taskId, status);
+    after(() => syncTaskToTrello(taskId, status)); // Trello: карточку под новый статус (напр. «В процесі»)
     if (status === "In Progress") await setDeployStage(taskId, "pr").catch(() => {}); // взял в работу → «Готується»
     return NextResponse.json({ ok: true, status });
   } catch (e) {

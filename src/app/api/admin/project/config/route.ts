@@ -32,6 +32,7 @@ export async function GET(req: Request) {
     // Режим доставки
     clientDeliverPR: !!m.clientDeliverPR,
     autoDeliver: !!m.autoDeliver,
+    gitflowDelivery: !!m.gitflowDelivery,
     deliverBranch: m.deliverBranch ?? null,
     clientAutoMigrate: !!m.clientAutoMigrate,
     autoApprove: !!m.autoApprove,
