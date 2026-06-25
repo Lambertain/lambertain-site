@@ -41,12 +41,23 @@ export async function autoDeliverAndNotify(projectKey: string, meta: ProjectMeta
     if (!ds || !ds.length) return;
     // toDefault только в прямом режиме (squash в main) → публикация в прод. В PR-режиме — ждём мержа дева клиента.
     if (ds.some((d) => d.toDefault)) await publishProjectToProd(projectKey).catch(() => {});
+    // Деплой «живой» = SUCCESS и задеплоен именно наш коммит. Иначе — явное предупреждение (не глотаем).
+    const live = (d: (typeof ds)[number]) => !d.deploy || (d.deploy.status === "SUCCESS" && d.deploy.matched !== false);
     const lines = ds
-      .map((d) => `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${d.deploy ? ` · деплой: ${d.deploy.status}` : ""}`)
+      .map((d) => {
+        const dep = d.deploy;
+        const depTxt = !dep
+          ? ""
+          : dep.status === "SUCCESS" && dep.matched !== false
+            ? " · деплой: ✓ опубліковано"
+            : ` · ⚠️ деплой: ${dep.status}${dep.matched === false ? " (НЕ той коміт!)" : ""}${dep.note ? " — " + dep.note : ""}`;
+        return `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${depTxt}`;
+      })
       .join("\n");
     const first = ds[0];
     const btn = first.prUrl ? { text: "Pull Request", url: first.prUrl } : { text: "Коммит", url: first.commitUrl };
-    await notifyAdmin(`🚀 <b>Авто-доставка</b> · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
+    const header = ds.every(live) ? "🚀 <b>Авто-доставка</b>" : "⚠️ <b>Авто-доставка — деплой НЕ опубліковано, перевір</b>";
+    await notifyAdmin(`${header} · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
   } catch (e) {
     await notifyAdmin(
       `⚠️ <b>Авто-доставка не вдалася</b> · ${await taskTag(taskId)}: ${e instanceof Error ? e.message : "помилка"}`,
