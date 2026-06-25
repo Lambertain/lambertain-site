@@ -183,7 +183,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           if (!show) return null;
           // DEV-31: команде — постановщик с всплывающим окном (роль/Telegram/проекты); клиенту — обычный текст.
           return reporterCard
-            ? <ReporterHover text={t(locale, "card.from", { name })} role={reporterCard.role} projects={reporterCard.projects} telegram={reporterCard.telegram} projectNames={projNames} locale={locale} />
+            ? <ReporterHover text={t(locale, "card.from", { name })} role={reporterCard.role ?? task.reporter?.role ?? null} projects={reporterCard.projects} telegram={reporterCard.telegram} projectNames={projNames} locale={locale} />
             : <span>{t(locale, "card.from", { name })}</span>;
         })()}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
