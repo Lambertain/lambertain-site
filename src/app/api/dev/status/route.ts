@@ -46,7 +46,8 @@ export async function POST(req: Request) {
       const task = await be.getTask(taskId);
       const proj = await getProjectFull(projectKey).catch(() => null);
       // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
-      if (task.autoDone || proj?.meta.autoApprove) {
+      // DEV-29: НО задачи ОТ КЛИЕНТА (reporter=client) авто-закрывать нельзя — их принимает сам клиент (идут в Review).
+      if ((task.autoDone || proj?.meta.autoApprove) && task.reporter?.role !== "client") {
         await be.updateStatus(taskId, "Done");
         after(() => syncTaskToTrello(taskId, "Done")); // Trello: карточку → «Виконано»
         await advanceStage(taskId, "dev").catch(() => {}); // готово и на дев-мейн → «На тестовому» + коммент клиенту; авто-доставка ниже переведёт в «Опубліковано»

@@ -79,13 +79,15 @@ export async function addTaskComment(
     // Автор коммента = текущий член (по логину); супер-админ без логина → Lambertain. Клиент видит команду как «Lambertain» (маскируется при выводе).
     await getBackend().addComment(id, body, visibility, me.youtrackLogin);
     revalidatePath(`/admin/tasks/${id}`);
-    // Клиент (или сотрудник-как-клиент) ответил → вернуть задачу в работу, если она была заблокирована
-    // (ответ на эскалацию) ИЛИ уже завершена (DEV-19: новый коммент на Done — задача не должна висеть закрытой).
+    // Клиент (или сотрудник-как-клиент) ответил → мяч у нас, возвращаем в работу:
+    // - blocked (ответ на эскалацию), done (DEV-19: новый коммент на Done — не висеть закрытой),
+    // - review (DEV-24: задача ушла в ревью с вопросом клиенту; клиент ответил → «In Progress».
+    //   Приёмку «всё ок» клиент делает кнопкой «Готово», а не комментарием — поэтому коммент = вернуть в работу).
     if (clientSide) {
       try {
         const t = await getBackend().getTask(id);
         const bucket = statusBucket(t.state);
-        if (bucket === "blocked" || bucket === "done") await getBackend().updateStatus(id, "In Progress");
+        if (bucket === "blocked" || bucket === "done" || bucket === "review") await getBackend().updateStatus(id, "In Progress");
       } catch { /* best-effort */ }
     }
     // Уведомления (best-effort): адресно по ролям + картинки задачи.

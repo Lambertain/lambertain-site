@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken, getTaskTags, getProjectFull } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
+import { statusBucket } from "@/lib/statuses";
 import { ESCALATION_MARK } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -75,6 +76,8 @@ export async function GET(req: Request) {
       ownerAction: t.ownerAction ?? null,
       // Ждёт действия клиента (регистрация/доступ) — тоже пропусти, продолжишь после ответа клиента.
       clientAction: t.clientAction ?? null,
+      // DEV-25: задача заблокирована (Blocked) — НЕ бери в работу, она ждёт разблокировки/решения.
+      blocked: statusBucket(t.state) === "blocked",
     })),
   });
 }
