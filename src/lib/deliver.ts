@@ -306,9 +306,13 @@ export interface ClientDeploy {
   pgServiceId?: string;
 }
 export interface DeployStatus {
-  status: string;
+  status: string; // SUCCESS | BUILDING | DEPLOYING | NEEDS_APPROVAL | FAILED | PENDING | NOT_CONFIGURED | ERROR | …
   commit: string;
   approved: boolean;
+  /** Совпал ли задеплоенный коммит с только что доставленным (false = задеплоен НЕ наш коммит → доставка не доехала). */
+  matched?: boolean;
+  /** Пояснение для UI: ошибка апрува / «авто-деплой не настроен» и т.п. */
+  note?: string;
 }
 
 async function railwayGql(token: string, query: string, variables: Record<string, unknown>): Promise<{ data?: Record<string, unknown>; errors?: unknown }> {
@@ -369,26 +373,40 @@ export async function clientDeployStatus(cd: ClientDeploy): Promise<DeployStatus
   return { status: node.status, commit: (node.meta?.commitHash || "").slice(0, 8), approved: node.status !== "NEEDS_APPROVAL" };
 }
 
-/** Апрувнуть ожидающий деплой клиента и опросить статус (ограниченно по времени). */
-export async function approveClientDeploy(cd: ClientDeploy, waitMs = 90000): Promise<DeployStatus> {
+/**
+ * Апрувнуть деплой клиента ИМЕННО по доставленному коммиту и дождаться статуса.
+ * Раньше брался «последний» деплой сразу — но после push новый деплой в Railway появляется не мгновенно,
+ * поэтому апрувился старый (уже SUCCESS), а наш свежий висел NEEDS_APPROVAL. Теперь ждём появления нужного
+ * коммита, апрувим именно его, и возвращаем matched=false, если задеплоен НЕ наш коммит (доставка не доехала).
+ */
+export async function approveClientDeploy(cd: ClientDeploy, expectCommit?: string, waitMs = 150000): Promise<DeployStatus> {
   if (!cdOk(cd)) throw new Error("Клиентский Railway не настроен (нужны token, projectId, environmentId, serviceId)");
-  const get = () => railwayGql(cd.railwayToken!, Q_DEPLOY, { p: cd.projectId, e: cd.environmentId, s: cd.serviceId });
-  const node0 = (await get()).data as { deployments?: { edges?: { node: { id: string; status: string; meta?: { commitHash?: string } } }[] } };
-  const dep = node0?.deployments?.edges?.[0]?.node;
-  if (!dep) throw new Error("Деплой клиента не найден");
+  const get = async () => {
+    const d = (await railwayGql(cd.railwayToken!, Q_DEPLOY, { p: cd.projectId, e: cd.environmentId, s: cd.serviceId })).data as { deployments?: { edges?: { node: { id: string; status: string; meta?: { commitHash?: string } } }[] } };
+    return d?.deployments?.edges?.[0]?.node;
+  };
+  const want = (expectCommit || "").slice(0, 7);
+  const isOurs = (n?: { meta?: { commitHash?: string } }) => !want || (n?.meta?.commitHash || "").startsWith(want);
+  const deadline = Date.now() + waitMs;
+  // 1) дождаться появления именно нашего деплоя (по коммиту), затем апрувнуть его.
+  let dep = await get();
+  while (Date.now() < deadline && want && !isOurs(dep)) {
+    await new Promise((r) => setTimeout(r, 5000));
+    dep = await get();
+  }
+  if (!dep) return { status: "PENDING", commit: want, approved: false, matched: false, note: "деплой ещё не появился" };
+  const matched = isOurs(dep);
   if (dep.status === "NEEDS_APPROVAL") {
     await railwayGql(cd.railwayToken!, `mutation($id:String!){ deploymentApprove(id:$id) }`, { id: dep.id });
   }
+  // 2) дождаться терминального статуса (или вернуть текущий «в процессе» — UI покажет, что идёт).
   const terminal = ["SUCCESS", "FAILED", "CRASHED", "REMOVED", "SKIPPED"];
-  const deadline = Date.now() + waitMs;
   let last = dep;
-  while (Date.now() < deadline) {
+  while (Date.now() < deadline && !terminal.includes(last.status)) {
     await new Promise((r) => setTimeout(r, 8000));
-    const d = (await get()).data as { deployments?: { edges?: { node: { id: string; status: string; meta?: { commitHash?: string } } }[] } };
-    last = d?.deployments?.edges?.[0]?.node ?? last;
-    if (terminal.includes(last.status)) break;
+    last = (await get()) ?? last;
   }
-  return { status: last.status, commit: (last.meta?.commitHash || "").slice(0, 8), approved: true };
+  return { status: last.status, commit: (last.meta?.commitHash || "").slice(0, 8), approved: last.status !== "NEEDS_APPROVAL", matched: matched && isOurs(last) };
 }
 
 /**

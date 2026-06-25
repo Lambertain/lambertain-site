@@ -83,12 +83,20 @@ export async function runDeliver(
       let deploy: DeployStatus | null = null;
       // Деплой/апрув — только в прямом режиме (push в main). В PR-режиме мержит дев клиента.
       if (!asPR && res.toDefault) {
+        const sha = (res.commitUrl.match(/\/commit\/([0-9a-f]+)/) || [])[1] || "";
         if (proj.meta.clientDeploy?.railwayToken) {
-          await new Promise((r) => setTimeout(r, 4000));
-          deploy = await approveClientDeploy(proj.meta.clientDeploy).catch(() => null);
+          // Апрувим ИМЕННО наш коммит (ждём его появления в Railway), ошибки НЕ глотаем — показываем в UI.
+          deploy = await approveClientDeploy(proj.meta.clientDeploy, sha).catch(
+            (e): DeployStatus => ({ status: "ERROR", commit: sha.slice(0, 8), approved: false, matched: false, note: e instanceof Error ? e.message : "ошибка апрува деплоя" }),
+          );
         } else if (proj.meta.clientVercel?.token) {
           await new Promise((r) => setTimeout(r, 6000));
-          deploy = await vercelDeployStatus(proj.meta.clientVercel).catch(() => null);
+          deploy = await vercelDeployStatus(proj.meta.clientVercel).catch(
+            (e): DeployStatus => ({ status: "ERROR", commit: sha.slice(0, 8), approved: false, note: e instanceof Error ? e.message : "ошибка статуса Vercel" }),
+          );
+        } else {
+          // Авто-деплой/апрув НЕ настроен — НЕ молчим: код доставлен, но мог не задеплоиться без ручного апрува.
+          deploy = { status: "NOT_CONFIGURED", commit: sha.slice(0, 8), approved: false, note: "Авто-деплой не налаштований (Railway/Vercel у налаштуваннях проєкту) — перевір і схвали деплой вручну, інакше клієнт не побачить змін." };
         }
       }
       results.push({ ...res, deploy });

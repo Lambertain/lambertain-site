@@ -439,6 +439,8 @@ export const DICT: Record<string, Entry> = {
   "tasks.searchFound": { uk: "Знайдено", ru: "Найдено", en: "Found" },
   "tasks.searchNone": { uk: "Нічого не знайдено", ru: "Ничего не найдено", en: "Nothing found" },
   "deliver.deploy": { uk: "Деплой клієнта", ru: "Деплой клиента", en: "Client deploy" },
+  "deliver.deployLive": { uk: "опубліковано (клієнт бачить зміни)", ru: "опубликовано (клиент видит изменения)", en: "published (client sees changes)" },
+  "deliver.deployStale": { uk: "задеплоєний НЕ цей коміт — зміни не доїхали, перевір деплой", ru: "задеплоен НЕ этот коммит — изменения не доехали, проверь деплой", en: "a different commit is deployed — changes did not land, check the deploy" },
 
   // — страница задачи —
   "task.back": { uk: "← до задач", ru: "← к задачам", en: "← to tasks" },

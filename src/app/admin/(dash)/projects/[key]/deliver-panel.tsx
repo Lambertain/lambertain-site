@@ -127,11 +127,19 @@ export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver, del
                   {t(locale, "deliver.pr")} →
                 </a>
               )}
-              {result.deploy && (
-                <p style={{ ...ui.monoLabel, textTransform: "none", marginTop: 10, color: result.deploy.status === "SUCCESS" ? "var(--accent)" : "#e8b339" }}>
-                  {t(locale, "deliver.deploy")}: {result.deploy.status} ({result.deploy.commit})
-                </p>
-              )}
+              {result.deploy && (() => {
+                const d = result.deploy;
+                const ok = d.status === "SUCCESS" && d.matched !== false;
+                const bad = d.status === "FAILED" || d.status === "CRASHED" || d.status === "ERROR";
+                const color = ok ? "var(--accent)" : bad ? "#ff5b5b" : "#e8b339";
+                return (
+                  <div style={{ ...ui.monoLabel, textTransform: "none", marginTop: 10, color, lineHeight: 1.55 }}>
+                    <div>{t(locale, "deliver.deploy")}: {ok ? `✓ ${t(locale, "deliver.deployLive")}` : `⚠ ${d.status}`}{d.commit ? ` (${d.commit})` : ""}</div>
+                    {d.matched === false && <div>⚠️ {t(locale, "deliver.deployStale")}</div>}
+                    {d.note && <div>{d.note}</div>}
+                  </div>
+                );
+              })()}
             </div>
           ))}
           <button onClick={() => setResults(null)} style={{ ...ui.btn, display: "block", marginTop: 12 }}>{t(locale, "common.cancel")}</button>
