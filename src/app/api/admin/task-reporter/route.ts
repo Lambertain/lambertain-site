@@ -4,7 +4,7 @@
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse } from "next/server";
-import { setTaskReporter } from "@/lib/db";
+import { setTaskReporter, projectReporterLogin } from "@/lib/db";
 import { readJsonSmart } from "@/lib/req-body";
 import { revalidatePath } from "next/cache";
 
@@ -21,8 +21,15 @@ export async function POST(req: Request) {
   let body: { readableId?: string; reporterLogin?: string };
   try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const readableId = String(body.readableId || "").trim();
-  const reporterLogin = String(body.reporterLogin || "").trim();
+  let reporterLogin = String(body.reporterLogin || "").trim();
   if (!readableId || !reporterLogin) return NextResponse.json({ error: "readableId и reporterLogin обязательны" }, { status: 400 });
+
+  // reporterLogin:"client" — поставить постановщиком клиента проекта (логин резолвится из проекта).
+  if (reporterLogin === "client") {
+    const client = await projectReporterLogin(readableId.split("-")[0]);
+    if (!client) return NextResponse.json({ error: "у проекта нет зарегистрированного клиента" }, { status: 400 });
+    reporterLogin = client;
+  }
 
   const ok = await setTaskReporter(readableId, reporterLogin);
   if (!ok) return NextResponse.json({ error: `задача ${readableId} или логин ${reporterLogin} не найдены` }, { status: 404 });
