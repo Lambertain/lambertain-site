@@ -67,6 +67,19 @@ export async function taskTag(taskId: string): Promise<string> {
   return rows[0]?.name ? `${rows[0].name} · ${taskId}` : taskId;
 }
 
+/** Telegram @username по числовому tg_id (через getChat). null, если ника нет/недоступен. Best-effort. */
+export async function tgUsernameById(tgId: string | number | null | undefined): Promise<string | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !tgId) return null;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${token}/getChat?chat_id=${tgId}`, { cache: "no-store" });
+    const j = (await r.json()) as { ok?: boolean; result?: { username?: string } };
+    return j?.ok ? j.result?.username || null : null;
+  } catch {
+    return null;
+  }
+}
+
 /** id вложений (/api/files/<id>) из текста — чтобы дослать их картинками. */
 export function attachmentIdsIn(...texts: (string | null | undefined)[]): number[] {
   const ids = new Set<number>();

@@ -5,6 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { memberCard } from "@/lib/db";
+import { tgUsernameById } from "@/lib/notify";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -20,5 +21,7 @@ export async function GET(req: Request) {
   if (!login) return NextResponse.json({ error: "login required" }, { status: 400 });
   const card = await memberCard(login);
   if (!card) return NextResponse.json({ error: `участник ${login} не найден` }, { status: 404 });
+  // @ник в БД не всегда — добиваем через getChat.
+  if (!card.telegram && card.tgId) card.telegram = await tgUsernameById(card.tgId);
   return NextResponse.json(card);
 }

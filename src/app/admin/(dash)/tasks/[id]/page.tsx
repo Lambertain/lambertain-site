@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, memberCard, projectHasClient } from "@/lib/db";
+import { tgUsernameById } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
 import { t, type Locale } from "@/lib/i18n";
@@ -114,6 +115,8 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   // DEV-31: всплывающее окно по постановщику (роль + Telegram + проекты) — только команде, не клиенту.
   const projNames: Record<string, string> = Object.fromEntries((projects ?? []).map((p) => [p.key, p.name]));
   const reporterCard = task.reporter && me.role !== "client" ? await memberCard(task.reporter.login) : null;
+  // @ник в БД хранится не всегда (только tg_id) — добиваем через getChat (best-effort).
+  const reporterTg = reporterCard ? reporterCard.telegram ?? (await tgUsernameById(reporterCard.tgId)) : null;
   const shownCount = me.role === "client" ? viewComments.filter((c) => c.visibility !== "internal" && c.approved).length : viewComments.length;
 
   return (
@@ -183,7 +186,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           if (!show) return null;
           // DEV-31: команде — постановщик с всплывающим окном (роль/Telegram/проекты); клиенту — обычный текст.
           return reporterCard
-            ? <ReporterHover text={t(locale, "card.from", { name })} role={reporterCard.role ?? task.reporter?.role ?? null} projects={reporterCard.projects} telegram={reporterCard.telegram} projectNames={projNames} locale={locale} />
+            ? <ReporterHover text={t(locale, "card.from", { name })} role={reporterCard.role ?? task.reporter?.role ?? null} projects={reporterCard.projects} telegram={reporterTg} projectNames={projNames} locale={locale} />
             : <span>{t(locale, "card.from", { name })}</span>;
         })()}
         {task.updated && <span>{fmt(task.updated, locale)}</span>}
