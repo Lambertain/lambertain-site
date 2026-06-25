@@ -19,6 +19,7 @@ import { TaskEdit } from "./task-edit";
 import { MoveTask } from "./move-task";
 import { StatusPicker } from "./status-picker";
 import { BackButton } from "./back-button";
+import { ScrollTop } from "./scroll-top";
 import { DeployBadge } from "../../deploy-badge";
 import { AddresseeBadge } from "../../addressee-badge";
 import { taskAddressee } from "@/lib/task-addressee";
@@ -113,6 +114,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div>
+      <ScrollTop label={t(locale, "task.scrollTop")} />
       {/* «← к задачам» липкая (DEV-3): остаётся видимой при прокрутке длинной задачи — пилюля с фоном поверх контента. */}
       <div style={{ position: "sticky", top: 0, zIndex: 20, marginBottom: 4, display: "flex" }}>
         <BackButton

@@ -119,6 +119,20 @@ export const RichComposer = forwardRef<RichComposerHandle, {
     emit();
   }
 
+  /** DEV-28: перенос строки по Enter. Голый хвостовой «\n» браузер схлопывает (строка не рисуется,
+   *  каретка прыгает в начало) — если перенос оказался последним узлом, ставим zero-width маркер после него,
+   *  чтобы новая строка отрисовалась и каретка встала на неё. В serialize() маркер вырезается. */
+  function insertNewline() {
+    edRef.current?.focus();
+    const r = workingRange();
+    r.deleteContents();
+    const nl = document.createTextNode("\n");
+    r.insertNode(nl);
+    if (!nl.nextSibling) nl.parentNode?.insertBefore(document.createTextNode("​"), null);
+    placeCaretAfter(nl);
+    emit();
+  }
+
   // —— тулбар форматирования: оборачивает выделение Markdown-разметкой ——
   function surround(before: string, after: string, placeholder: string) {
     edRef.current?.focus();
@@ -238,7 +252,7 @@ export const RichComposer = forwardRef<RichComposerHandle, {
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey && !(e.nativeEvent as { isComposing?: boolean }).isComposing) {
       e.preventDefault();
-      insertText("\n");
+      insertNewline();
     }
   }
   function onDrop(e: React.DragEvent) {
