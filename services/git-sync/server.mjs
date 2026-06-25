@@ -102,6 +102,49 @@ async function syncPair(devGit, clientGit) {
   }
 }
 
+/** Открыть PR в клиентском репо (REST API — Bearer тут работает, в отличие от git push). */
+async function openPR(clientRepo, head, base, title, body) {
+  const h = { Authorization: `Bearer ${GITHUB_TOKEN}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" };
+  const r = await fetch(`https://api.github.com/repos/${clientRepo}/pulls`, { method: "POST", headers: h, body: JSON.stringify({ title, head, base, body }) });
+  if (r.ok) { const j = await r.json(); return { prUrl: j.html_url, prNumber: j.number, created: true }; }
+  if (r.status === 422) { // PR с этой ветки уже открыт — найдём
+    const owner = clientRepo.split("/")[0];
+    const list = await fetch(`https://api.github.com/repos/${clientRepo}/pulls?state=open&head=${encodeURIComponent(owner + ":" + head)}`, { headers: h });
+    if (list.ok) { const arr = await list.json(); if (arr[0]) return { prUrl: arr[0].html_url, prNumber: arr[0].number, created: false }; }
+  }
+  return { prError: `PR ${r.status}: ${(await r.text().catch(() => "")).slice(0, 150)}` };
+}
+
+/**
+ * Доставка gitflow: взять feature-ветку из нашего форка, запушить в клиентский репо и открыть PR в base (develop).
+ * Ветка создана разработчиком от client-sync/<base> (зеркало клиентского base, те же SHA) → общая база,
+ * push переносит только её коммиты. upToDate=false → клиентский base ушёл вперёд, нужен ресинк/ребейз (но PR откроется).
+ */
+async function deliverBranch({ devGit, clientGit, branch, base = "develop", title, body }) {
+  const devRepo = repoFromGit(devGit), clientRepo = repoFromGit(clientGit);
+  if (!devRepo || !clientRepo) return { error: "не распознан dev/client репозиторий" };
+  if (!branch) return { error: "branch обязателен" };
+  const devUrl = authUrl(devRepo), clientUrl = authUrl(clientRepo);
+  const dir = await mkdtemp(join(tmpdir(), "lmb-deliver-"));
+  try {
+    const init = await git(["init", "-q", "--initial-branch=main"], dir);
+    if (init.code === 127) return { error: "git не найден в рантайме" };
+    const f = await git(["fetch", "--no-tags", devUrl, `+refs/heads/${branch}:refs/heads/${branch}`], dir);
+    if (f.code !== 0) return { error: `fetch dev ${branch}: ${redact(f.stderr).slice(0, 200)}` };
+    const fb = await git(["fetch", "--no-tags", clientUrl, `+refs/heads/${base}:refs/remotes/client/${base}`], dir);
+    if (fb.code !== 0) return { error: `fetch client ${base}: ${redact(fb.stderr).slice(0, 200)}` };
+    // Свежий ли base в основе ветки (иначе develop ушёл вперёд → лучше ресинкнуться).
+    const anc = await git(["merge-base", "--is-ancestor", `refs/remotes/client/${base}`, `refs/heads/${branch}`], dir);
+    const upToDate = anc.code === 0;
+    const push = await git(["push", "--force", clientUrl, `refs/heads/${branch}:refs/heads/${branch}`], dir);
+    if (push.code !== 0) return { error: `push client ${branch}: ${redact(push.stderr).slice(0, 200)}` };
+    const pr = await openPR(clientRepo, branch, base, title || branch, body || "");
+    return { clientRepo, branch, base, upToDate, ...pr };
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 function send(res, status, body) {
   const s = JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -136,10 +179,25 @@ async function handleSync(req, res) {
   return send(res, 200, { results });
 }
 
+async function handleDeliver(req, res) {
+  const auth = req.headers.authorization || "";
+  if (!SECRET || auth !== `Bearer ${SECRET}`) return send(res, 403, { error: "forbidden" });
+  if (!GITHUB_TOKEN) return send(res, 500, { error: "нет GITHUB_TOKEN" });
+  let b;
+  try { b = JSON.parse(await readBody(req)); } catch { return send(res, 400, { error: "bad json" }); }
+  if (!b?.devGit || !b?.clientGit || !b?.branch) return send(res, 400, { error: "devGit, clientGit, branch обязательны" });
+  const r = await deliverBranch(b);
+  return send(res, r.error ? 422 : 200, r);
+}
+
 const server = createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true });
   if (req.method === "POST" && req.url === "/sync") {
     handleSync(req, res).catch((e) => send(res, 500, { error: String(e?.message || e) }));
+    return;
+  }
+  if (req.method === "POST" && req.url === "/deliver") {
+    handleDeliver(req, res).catch((e) => send(res, 500, { error: String(e?.message || e) }));
     return;
   }
   send(res, 404, { error: "not found" });

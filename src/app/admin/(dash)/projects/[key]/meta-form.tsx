@@ -151,6 +151,7 @@ export function MetaForm({
   const [autoApprove, setAutoApprove] = useState(!!m.autoApprove);
   const [deliverPR, setDeliverPR] = useState(!!m.clientDeliverPR);
   const [deliverBranch, setDeliverBranch] = useState(m.deliverBranch ?? "");
+  const [gitflowDelivery, setGitflowDelivery] = useState(!!m.gitflowDelivery);
   const [autoMigrate, setAutoMigrate] = useState(!!m.clientAutoMigrate);
   const [vis, setVis] = useState<Record<string, FieldVis>>(m.fieldVisibility ?? {});
   const [prodAccounts, setProdAccounts] = useState<Account[]>(m.prodAccounts ?? []);
@@ -217,6 +218,7 @@ export function MetaForm({
       deploy: { prodBranch: prodBranch || undefined, devBranch: devBranch || undefined },
       clientDeliverPR: deliverPR || undefined,
       deliverBranch: deliverBranch.trim() || undefined,
+      gitflowDelivery: gitflowDelivery || undefined,
       clientAutoMigrate: autoMigrate || undefined,
       design: design || undefined,
       spec: spec || undefined,
@@ -384,6 +386,13 @@ export function MetaForm({
         <span>
           <span style={{ fontSize: 14 }}>{t(locale, "projects.deliverPR")}</span>
           <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "projects.deliverPRHint")}</span>
+        </span>
+      </label>
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginTop: 10 }}>
+        <input type="checkbox" checked={gitflowDelivery} onChange={(e) => setGitflowDelivery(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />
+        <span>
+          <span style={{ fontSize: 14 }}>{t(locale, "projects.gitflowDelivery")}</span>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "projects.gitflowDeliveryHint")}</span>
         </span>
       </label>
       <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginTop: 10 }}>

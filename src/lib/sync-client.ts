@@ -52,3 +52,38 @@ export async function syncClientToDev(meta: ProjectMeta): Promise<SyncRepoResult
   if (!r.ok) throw new Error(`git-sync ${r.status}: ${data.error || "ошибка сервиса"}`);
   return data.results ?? [];
 }
+
+export interface GitflowDeliverResult {
+  clientRepo?: string;
+  branch?: string;
+  base?: string;
+  upToDate?: boolean;
+  prUrl?: string;
+  prNumber?: number;
+  created?: boolean;
+  prError?: string;
+  error?: string;
+}
+
+/**
+ * gitflow-доставка: запушить feature-ветку разработчика (из нашего форка) в клиентский репо и открыть PR в base.
+ * Пробует все пары репо проекта — доставит ту, где ветка существует (в остальных вернётся error «ветка не найдена»).
+ */
+export async function deliverGitflow(meta: ProjectMeta, branch: string, base = "develop", title?: string, body?: string): Promise<GitflowDeliverResult[]> {
+  const baseUrl = process.env.GIT_SYNC_URL;
+  const secret = process.env.GIT_SYNC_SECRET;
+  if (!baseUrl || !secret) throw new Error("сервис git-sync не настроен (GIT_SYNC_URL / GIT_SYNC_SECRET)");
+  const pairs = collectPairs(meta);
+  if (!pairs.length) throw new Error("у проекта нет пар dev↔client репо");
+  const out: GitflowDeliverResult[] = [];
+  for (const p of pairs) {
+    const r = await fetch(`${baseUrl.replace(/\/$/, "")}/deliver`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ devGit: p.dev, clientGit: p.client, branch, base, title, body }),
+      cache: "no-store",
+    });
+    out.push((await r.json().catch(() => ({ error: `git-sync ${r.status}` }))) as GitflowDeliverResult);
+  }
+  return out;
+}

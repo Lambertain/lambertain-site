@@ -45,6 +45,9 @@ export interface ProjectMeta {
   clientDeliverPR?: boolean;
   /** Целевая ветка доставки в клиентских репо (для всех пар проекта). Пусто = дефолтная ветка клиента. Для gitflow — develop. */
   deliverBranch?: string;
+  /** gitflow-доставка: портал пушит feature-ветку разработчика в клиентский репо и открывает PR в develop
+   *  (вместо squash-снимка). Разработчик работает per-task на ветке от client-sync/develop. Взаимоисключающе с autoDeliver. */
+  gitflowDelivery?: boolean;
   /** Схема накатывается на клиентскую БД автоматически (preDeploy клиентского деплоя) — предупреждение о схеме при доставке не блокирует. */
   clientAutoMigrate?: boolean;
   /** Конвенции/правила проекта (легаси; основной источник — CLAUDE.md дев-репо). */

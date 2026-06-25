@@ -14,7 +14,7 @@ import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
-import { autoDeliverAndNotify } from "@/lib/auto-deliver";
+import { autoDeliverAndNotify, deliverGitflowAndNotify } from "@/lib/auto-deliver";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
@@ -30,11 +30,12 @@ export async function POST(req: Request) {
   const projectKey = await getProjectKeyByToken(token);
   if (!projectKey) return NextResponse.json({ error: "invalid token" }, { status: 403 });
 
-  let body: { taskId?: string; status?: string; summary?: string };
+  let body: { taskId?: string; status?: string; summary?: string; branch?: string };
   try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const taskId = String(body.taskId || "").trim();
   const status = MAP[String(body.status || "")];
   const summary = String(body.summary || "").trim();
+  const branch = String(body.branch || "").trim(); // feature-ветка для gitflow-доставки (PR в develop)
   if (!taskId || !status) return NextResponse.json({ error: "taskId and status (in_progress|review) required" }, { status: 400 });
   if (!taskId.startsWith(projectKey + "-")) return NextResponse.json({ error: "task not in project" }, { status: 403 });
 
@@ -52,11 +53,16 @@ export async function POST(req: Request) {
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
         // Авто-доставка на репо клиента (squash-пуш/PR + апрув деплоя/мониторинг; миграция — через preDeploy
         // клиентского деплоя) — только если включён флаг autoDeliver. Фоном (after) — не блокируем ответ дев-Клоду.
-        if (proj?.meta?.autoDeliver) {
+        // gitflow-режим (meta.gitflowDelivery): доставляем feature-ветку разработчика как PR в develop клиента.
+        // Иначе — legacy squash-доставка (meta.autoDeliver). Режимы взаимоисключающие.
+        if (proj?.meta?.gitflowDelivery && branch) {
+          const meta = proj.meta;
+          after(() => deliverGitflowAndNotify(projectKey, meta, branch, taskId));
+        } else if (proj?.meta?.autoDeliver) {
           const meta = proj.meta;
           after(() => autoDeliverAndNotify(projectKey, meta, taskId));
         }
-        return NextResponse.json({ ok: true, status: "Done" });
+        return NextResponse.json({ ok: true, status: "Done", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : (proj?.meta?.autoDeliver ? "squash" : "none") });
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
       await be.updateStatus(taskId, "Review");
@@ -72,7 +78,12 @@ export async function POST(req: Request) {
       if (task.reporter?.login && task.reporter.role !== "client" && task.reporter.role !== "employee") {
         await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(taskId)}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
       }
-      return NextResponse.json({ ok: true, status: "Review" });
+      // gitflow-доставка и на ручной приёмке (проект без autoApprove): открываем PR в develop из ветки разработчика.
+      if (proj?.meta?.gitflowDelivery && branch) {
+        const meta = proj.meta;
+        after(() => deliverGitflowAndNotify(projectKey, meta, branch, taskId));
+      }
+      return NextResponse.json({ ok: true, status: "Review", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : "none" });
     }
     await be.updateStatus(taskId, status);
     if (status === "In Progress") await setDeployStage(taskId, "pr").catch(() => {}); // взял в работу → «Готується»
