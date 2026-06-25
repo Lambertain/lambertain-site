@@ -456,6 +456,7 @@ export const DICT: Record<string, Entry> = {
   "addr.internal": { uk: "Внутрішня", ru: "Внутренняя", en: "Internal" },
   "addr.fromClient": { uk: "Від клієнта", ru: "От клиента", en: "From client" },
   "addr.team": { uk: "Командна", ru: "Командная", en: "Team" },
+  "addr.personalSelf": { uk: "Особиста", ru: "Личная", en: "Personal" },
   "mod.pendingBadge": { uk: "на модерації", ru: "на модерации", en: "pending review" },
   "mod.note": { uk: "Коментар команди — на модерації:", ru: "Комментарий команды — на модерации:", en: "Team comment — pending review:" },
   "mod.approve": { uk: "Схвалити", ru: "Одобрить", en: "Approve" },

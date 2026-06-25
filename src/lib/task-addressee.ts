@@ -8,10 +8,10 @@
  */
 import type { Role } from "./tasks/types";
 
-export type AddresseeKey = "clientWait" | "ownerWait" | "internalSelf" | "internalAdmin" | "fromClient" | "team";
+export type AddresseeKey = "clientWait" | "ownerWait" | "internalSelf" | "internalAdmin" | "fromClient" | "team" | "personalSelf";
 
 /** Видит ли клиент задачу / где «мяч» — для цвета бейджа. */
-export type AddresseeTone = "client" | "wait" | "internal" | "team";
+export type AddresseeTone = "client" | "wait" | "internal" | "team" | "personal";
 
 interface AddresseeInput {
   internal?: boolean;
@@ -24,12 +24,16 @@ interface AddresseeInput {
 export function taskAddressee(task: AddresseeInput): AddresseeKey {
   const r = task.reporter, a = task.assignee;
   const selfDev = !!r?.login && !!a?.login && r.login === a.login && (r.role === "contributor" || r.role === "employee");
+  // Владелец (супер-админ) сам себе: постановщик — владелец (reporter=null т.е. супер-админ, либо role=admin),
+  // и задача НЕ делегирована разработчику (нет отдельного исполнителя). Это личная задача, не командная.
+  const ownerSelf = (!r || r.role === "admin") && (!a?.login || a.login === r?.login);
   if (task.clientAction) return "clientWait";                 // клиент должен зарегистрировать/дать данные (видит, жмёт «Готово»)
   if (task.ownerAction) return "ownerWait";                   // ops-шаг владельца — клиент не видит
-  if (task.internal) return selfDev ? "internalSelf" : "internalAdmin"; // внутренняя — клиент не видит
+  if (task.internal) return ownerSelf ? "personalSelf" : selfDev ? "internalSelf" : "internalAdmin"; // внутренняя — клиент не видит
   // internal:false ниже — клиент видит задачу.
   if (selfDev) return "clientWait";                           // разработчик сам себе + НЕ internal = вопрос клиенту (recipient:client)
   if (r?.role === "client") return "fromClient";              // клиент поставил — он видит и трекает
+  if (ownerSelf) return "personalSelf";                       // владелец сам себе (не делегировано) — ЛИЧНАЯ
   return "team";                                              // обычная: админ → разработчику (клиент видит, наш рабочий элемент)
 }
 
@@ -40,6 +44,7 @@ export const ADDRESSEE_TONE: Record<AddresseeKey, AddresseeTone> = {
   internalAdmin: "internal",
   fromClient: "client",
   team: "team",
+  personalSelf: "personal",
 };
 
 /** i18n-ключ подписи бейджа. */
@@ -50,4 +55,5 @@ export const ADDRESSEE_LABEL: Record<AddresseeKey, string> = {
   internalAdmin: "addr.internal",
   fromClient: "addr.fromClient",
   team: "addr.team",
+  personalSelf: "addr.personalSelf",
 };
