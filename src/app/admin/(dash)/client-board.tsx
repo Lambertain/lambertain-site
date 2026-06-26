@@ -35,12 +35,18 @@ export function ClientBoard({
   empty: string;
   feedbackKey?: string;
 }) {
-  // "" = «Всі задачі» (по всех проектах) — выбрано по умолчанию; карточку проекта показываем при выборе конкретного.
+  // "" = «Всі задачі» (по всех проектах) — выбрано по умолчанию.
   const [activeProject, setActiveProject] = useState<string>("");
+
+  // Карточку проекта (инфо/доступы) показываем: выбран конкретный проект → его карточка; на «Всі задачі»
+  // у клиента с ОДНИМ проектом — всё равно его карточку (иначе клиент не видел инфо проекта вообще, пока
+  // не догадается кликнуть таб проекта). Несколько проектов на «Всі» — не навязываем (выберет нужный).
+  const cardKeys = Object.keys(projectCards);
+  const activeCard = activeProject ? projectCards[activeProject] : cardKeys.length === 1 ? projectCards[cardKeys[0]] : null;
 
   return (
     <div>
-      {projectCards[activeProject] && <div style={{ marginBottom: 18 }}>{projectCards[activeProject]}</div>}
+      {activeCard && <div style={{ marginBottom: 18 }}>{activeCard}</div>}
       {header}
       <TaskTabs
         tasks={tasks}
