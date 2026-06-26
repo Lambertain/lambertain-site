@@ -5,7 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { getBackend } from "@/lib/tasks";
-import { getTaskTags } from "@/lib/db";
+import { getTaskTags, getTaskEvents } from "@/lib/db";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -23,6 +23,6 @@ export async function GET(req: Request) {
   const be = getBackend();
   let task;
   try { task = await be.getTask(id); } catch { return NextResponse.json({ error: `задача ${id} не найдена` }, { status: 404 }); }
-  const [comments, tags] = await Promise.all([be.getComments(id).catch(() => []), getTaskTags(id).catch(() => null)]);
-  return NextResponse.json({ task, tags, comments });
+  const [comments, tags, events] = await Promise.all([be.getComments(id).catch(() => []), getTaskTags(id).catch(() => null), getTaskEvents(id).catch(() => [])]);
+  return NextResponse.json({ task, tags, comments, events });
 }

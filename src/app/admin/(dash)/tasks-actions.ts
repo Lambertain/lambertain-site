@@ -16,12 +16,14 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
   try {
-    await getBackend().updateStatus(id, status);
+    // DEV-32: актор смены статуса — текущий пользователь (ручная смена в портале).
+    const evt = { actorLogin: me.youtrackLogin ?? null, actorRole: me.role ?? "admin", trigger: "ручна зміна у порталі" };
+    await getBackend().updateStatus(id, status, evt);
     after(() => syncTaskToTrello(id, status)); // Trello: подвинуть связанную карточку под новый статус
     // Деплой-стадия от статуса: взял в работу → «Готується» (pr); на ревью → «На тестовому» (dev). prod ставит доставка.
     const bucket = statusBucket(status);
-    if (bucket === "inProgress") await setDeployStage(id, "pr").catch(() => {});
-    else if (bucket === "review") await advanceStage(id, "dev").catch(() => {}); // + коммент клиенту «на тестовому»
+    if (bucket === "inProgress") await setDeployStage(id, "pr", evt).catch(() => {});
+    else if (bucket === "review") await advanceStage(id, "dev", "здав на ревʼю у порталі").catch(() => {}); // + коммент клиенту «на тестовому»
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
     // Задача готова → уведомляем клиента проекта (best-effort).

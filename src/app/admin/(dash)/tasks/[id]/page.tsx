@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, memberCard, projectHasClient } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, memberCard, projectHasClient, getTaskEvents } from "@/lib/db";
 import { tgUsernameById } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
@@ -10,7 +10,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { CommentBox } from "./comment-box";
 import { ApprovalBar } from "./approval-bar";
 import { ReviewActions } from "./review-actions";
-import { CommentsView, type ViewComment } from "./comments-view";
+import { CommentsView, type ViewComment, type TimelineEvent } from "./comments-view";
 import { OwnerActionBar } from "./owner-action-bar";
 import { ClientActionBar } from "./client-action-bar";
 import { DeleteOwnTask } from "./delete-own-task";
@@ -52,10 +52,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   // (на боці клієнта буває кілька людей — задачу створив один, перевіряє інший).
   const isProjectClientSide = (me.role === "client" || me.role === "employee") && (me.projectKey === taskKey || (me.projectKeys?.includes(taskKey) ?? false));
 
-  let task, comments, deps, reads, users, tags, projects;
+  let task, comments, deps, reads, users, tags, projects, events;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
-    [task, comments, deps, reads, users, tags, projects] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), be.listProjects()]);
+    // DEV-32: журнал событий — только команде (клиенту не тянем и не показываем).
+    [task, comments, deps, reads, users, tags, projects, events] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), be.listProjects(), me.role === "client" ? Promise.resolve([]) : getTaskEvents(id)]);
   } catch (e) {
     return (
       <div>
@@ -109,6 +110,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     canEdit: c.approved !== false && !!myLogin && c.author.login === myLogin && c.created > lastOtherCreated,
     devAuthored: c.devAuthored === true,
     isNew: c.created > prevRead,
+  }));
+  // DEV-32: события журнала → во view-модель ленты (команде; клиенту events уже пуст).
+  const viewEvents: TimelineEvent[] = (events ?? []).map((e) => ({
+    id: e.id, ts: e.ts, type: e.type, actorName: e.actorName, actorRole: e.actorRole, trigger: e.trigger, from: e.from, to: e.to, details: e.details,
   }));
   // DEV-7: коммент Клода (dev_authored) разработчик/админ может править/удалять из UI (супер-админ — через модерацию).
   const canManageDev = isAdmin || me.role === "contributor";
@@ -292,7 +297,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <div style={ui.monoLabel}>
           {t(locale, "task.comments")} · {shownCount}
         </div>
-        <CommentsView taskId={task.id} comments={viewComments} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} canManageDev={canManageDev} locale={locale} />
+        <CommentsView taskId={task.id} comments={viewComments} events={viewEvents} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} canManageDev={canManageDev} locale={locale} />
         <CommentBox id={task.id} locale={locale} canChooseVisibility={!clientSide} />
       </div>
     </div>

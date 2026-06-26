@@ -6,7 +6,7 @@
  */
 import { getBackend } from "./tasks";
 import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag, warnClientUnreachable } from "./notify";
-import { q, getProjectFull } from "./db";
+import { q, getProjectFull, logTaskEvent } from "./db";
 import { PORTAL_BASE } from "./dev-protocol";
 
 const taskBtn = (taskId: string) => ({ text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
@@ -50,6 +50,8 @@ export async function approveModeratedComment(commentId: string): Promise<{ task
   const r = await commentInfo(commentId);
   if (!r) return { error: "not found" };
   await q("UPDATE comments SET approved = true WHERE id = $1", [commentId]);
+  // DEV-32: журнал — коммент команды одобрен модерацией и стал виден клиенту.
+  await logTaskEvent(r.readable_id, { type: "comment_moderated", to: "approved", actorRole: "admin", trigger: "Lambertain схвалив → опубліковано клієнту", details: { commentId } });
   const reached = await notifyProjectClients(
     r.project_key,
     `💬 <b>${r.project_name} · ${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
@@ -75,7 +77,10 @@ export async function editModeratedComment(commentId: string, body: string): Pro
  * клиент не видит, очередь модерации чистится. Полное удаление — отдельной корзиной (deleteCommentAny).
  */
 export async function rejectToInternal(commentId: string): Promise<void> {
+  const r = await commentInfo(commentId);
   await q("UPDATE comments SET approved = true, visibility = 'internal' WHERE id = $1 AND approved = false", [commentId]);
+  // DEV-32: журнал — модерация отклонила коммент клиенту (остался внутренним).
+  if (r) await logTaskEvent(r.readable_id, { type: "comment_moderated", to: "rejected", actorRole: "admin", trigger: "Lambertain відхилив → лишився внутрішнім", details: { commentId } });
 }
 
 /** Автор-член правит СВОЙ pending-коммент (до модерации). Проверяет авторство и что ещё не опубликован. */

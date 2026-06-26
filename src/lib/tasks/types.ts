@@ -216,6 +216,7 @@ export interface TasksBackend {
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
   addComment(id: string, text: string, visibility?: "client" | "internal", authorLogin?: string, approved?: boolean, devAuthored?: boolean): Promise<Comment>;
-  updateStatus(id: string, status: string): Promise<void>;
+  // evt (DEV-32) — контекст для журнала событий: кто/почему сменил статус (актор/триггер).
+  updateStatus(id: string, status: string, evt?: { actorLogin?: string | null; actorRole?: string | null; trigger?: string | null }): Promise<void>;
   deleteTask(id: string): Promise<void>;
 }

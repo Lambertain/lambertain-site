@@ -48,9 +48,9 @@ export async function POST(req: Request) {
       // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
       // DEV-29: НО задачи ОТ КЛИЕНТА (reporter=client) авто-закрывать нельзя — их принимает сам клиент (идут в Review).
       if ((task.autoDone || proj?.meta.autoApprove) && task.reporter?.role !== "client") {
-        await be.updateStatus(taskId, "Done");
+        await be.updateStatus(taskId, "Done", { actorRole: "system", trigger: task.autoDone ? "автоздача за спекою (autoDone)" : "gitflow: авто-приймання (autoApprove)" });
         after(() => syncTaskToTrello(taskId, "Done")); // Trello: карточку → «Виконано»
-        await advanceStage(taskId, "dev").catch(() => {}); // готово и на дев-мейн → «На тестовому» + коммент клиенту; авто-доставка ниже переведёт в «Опубліковано»
+        await advanceStage(taskId, "dev", "розробник здав на ревʼю").catch(() => {}); // готово и на дев-мейн → «На тестовому» + коммент клиенту; авто-доставка ниже переведёт в «Опубліковано»
         if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
         if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
@@ -68,9 +68,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, status: "Done", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : (proj?.meta?.autoDeliver ? "squash" : "none") });
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
-      await be.updateStatus(taskId, "Review");
+      await be.updateStatus(taskId, "Review", { actorRole: "contributor", trigger: "розробник здав на ревʼю" });
       after(() => syncTaskToTrello(taskId, "Review")); // Trello: карточку → колонка тестирования
-      await advanceStage(taskId, "dev").catch(() => {}); // сдал на ревью = на дев-мейн → «На тестовому сайті» + коммент клиенту
+      await advanceStage(taskId, "dev", "розробник здав на ревʼю").catch(() => {}); // сдал на ревью = на дев-мейн → «На тестовому сайті» + коммент клиенту
       // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
       if (summary) {
         await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary, devAuthored: true });
@@ -89,9 +89,9 @@ export async function POST(req: Request) {
       }
       return NextResponse.json({ ok: true, status: "Review", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : "none" });
     }
-    await be.updateStatus(taskId, status);
+    await be.updateStatus(taskId, status, { actorRole: "contributor", trigger: status === "In Progress" ? "розробник взяв у роботу" : undefined });
     after(() => syncTaskToTrello(taskId, status)); // Trello: карточку под новый статус (напр. «В процесі»)
-    if (status === "In Progress") await setDeployStage(taskId, "pr").catch(() => {}); // взял в работу → «Готується»
+    if (status === "In Progress") await setDeployStage(taskId, "pr", { actorRole: "contributor", trigger: "розробник взяв у роботу" }).catch(() => {}); // взял в работу → «Готується»
     return NextResponse.json({ ok: true, status });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });

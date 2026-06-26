@@ -6,7 +6,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken, getTaskTags, getProjectFull } from "@/lib/db";
+import { getProjectKeyByToken, getTaskTags, getProjectFull, getTaskEvents } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { statusBucket } from "@/lib/statuses";
 import { ESCALATION_MARK } from "@/lib/dev-protocol";
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     if (!id.startsWith(projectKey + "-")) {
       return NextResponse.json({ error: "task not in project" }, { status: 403 });
     }
-    const [task, comments, tags, proj] = await Promise.all([be.getTask(id), be.getComments(id), getTaskTags(id), getProjectFull(projectKey)]);
+    const [task, comments, tags, proj, events] = await Promise.all([be.getTask(id), be.getComments(id), getTaskTags(id), getProjectFull(projectKey), getTaskEvents(id)]);
     // Эскалации (вопросы) и ответы ПОЛЬЗОВАТЕЛЯ — чтобы Claude понимал, на что уже ответили.
     // Отвечает «сторона пользователя»: клиент ИЛИ сотрудник (в проектах без клиента/с тех-поддержкой отвечает сотрудник —
     // раньше учитывался только client, и ответы сотрудника игнорировались → Claude переспрашивал уже отвеченное).
@@ -51,7 +51,9 @@ export async function GET(req: Request) {
     const commentsOut = comments.map((c) => ({ ...c, text: devFiles(c.text) }));
     // projectSpec — ПОЛНАЯ спека проекта (общий контекст; читай ДО эскалаций — там почти всё).
     // tags: { type, complexity (small|feature), skills:[slug] } — по skills тяни плейбуки из /api/dev/skills.
-    return NextResponse.json({ task: taskOut, tags, projectSpec: devFiles(proj?.meta.spec || null), projectInfo: devFiles(proj?.meta.devInfo || null), comments: commentsOut, awaitingClient, lastClientAnswer, answerImageIds });
+    // events (DEV-32): журнал подій задачі (зміни статусу/стадії, PR, модерація, ескалації…) — щоб агент розумів
+    // ХТО і ЧОМУ змінив стан («X змінив статус через Y»), без розпитувань. Хронологічно; зливай із comments за ts.
+    return NextResponse.json({ task: taskOut, tags, projectSpec: devFiles(proj?.meta.spec || null), projectInfo: devFiles(proj?.meta.devInfo || null), comments: commentsOut, events, awaitingClient, lastClientAnswer, answerImageIds });
   }
 
   // Список задач проекта.

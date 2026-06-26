@@ -67,7 +67,7 @@ export async function POST(req: Request) {
   for (const t of prTasks) {
     try {
       const merged = await Promise.all(t.prs.map(prMerged));
-      if (merged.every(Boolean)) { await advanceStage(t.readable_id, "dev"); promotedToDev++; }
+      if (merged.every(Boolean)) { await advanceStage(t.readable_id, "dev", t.prs.length > 1 ? "усі PR змержені в develop" : "PR змержено в develop"); promotedToDev++; }
     } catch (e) {
       await reportTaskError(t.readable_id, "перевірка мержу PR (pr→dev)", e);
     }
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
   for (const t of devTasks) {
     try {
       const reached = await Promise.all(t.prs.map(prReachedClientMain));
-      if (reached.every(Boolean)) { await advanceStage(t.readable_id, "prod"); promotedToProd++; }
+      if (reached.every(Boolean)) { await advanceStage(t.readable_id, "prod", "develop злито в main клієнта → опубліковано"); promotedToProd++; }
     } catch (e) {
       await reportTaskError(t.readable_id, "перевірка публікації (dev→prod)", e);
     }

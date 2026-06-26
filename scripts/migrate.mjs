@@ -115,6 +115,22 @@ CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   PRIMARY KEY (task_id, depends_on_id));
+-- DEV-32: журнал событий задачи (audit/activity timeline). Только для разработчиков (internal), клиент не видит.
+-- Immutable: пишется автоматически в choke-точках (смена статуса/стадии, PR, модерация, эскалация, assignee, создание).
+-- type — вид события; actor_login/role — кто (NULL/system = автоматика портала); trigger — причина авто-изменения;
+-- from_val/to_val — было→стало; details — доп. данные (prUrl тощо). Отдаётся в UI-ленту и через dev-API.
+CREATE TABLE IF NOT EXISTS task_events (
+  id          SERIAL PRIMARY KEY,
+  task_id     INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  type        TEXT NOT NULL,
+  actor_login TEXT,
+  actor_role  TEXT,
+  trigger     TEXT,
+  from_val    TEXT,
+  to_val      TEXT,
+  details     JSONB,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS idx_task_events_task ON task_events(task_id, created_at);
 CREATE TABLE IF NOT EXISTS attachments (
   id         SERIAL PRIMARY KEY,
   task_id    INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

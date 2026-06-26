@@ -21,6 +21,19 @@ export type ViewComment = {
   isNew: boolean;
 };
 
+// DEV-32: системное событие журнала задачи (для ленты; только команде).
+export type TimelineEvent = {
+  id: string;
+  ts: number;
+  type: string;
+  actorName: string | null;
+  actorRole: string | null;
+  trigger: string | null;
+  from: string | null;
+  to: string | null;
+  details: Record<string, unknown> | null;
+};
+
 const DATE_LOC: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
 function fmt(ms: number, locale: Locale): string {
   if (!ms) return "";
@@ -30,6 +43,7 @@ function fmt(ms: number, locale: Locale): string {
 export function CommentsView({
   taskId,
   comments,
+  events = [],
   isClient,
   canModerate,
   canManageDev = false,
@@ -37,6 +51,7 @@ export function CommentsView({
 }: {
   taskId: string;
   comments: ViewComment[];
+  events?: TimelineEvent[];
   isClient: boolean;
   canModerate: boolean;
   canManageDev?: boolean;
@@ -44,6 +59,7 @@ export function CommentsView({
 }) {
   const newRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const [hiddenNew, setHiddenNew] = useState(0); // сколько новых комментов ниже зоны видимости
+  const [showEvents, setShowEvents] = useState(true); // DEV-32: переключатель системных событий
 
   // На входе отмечаем задачу прочитанной (метка снимется при следующем заходе).
   useEffect(() => {
@@ -82,12 +98,32 @@ export function CommentsView({
 
   // Клиент не видит внутренние И комменты на модерации (approved=false).
   const shown = isClient ? comments.filter((c) => c.visibility !== "internal" && c.approved) : comments;
+  // DEV-32: системные события — только команде (клиенту никогда). Сливаем с комментами в одну хронологию.
+  const sysEvents = isClient ? [] : events;
+  type FeedItem = { kind: "comment"; ts: number; c: ViewComment } | { kind: "event"; ts: number; e: TimelineEvent };
+  const feed: FeedItem[] = [
+    ...shown.map((c): FeedItem => ({ kind: "comment", ts: c.created, c })),
+    ...(showEvents ? sysEvents.map((e): FeedItem => ({ kind: "event", ts: e.ts, e })) : []),
+  ].sort((a, b) => a.ts - b.ts || (a.kind === "event" ? -1 : 1));
 
   return (
     <>
+      {/* DEV-32: переключатель системных событий (только команде, только если события есть). */}
+      {!isClient && sysEvents.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+          <button onClick={() => setShowEvents((v) => !v)} style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", background: "transparent", border: "1px solid var(--border-2)", borderRadius: 4, padding: "3px 10px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              {showEvents ? <><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" /></> : <><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>}
+            </svg>
+            {t(locale, showEvents ? "timeline.hideEvents" : "timeline.showEvents")}
+          </button>
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-        {shown.length === 0 && <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "task.noComments")}</p>}
-        {shown.map((c) => {
+        {feed.length === 0 && <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "task.noComments")}</p>}
+        {feed.map((item) => {
+          if (item.kind === "event") return <SystemEventRow key={`e${item.e.id}`} e={item.e} locale={locale} />;
+          const c = item.c;
           const internal = c.visibility === "internal";
           const pending = !c.approved;
           return (
@@ -141,6 +177,47 @@ export function CommentsView({
         </button>
       )}
     </>
+  );
+}
+
+// DEV-32: подпись типа события (i18n с литеральными ключами — TS-safe).
+function eventLabel(locale: Locale, type: string): string {
+  switch (type) {
+    case "status_change": return t(locale, "ev.status_change");
+    case "stage_change": return t(locale, "ev.stage_change");
+    case "pr_linked": return t(locale, "ev.pr_linked");
+    case "pr_merged": return t(locale, "ev.pr_merged");
+    case "comment_moderated": return t(locale, "ev.comment_moderated");
+    case "escalation": return t(locale, "ev.escalation");
+    case "assignee_change": return t(locale, "ev.assignee_change");
+    case "task_created": return t(locale, "ev.task_created");
+    default: return t(locale, "ev.event");
+  }
+}
+const STAGE_LABEL: Record<string, Record<Locale, string>> = {
+  pr: { uk: "Готується", ru: "Готовится", en: "Preparing" },
+  dev: { uk: "На тестовому", ru: "На тестовом", en: "On test" },
+  prod: { uk: "Опубліковано", ru: "Опубликовано", en: "Published" },
+};
+
+/** DEV-32: системное событие журнала — лёгкая «системная» строка в ленте (отличается от карточек комментов). */
+function SystemEventRow({ e, locale }: { e: TimelineEvent; locale: Locale }) {
+  const actor = !e.actorName || e.actorRole === "system" ? t(locale, "timeline.system") : e.actorName;
+  const human = (v: string | null) => (v && e.type === "stage_change" && STAGE_LABEL[v] ? STAGE_LABEL[v][locale] : v);
+  const fromTo = e.from || e.to ? `${human(e.from) ?? "—"} → ${human(e.to) ?? "—"}` : null;
+  const prUrl = typeof e.details?.prUrl === "string" ? e.details.prUrl : null;
+  return (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "6px 12px", borderLeft: "2px solid var(--border-2)", background: "rgba(255,255,255,0.015)", borderRadius: 3, ...ui.monoLabel, textTransform: "none", color: "var(--muted)", fontSize: 12.5 }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0, opacity: 0.7 }}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "2px 7px", flex: 1, lineHeight: 1.5 }}>
+        <span style={{ color: "var(--text)", fontWeight: 600 }}>{eventLabel(locale, e.type)}</span>
+        {fromTo && <span style={{ color: "var(--accent)" }}>{fromTo}</span>}
+        {e.trigger && <span>· {e.trigger}</span>}
+        <span style={{ opacity: 0.8 }}>· {t(locale, "timeline.by")} {actor}</span>
+        {prUrl && <a href={prUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "none" }}>· PR ↗</a>}
+        <span style={{ marginLeft: "auto", opacity: 0.7 }}>{fmt(e.ts, locale)}</span>
+      </div>
+    </div>
   );
 }
 

@@ -778,7 +778,9 @@ export async function setTaskPr(taskId: string, prUrl: string): Promise<{ projec
     [taskId, prUrl],
   );
   if (!r[0]) return null;
-  await q(`INSERT INTO task_prs (task_id, pr_url) VALUES ($1,$2) ON CONFLICT (task_id, pr_url) DO NOTHING`, [r[0].id, prUrl]);
+  const ins = await q<{ pr_url: string }>(`INSERT INTO task_prs (task_id, pr_url) VALUES ($1,$2) ON CONFLICT (task_id, pr_url) DO NOTHING RETURNING pr_url`, [r[0].id, prUrl]);
+  // DEV-32: журнал — PR відкрито/прив'язано (только если реально новый PR, не повтор). Стадія 'pr' — звідси.
+  if (ins.length) await logTaskEvent(taskId, { type: "pr_linked", to: "pr", actorRole: "system", trigger: "gitflow: PR відкрито", details: { prUrl } });
   return { projectKey: r[0].key };
 }
 /** PR (список) задач в стадии 'pr' — для синка «все смержены в develop» → dev. */
@@ -809,10 +811,65 @@ export async function setPrReviewSynced(taskId: string, prUrl: string, ts?: stri
   if (ts) await q("UPDATE task_prs SET review_synced_at=$3 WHERE task_id=$1 AND pr_url=$2", [id[0].id, prUrl, ts]);
   else await q("UPDATE task_prs SET review_synced_at=now() WHERE task_id=$1 AND pr_url=$2 AND review_synced_at IS NULL", [id[0].id, prUrl]);
 }
-/** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов). */
-export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<boolean> {
+/** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов).
+ *  evt — контекст для журнала (DEV-32): кто/почему сменил стадию (по умолчанию актор = система-автоматика). */
+export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod", evt?: TaskEventActor): Promise<boolean> {
+  const before = await q<{ deploy_stage: string | null }>("SELECT deploy_stage FROM tasks WHERE readable_id=$1", [taskId]);
   const r = await q<{ readable_id: string }>("UPDATE tasks SET deploy_stage=$2 WHERE readable_id=$1 AND deploy_stage IS DISTINCT FROM $2 RETURNING readable_id", [taskId, stage]);
+  if (r.length > 0) {
+    await logTaskEvent(taskId, { type: "stage_change", from: before[0]?.deploy_stage ?? null, to: stage, actorRole: "system", ...evt }).catch(() => {});
+  }
   return r.length > 0;
+}
+
+// ---- DEV-32: журнал событий задачи (audit/activity timeline; только для разработчиков) ----
+export interface TaskEventActor { actorLogin?: string | null; actorRole?: string | null; trigger?: string | null }
+export interface TaskEventInput extends TaskEventActor { type: string; from?: string | null; to?: string | null; details?: Record<string, unknown> | null }
+export interface TaskEvent {
+  id: string;
+  ts: number;
+  type: string;
+  actorLogin: string | null;
+  actorName: string | null;
+  actorRole: string | null;
+  trigger: string | null;
+  from: string | null;
+  to: string | null;
+  details: Record<string, unknown> | null;
+}
+/** Записать событие в журнал задачи (immutable). Никогда не роняет вызывающий код — журнал вторичен. */
+export async function logTaskEvent(taskId: string, e: TaskEventInput): Promise<void> {
+  await q(
+    `INSERT INTO task_events (task_id, type, actor_login, actor_role, trigger, from_val, to_val, details)
+       SELECT id, $2,$3,$4,$5,$6,$7,$8 FROM tasks WHERE readable_id=$1`,
+    [taskId, e.type, e.actorLogin ?? null, e.actorRole ?? null, e.trigger ?? null, e.from ?? null, e.to ?? null, e.details ? JSON.stringify(e.details) : null],
+  ).catch(() => {});
+}
+/** Журнал событий задачи в хронологическом порядке (для UI-ленты и dev-API). */
+export async function getTaskEvents(taskId: string): Promise<TaskEvent[]> {
+  const rows = await q<{
+    id: number; type: string; actor_login: string | null; actor_role: string | null; actor_name: string | null;
+    trigger: string | null; from_val: string | null; to_val: string | null; details: Record<string, unknown> | null; created_at: string;
+  }>(
+    `SELECT te.id, te.type, te.actor_login, te.actor_role, te.trigger, te.from_val, te.to_val, te.details, te.created_at,
+            m.full_name AS actor_name
+       FROM task_events te JOIN tasks t ON t.id=te.task_id
+       LEFT JOIN members m ON m.login=te.actor_login
+       WHERE t.readable_id=$1 ORDER BY te.created_at, te.id`,
+    [taskId],
+  );
+  return rows.map((r) => ({
+    id: String(r.id),
+    ts: new Date(r.created_at).getTime(),
+    type: r.type,
+    actorLogin: r.actor_login,
+    actorName: r.actor_name ?? r.actor_login,
+    actorRole: r.actor_role,
+    trigger: r.trigger,
+    from: r.from_val,
+    to: r.to_val,
+    details: r.details,
+  }));
 }
 /** Задачи проекта в стадии 'dev' (на тестовом) — для публикации в прод при доставке. */
 export async function listProjectDevStageTasks(projectKey: string): Promise<string[]> {
@@ -994,13 +1051,18 @@ export async function reporterAudit(login: string): Promise<{ key: string; name:
   }
   return [...map.values()];
 }
-/** Назначить исполнителя по логину. Статус НЕ меняем — «В работе» ставит сам разработчик, коли реально взяв задачу. */
-export async function assignTask(readableId: string, login: string): Promise<void> {
+/** Назначить исполнителя по логину. Статус НЕ меняем — «В работе» ставит сам разработчик, коли реально взяв задачу.
+ *  evt (DEV-32) — кто инициировал назначение (для журнала). */
+export async function assignTask(readableId: string, login: string, evt?: TaskEventActor): Promise<void> {
+  const before = await q<{ login: string | null }>("SELECT m.login FROM tasks t LEFT JOIN members m ON m.id=t.assignee_id WHERE t.readable_id=$1", [readableId]);
   await q(
     `UPDATE tasks SET assignee_id = (SELECT id FROM members WHERE login = $2), updated_at = now()
      WHERE readable_id = $1`,
     [readableId, login],
   );
+  if ((before[0]?.login ?? null) !== login) {
+    await logTaskEvent(readableId, { type: "assignee_change", from: before[0]?.login ?? null, to: login, actorRole: "system", ...evt });
+  }
 }
 
 /** Назначить постановщика (reporter) задачи по логину. false — логин/задача не найдены. */

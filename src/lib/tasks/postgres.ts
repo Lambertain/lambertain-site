@@ -4,7 +4,7 @@
  */
 import type { TasksBackend, TaskFilter, Project, User, Task, Comment, Role } from "./types";
 import type { ProjectMeta } from "./types";
-import { q, withTransaction } from "../db";
+import { q, withTransaction, logTaskEvent } from "../db";
 
 function ms(v: string | Date | null | undefined): number | undefined {
   if (!v) return undefined;
@@ -171,6 +171,8 @@ export const postgresBackend: TasksBackend = {
       );
       return rid;
     });
+    // DEV-32: журнал — факт создания задачи (кто и какой ролью).
+    await logTaskEvent(readable, { type: "task_created", actorLogin: input.reporterLogin ?? null, actorRole: input.createdByRole ?? null, trigger: input.internal ? "внутрішня задача" : null });
     return this.getTask(readable);
   },
 
@@ -213,8 +215,15 @@ export const postgresBackend: TasksBackend = {
     });
   },
 
-  async updateStatus(id: string, status: string): Promise<void> {
+  async updateStatus(id: string, status: string, evt?: { actorLogin?: string | null; actorRole?: string | null; trigger?: string | null }): Promise<void> {
+    // DEV-32: журнал. Читаем прежний статус ДО апдейта; если реально изменился — пишем событие (актор/триггер из evt,
+    // по умолчанию актор = система-автоматика). Логирование — единая choke-точка: любая смена статуса попадает в журнал.
+    const before = await q<{ status: string | null }>("SELECT status FROM tasks WHERE readable_id = $1", [id]);
     await q("UPDATE tasks SET status = $2, updated_at = now() WHERE readable_id = $1", [id, status]);
+    const from = before[0]?.status ?? null;
+    if (from !== status) {
+      await logTaskEvent(id, { type: "status_change", from, to: status, actorRole: "system", ...evt });
+    }
   },
 
   async deleteTask(id: string): Promise<void> {

@@ -318,8 +318,10 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
     const taskKey = id.split("-")[0];
     const isProjectClientSide = (me.role === "client" || me.role === "employee") && (me.projectKey === taskKey || (me.projectKeys?.includes(taskKey) ?? false));
     if (me.realRole !== "admin" && !isReporter && !isProjectClientSide) return { error: "Нет прав" };
+    // DEV-32: актор приёмки/возврата — текущий постановщик/клиент/админ.
+    const evt = { actorLogin: me.youtrackLogin ?? null, actorRole: me.role ?? "admin" };
     if (accept) {
-      await be.updateStatus(id, "Done");
+      await be.updateStatus(id, "Done", { ...evt, trigger: "постановник прийняв задачу" });
       after(() => syncTaskToTrello(id, "Done")); // Trello: карточку → «Виконано»
       if (task.assignee?.login) await notifyLogins([task.assignee.login], `✅ <b>Принято</b> · ${await taskTag(id)}: ${task.summary}`).catch(() => {});
       // Автодоставка dev→client при приёмке (если включён флаг проекта). Фоном — не блокируем экшен.
@@ -329,7 +331,7 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
         after(() => autoDeliverAndNotify(task.projectKey, meta, id));
       }
     } else {
-      await be.updateStatus(id, "Rework");
+      await be.updateStatus(id, "Rework", { ...evt, trigger: "постановник повернув на доопрацювання" });
       after(() => syncTaskToTrello(id, "Rework")); // Trello: карточку → назад в работу
       if (note?.trim()) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${note.trim()}`, "internal");
       if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${await taskTag(id)}: ${task.summary}${note?.trim() ? `\n${note.trim().slice(0, 300)}` : ""}`).catch(() => {});

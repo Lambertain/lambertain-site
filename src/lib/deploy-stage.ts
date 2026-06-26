@@ -19,8 +19,9 @@ const NOTE: Record<string, string> = {
  * Поставить деплой-стадию задачи и, если она реально изменилась, дослать клиенту понятный коммент
  * (тільки для клієнтських проєктів і не для внутрішніх задач). 'pr' — без коммента.
  */
-export async function advanceStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<void> {
-  const changed = await setDeployStage(taskId, stage);
+export async function advanceStage(taskId: string, stage: "pr" | "dev" | "prod", trigger?: string): Promise<void> {
+  // DEV-32: триггер уходит в журнал стадии (что именно сдвинуло стадию — PR смержен / доставка в прод тощо).
+  const changed = await setDeployStage(taskId, stage, { actorRole: "system", trigger });
   if (!changed) return;
   const note = NOTE[stage];
   if (!note) return;

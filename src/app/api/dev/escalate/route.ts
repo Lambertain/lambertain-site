@@ -6,7 +6,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken } from "@/lib/db";
+import { getProjectKeyByToken, logTaskEvent } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { draftClientQuestion } from "@/lib/replies";
 import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
@@ -48,6 +48,7 @@ export async function POST(req: Request) {
       // Постановщик-член (напр. админ Настя) получает уведомление; иначе — супер-админ (Никита).
       const body = `🔧 Вопрос разработчика (нужно решение):\n\n${question}`;
       await be.addComment(taskId, body, "internal", undefined, true, true);
+      await logTaskEvent(taskId, { type: "escalation", actorRole: "contributor", trigger: "escalate(admin)", details: { kind: "admin", question: question.slice(0, 300) } });
       const msg = `🔧 <b>Вопрос разработчика</b> · ${await taskTag(taskId)}: ${task.summary}\n${question.slice(0, 400)}`;
       if (task.reporter?.login) await notifyLogins([task.reporter.login], msg, [], openBtn);
       else await notifyAdmin(msg, openBtn);
@@ -57,7 +58,8 @@ export async function POST(req: Request) {
     // client: оформляем вопрос от лица агентства → на МОДЕРАЦИЮ супер-админу (клиент увидит после апрува). Задача блокируется до ответа.
     const polished = await draftClientQuestion(task, question, comments);
     await submitForModeration(taskId, `${ESCALATION_MARK}\n\n${polished}`, { taskSummary: task.summary, devAuthored: true });
-    await be.updateStatus(taskId, "Blocked").catch(() => {});
+    await logTaskEvent(taskId, { type: "escalation", actorRole: "contributor", trigger: "escalate(client) → Blocked", details: { kind: "client", question: question.slice(0, 300) } });
+    await be.updateStatus(taskId, "Blocked", { actorRole: "contributor", trigger: "escalate(client): питання клієнту" }).catch(() => {});
     return NextResponse.json({ ok: true, escalatedTo: "client (на модерации)", posted: polished });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
