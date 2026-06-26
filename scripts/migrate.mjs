@@ -93,6 +93,9 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS remind_count INT NOT NULL DEFAULT 0;
 -- Деплой-стадия задачи (независимо от Open/Review/Done): pr → dev → prod. pr_url — PR от разработчика.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pr_url TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deploy_stage TEXT;
+-- Курсор зеркалирования код-ревью из GitHub PR в задачу: created_at последнего зазеркаленного
+-- ревью-коммента. NULL = ещё не инициализировано (первый проход ставит now(), историю не тянем).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pr_review_synced_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

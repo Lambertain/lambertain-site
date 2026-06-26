@@ -781,6 +781,17 @@ export async function listPrStageTasks(): Promise<{ readable_id: string; pr_url:
 export async function listDevStageTasksWithPr(): Promise<{ readable_id: string; pr_url: string }[]> {
   return q<{ readable_id: string; pr_url: string }>("SELECT readable_id, pr_url FROM tasks WHERE deploy_stage='dev' AND pr_url IS NOT NULL");
 }
+/** Задачи с живым PR (стадия pr/dev) — для зеркалирования код-ревью из GitHub в задачу. */
+export async function listTasksForReviewSync(): Promise<{ readable_id: string; pr_url: string; pr_review_synced_at: Date | null }[]> {
+  return q<{ readable_id: string; pr_url: string; pr_review_synced_at: Date | null }>(
+    "SELECT readable_id, pr_url, pr_review_synced_at FROM tasks WHERE pr_url IS NOT NULL AND deploy_stage IN ('pr','dev')",
+  );
+}
+/** Курсор зеркалирования код-ревью: ISO-строка времени последнего зазеркаленного коммента (или now(), если ts не передан). */
+export async function setPrReviewSynced(taskId: string, ts?: string): Promise<void> {
+  if (ts) await q("UPDATE tasks SET pr_review_synced_at=$2 WHERE readable_id=$1", [taskId, ts]);
+  else await q("UPDATE tasks SET pr_review_synced_at=now() WHERE readable_id=$1 AND pr_review_synced_at IS NULL", [taskId]);
+}
 /** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов). */
 export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<boolean> {
   const r = await q<{ readable_id: string }>("UPDATE tasks SET deploy_stage=$2 WHERE readable_id=$1 AND deploy_stage IS DISTINCT FROM $2 RETURNING readable_id", [taskId, stage]);

@@ -425,8 +425,10 @@ ADMIN_TELEGRAM_ID                    Telegram id админа
 SESSION_SECRET                       подпись сессионной куки
 DATABASE_URL                         Postgres (локально 5434, на Railway — плагин)
 # флаги поллера (любой = "0" отключает): REMIND_APPROVALS, REMIND_ASSIGNEES, REMIND_COMMENTS, REMIND_REVIEW, NOTIFY_TOKENS, DEPLOY_SYNC
-#   DEPLOY_SYNC      — деплой-стадия задач (дёргает /api/admin/deploy-sync; GitHub-логика на портале):
-#                      'pr'→'dev' (PR смержен в develop) и 'dev'→'prod' (develop слит в main клиента → «Опубліковано»).
+#   DEPLOY_SYNC      — деплой-стадия задач + зеркало код-ревью (дёргает /api/admin/deploy-sync; GitHub-логика на портале):
+#                      'pr'→'dev' (PR смержен в develop), 'dev'→'prod' (develop слит в main клиента → «Опубліковано»),
+#                      и зеркалирование код-ревью из GitHub PR (inline/вердикт/комменты) внутренними комментами в задачу
+#                      (pr-review-sync.ts, курсор tasks.pr_review_synced_at) — Claude-разраб видит фидбек ревьюера в задаче.
 #                      В gitflow-проектах PR к задаче привязывается АВТОМАТИЧЕСКИ при доставке (см. deliverGitflowAndNotify),
 #                      ручной /api/dev/pr не нужен. Ошибки синка — видны в самой задаче (internal-коммент) + пуш админу.
 #   ПОВТОРНЫЕ напоминания (assignees/comments/review) шлём ТОЛЬКО агентству-админу; клиентам, сотрудникам И разработчикам

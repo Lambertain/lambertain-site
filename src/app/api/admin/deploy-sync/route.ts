@@ -2,14 +2,16 @@
  * Синхронизация деплой-стадии задач (дёргается поллером каждые 5 мин):
  *  1. 'pr'  + привязанный PR смержен в base (develop) → стадия 'dev' («На тестовому сайті»).
  *  2. 'dev' + merge-коммит PR доехал до main клиента (develop слит в main) → стадия 'prod' («Опубліковано»).
- * Так весь путь pr→dev→prod ведётся автоматически по факту git, без ручных шагов разработчика.
+ *  3. живой PR (pr/dev) → зеркалим новое код-ревью из GitHub (inline/вердикт/комменты) в задачу (internal).
+ * Так весь путь pr→dev→prod и фидбек ревьюера ведутся автоматически, без ручных шагов разработчика.
  * Ошибки по конкретной задаче не глотаются — видны на портале (internal-коммент) + уведомление админа.
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse } from "next/server";
-import { listPrStageTasks, listDevStageTasksWithPr } from "@/lib/db";
+import { listPrStageTasks, listDevStageTasksWithPr, listTasksForReviewSync } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { reportTaskError } from "@/lib/task-error";
+import { syncPrReview } from "@/lib/pr-review-sync";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -81,5 +83,16 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, checkedPr: prTasks.length, promotedToDev, checkedDev: devTasks.length, promotedToProd });
+  // 3. Зеркалирование код-ревью из GitHub в задачу (живой PR: стадия pr/dev).
+  const reviewTasks = await listTasksForReviewSync();
+  let mirroredReviews = 0;
+  for (const t of reviewTasks) {
+    try {
+      mirroredReviews += await syncPrReview(t.readable_id, t.pr_url, t.pr_review_synced_at);
+    } catch (e) {
+      await reportTaskError(t.readable_id, "зеркалювання код-рев'ю з PR", e);
+    }
+  }
+
+  return NextResponse.json({ ok: true, checkedPr: prTasks.length, promotedToDev, checkedDev: devTasks.length, promotedToProd, checkedReview: reviewTasks.length, mirroredReviews });
 }
