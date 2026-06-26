@@ -765,32 +765,49 @@ export async function getReviewRef(taskId: string): Promise<string | null> {
 }
 
 // ---- Деплой-стадия задачи (pr → dev → prod), независимая от статуса ----
-/** Привязать PR к задаче → стадия 'pr' (готовится/на проверке кода). */
+// Мультирепо: у задачи может быть НЕСКОЛЬКО PR (backend+app тощо) — они в task_prs. Стадия задачи
+// двигается по ВСЕМ её PR. tasks.pr_url держим как «первичный» PR (первый привязанный) для отображения.
+/**
+ * Привязать PR к задаче → стадия 'pr'. Идемпотентно (ON CONFLICT). Поддерживает несколько PR на задачу:
+ * каждый вызов добавляет ещё один PR в task_prs. Первый становится первичным (tasks.pr_url).
+ */
 export async function setTaskPr(taskId: string, prUrl: string): Promise<{ projectKey: string } | null> {
-  const r = await q<{ key: string }>(
-    `UPDATE tasks t SET pr_url=$2, deploy_stage='pr' FROM projects p WHERE t.project_id=p.id AND t.readable_id=$1 RETURNING p.key`,
+  const r = await q<{ id: number; key: string }>(
+    `UPDATE tasks t SET pr_url=COALESCE(t.pr_url,$2), deploy_stage='pr' FROM projects p
+       WHERE t.project_id=p.id AND t.readable_id=$1 RETURNING t.id, p.key`,
     [taskId, prUrl],
   );
-  return r[0] ? { projectKey: r[0].key } : null;
+  if (!r[0]) return null;
+  await q(`INSERT INTO task_prs (task_id, pr_url) VALUES ($1,$2) ON CONFLICT (task_id, pr_url) DO NOTHING`, [r[0].id, prUrl]);
+  return { projectKey: r[0].key };
 }
-/** Задачи в стадии 'pr' с привязанным PR — для синка merge→dev. */
-export async function listPrStageTasks(): Promise<{ readable_id: string; pr_url: string }[]> {
-  return q<{ readable_id: string; pr_url: string }>("SELECT readable_id, pr_url FROM tasks WHERE deploy_stage='pr' AND pr_url IS NOT NULL");
-}
-/** Задачи в стадии 'dev' с привязанным PR — для синка «merge доехал до main клиента» → prod. */
-export async function listDevStageTasksWithPr(): Promise<{ readable_id: string; pr_url: string }[]> {
-  return q<{ readable_id: string; pr_url: string }>("SELECT readable_id, pr_url FROM tasks WHERE deploy_stage='dev' AND pr_url IS NOT NULL");
-}
-/** Задачи с живым PR (стадия pr/dev) — для зеркалирования код-ревью из GitHub в задачу. */
-export async function listTasksForReviewSync(): Promise<{ readable_id: string; pr_url: string; pr_review_synced_at: Date | null }[]> {
-  return q<{ readable_id: string; pr_url: string; pr_review_synced_at: Date | null }>(
-    "SELECT readable_id, pr_url, pr_review_synced_at FROM tasks WHERE pr_url IS NOT NULL AND deploy_stage IN ('pr','dev')",
+/** PR (список) задач в стадии 'pr' — для синка «все смержены в develop» → dev. */
+export async function listPrStageTasksMulti(): Promise<{ readable_id: string; prs: string[] }[]> {
+  return q<{ readable_id: string; prs: string[] }>(
+    `SELECT t.readable_id, array_agg(tp.pr_url) AS prs FROM tasks t JOIN task_prs tp ON tp.task_id=t.id
+       WHERE t.deploy_stage='pr' GROUP BY t.readable_id`,
   );
 }
-/** Курсор зеркалирования код-ревью: ISO-строка времени последнего зазеркаленного коммента (или now(), если ts не передан). */
-export async function setPrReviewSynced(taskId: string, ts?: string): Promise<void> {
-  if (ts) await q("UPDATE tasks SET pr_review_synced_at=$2 WHERE readable_id=$1", [taskId, ts]);
-  else await q("UPDATE tasks SET pr_review_synced_at=now() WHERE readable_id=$1 AND pr_review_synced_at IS NULL", [taskId]);
+/** PR (список) задач в стадии 'dev' — для синка «все доехали до main клиента» → prod. */
+export async function listDevStageTasksMulti(): Promise<{ readable_id: string; prs: string[] }[]> {
+  return q<{ readable_id: string; prs: string[] }>(
+    `SELECT t.readable_id, array_agg(tp.pr_url) AS prs FROM tasks t JOIN task_prs tp ON tp.task_id=t.id
+       WHERE t.deploy_stage='dev' GROUP BY t.readable_id`,
+  );
+}
+/** Все живые PR (по строке на PR) задач в стадии pr/dev — для зеркалирования код-ревью (курсор per-PR). */
+export async function listPrsForReviewSync(): Promise<{ readable_id: string; pr_url: string; review_synced_at: Date | null }[]> {
+  return q<{ readable_id: string; pr_url: string; review_synced_at: Date | null }>(
+    `SELECT t.readable_id, tp.pr_url, tp.review_synced_at FROM tasks t JOIN task_prs tp ON tp.task_id=t.id
+       WHERE t.deploy_stage IN ('pr','dev')`,
+  );
+}
+/** Курсор зеркалирования код-ревью per-PR: ISO-строка времени последнего коммента (или now(), если ts не передан). */
+export async function setPrReviewSynced(taskId: string, prUrl: string, ts?: string): Promise<void> {
+  const id = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id=$1", [taskId]);
+  if (!id[0]) return;
+  if (ts) await q("UPDATE task_prs SET review_synced_at=$3 WHERE task_id=$1 AND pr_url=$2", [id[0].id, prUrl, ts]);
+  else await q("UPDATE task_prs SET review_synced_at=now() WHERE task_id=$1 AND pr_url=$2 AND review_synced_at IS NULL", [id[0].id, prUrl]);
 }
 /** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов). */
 export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<boolean> {

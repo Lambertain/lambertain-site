@@ -8,7 +8,7 @@
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse } from "next/server";
-import { listPrStageTasks, listDevStageTasksWithPr, listTasksForReviewSync } from "@/lib/db";
+import { listPrStageTasksMulti, listDevStageTasksMulti, listPrsForReviewSync } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { reportTaskError } from "@/lib/task-error";
 import { syncPrReview } from "@/lib/pr-review-sync";
@@ -61,38 +61,40 @@ export async function POST(req: Request) {
   if (bearer(req) !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
   if (!process.env.GITHUB_TOKEN) return NextResponse.json({ error: "no GITHUB_TOKEN" }, { status: 503 });
 
-  // 1. pr → dev: PR смержен в develop.
-  const prTasks = await listPrStageTasks();
+  // 1. pr → dev: ВСЕ PR задачи смержены в develop (мультирепо: backend И app).
+  const prTasks = await listPrStageTasksMulti();
   let promotedToDev = 0;
   for (const t of prTasks) {
     try {
-      if (await prMerged(t.pr_url)) { await advanceStage(t.readable_id, "dev"); promotedToDev++; }
+      const merged = await Promise.all(t.prs.map(prMerged));
+      if (merged.every(Boolean)) { await advanceStage(t.readable_id, "dev"); promotedToDev++; }
     } catch (e) {
       await reportTaskError(t.readable_id, "перевірка мержу PR (pr→dev)", e);
     }
   }
 
-  // 2. dev → prod: develop слит в main клиента (merge-коммит доехал до main) → публикация.
-  const devTasks = await listDevStageTasksWithPr();
+  // 2. dev → prod: ВСЕ PR задачи доехали до main клиента (develop слит в main по всем репо) → публикация.
+  const devTasks = await listDevStageTasksMulti();
   let promotedToProd = 0;
   for (const t of devTasks) {
     try {
-      if (await prReachedClientMain(t.pr_url)) { await advanceStage(t.readable_id, "prod"); promotedToProd++; }
+      const reached = await Promise.all(t.prs.map(prReachedClientMain));
+      if (reached.every(Boolean)) { await advanceStage(t.readable_id, "prod"); promotedToProd++; }
     } catch (e) {
       await reportTaskError(t.readable_id, "перевірка публікації (dev→prod)", e);
     }
   }
 
-  // 3. Зеркалирование код-ревью из GitHub в задачу (живой PR: стадия pr/dev).
-  const reviewTasks = await listTasksForReviewSync();
+  // 3. Зеркалирование код-ревью из GitHub в задачу — по КАЖДОМУ живому PR (стадия pr/dev), курсор per-PR.
+  const reviewPrs = await listPrsForReviewSync();
   let mirroredReviews = 0;
-  for (const t of reviewTasks) {
+  for (const r of reviewPrs) {
     try {
-      mirroredReviews += await syncPrReview(t.readable_id, t.pr_url, t.pr_review_synced_at);
+      mirroredReviews += await syncPrReview(r.readable_id, r.pr_url, r.review_synced_at);
     } catch (e) {
-      await reportTaskError(t.readable_id, "зеркалювання код-рев'ю з PR", e);
+      await reportTaskError(r.readable_id, "зеркалювання код-рев'ю з PR", e);
     }
   }
 
-  return NextResponse.json({ ok: true, checkedPr: prTasks.length, promotedToDev, checkedDev: devTasks.length, promotedToProd, checkedReview: reviewTasks.length, mirroredReviews });
+  return NextResponse.json({ ok: true, checkedPrTasks: prTasks.length, promotedToDev, checkedDevTasks: devTasks.length, promotedToProd, checkedReviewPrs: reviewPrs.length, mirroredReviews });
 }

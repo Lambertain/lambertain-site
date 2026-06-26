@@ -5,8 +5,8 @@
  * вердиктом, общие комменты) → портал кладёт их ВНУТРЕННИМ комментом в задачу, чтобы Claude-разработчик
  * видел фидбек прямо в задаче, а не ходил в GitHub. Клиенту эти комменты не видны (visibility:internal).
  *
- * Дедуп: курсор tasks.pr_review_synced_at (created_at последнего зазеркаленного). Первый проход не тянет
- * историю (ставит курсор = now()), дальше — только то, что новее курсора. Server-side only.
+ * Дедуп: курсор task_prs.review_synced_at per-PR (created_at последнего зазеркаленного). Первый проход не
+ * тянет историю (ставит курсор = now()), дальше — только то, что новее курсора. Server-side only.
  */
 import { getBackend } from "./tasks";
 import { setPrReviewSynced } from "./db";
@@ -49,7 +49,7 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
   if (!p) throw new Error(`не GitHub PR URL: ${prUrl}`);
 
   // Первый проход (курсор пуст) — не тянем всю историю ревью, просто ставим курсор «отсюда и далее».
-  if (!syncedAt) { await setPrReviewSynced(taskId); return 0; }
+  if (!syncedAt) { await setPrReviewSynced(taskId, prUrl); return 0; }
   const since = syncedAt.toISOString();
   const newer = (ts?: string | null) => !!ts && ts > since; // ISO-строки сравнимы лексикографически = хронологически
 
@@ -88,7 +88,7 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
   for (const it of items) {
     await be.addComment(taskId, it.text, "internal", undefined, true, false);
   }
-  // Курсор — на время последнего обработанного коммента.
-  await setPrReviewSynced(taskId, items[items.length - 1].ts);
+  // Курсор — на время последнего обработанного коммента (per-PR).
+  await setPrReviewSynced(taskId, prUrl, items[items.length - 1].ts);
   return items.length;
 }

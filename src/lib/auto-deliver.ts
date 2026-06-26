@@ -25,9 +25,12 @@ export async function deliverGitflowAndNotify(projectKey: string, meta: ProjectM
     const results = await deliverGitflow(meta, branch, "develop", `${taskId}: ${branch}`, `Lambertain · задача ${taskId} · гілка ${branch}`);
     const delivered = results.filter((r) => r.prUrl);
     if (delivered.length) {
-      // Автопривязка PR к задаче → поллер deploy-sync подхватит мерж (pr→dev) и публикацию (dev→prod).
-      // Берём первый PR с номером (основной репо). Сбой привязки тоже виден на портале, а не молчит.
-      await setTaskPr(taskId, delivered[0].prUrl!).catch((e) => reportTaskError(taskId, "прив'язка PR до задачі", e));
+      // Автопривязка ВСЕХ открытых PR к задаче (мультирепо: backend+app → несколько PR) → поллер
+      // deploy-sync двигает стадию, когда ВСЕ смержены/опубликованы, и зеркалит ревью по каждому.
+      // Сбой привязки тоже виден на портале, а не молчит.
+      for (const d of delivered) {
+        await setTaskPr(taskId, d.prUrl!).catch((e) => reportTaskError(taskId, `прив'язка PR до задачі (${d.clientRepo || "?"})`, e));
+      }
       const lines = delivered.map((r) => `• ${r.clientRepo}: PR ${r.created ? "відкрито" : "оновлено"}${r.upToDate === false ? " ⚠️ develop пішов вперед — потрібен ребейз" : ""}`).join("\n");
       await notifyAdmin(`🚀 <b>Gitflow-доставка</b> · ${await taskTag(taskId)} · гілка <code>${branch}</code>\n${lines}`, { text: "Pull Request", url: delivered[0].prUrl! }).catch(() => {});
     } else {

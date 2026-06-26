@@ -95,7 +95,22 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pr_url TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deploy_stage TEXT;
 -- Курсор зеркалирования код-ревью из GitHub PR в задачу: created_at последнего зазеркаленного
 -- ревью-коммента. NULL = ещё не инициализировано (первый проход ставит now(), историю не тянем).
+-- (legacy, single-PR; для мультирепо курсор — per-PR в task_prs.review_synced_at ниже.)
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pr_review_synced_at TIMESTAMPTZ;
+-- Мультирепо-задачи (gitflow + extraRepos: backend+app тощо) дают НЕСКОЛЬКО PR на одну задачу.
+-- task_prs хранит ВСЕ PR задачи; деплой-стадия задачи двигается по ВСЕМ её PR (dev — когда все
+-- смержены в develop; prod — когда все доехали до main). review_synced_at — курсор зеркала ревью per-PR.
+-- tasks.pr_url остаётся как «первичный» PR (для совместимости/отображения).
+CREATE TABLE IF NOT EXISTS task_prs (
+  task_id          INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  pr_url           TEXT NOT NULL,
+  review_synced_at TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (task_id, pr_url));
+-- Бэкфилл: существующие одиночные PR (tasks.pr_url) переносим в task_prs, сохраняя курсор ревью.
+INSERT INTO task_prs (task_id, pr_url, review_synced_at)
+  SELECT id, pr_url, pr_review_synced_at FROM tasks WHERE pr_url IS NOT NULL
+  ON CONFLICT (task_id, pr_url) DO NOTHING;
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
