@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   let task;
   try { task = await getBackend().getTask(readableId); } catch { return NextResponse.json({ error: `задача ${readableId} не найдена` }, { status: 404 }); }
 
-  await assignTask(readableId, assigneeLogin);
+  await assignTask(readableId, assigneeLogin, { actorRole: "admin", trigger: "призначення через admin-API" });
   await notifyLogins([assigneeLogin], `🆕 <b>Задача призначена вам</b> · ${await taskTag(readableId)}: ${task.summary}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` }).catch(() => {});
   revalidatePath("/admin/tasks");
   revalidatePath(`/admin/tasks/${readableId}`);

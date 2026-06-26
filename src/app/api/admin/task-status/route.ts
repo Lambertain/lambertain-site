@@ -37,7 +37,8 @@ export async function POST(req: Request) {
   const be = getBackend();
   let task;
   try { task = await be.getTask(readableId); } catch { return NextResponse.json({ error: `Задача ${readableId} не найдена` }, { status: 404 }); }
-  await be.updateStatus(readableId, status);
+  // DEV-32: атрибуция в журнал — смена через admin-API (актор = агентство/постановщик).
+  await be.updateStatus(readableId, status, { actorRole: "admin", trigger: "зміна через admin-API" });
   const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
 
   // Review → постановщику (reporter) на приёмку: комментарий-итог + пуш.

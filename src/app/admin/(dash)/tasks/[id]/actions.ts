@@ -165,7 +165,7 @@ export async function delegateTask(taskId: string, employeeLogin: string): Promi
   const emps = await getProjectEmployees(projectKey);
   const emp = emps.find((e) => e.login === employeeLogin);
   if (!emp) return { error: "Сотрудник не найден в проекте" };
-  await assignTask(taskId, employeeLogin);
+  await assignTask(taskId, employeeLogin, { actorLogin: me.youtrackLogin ?? null, actorRole: me.role, trigger: "клієнт делегував співробітнику" });
   const be = getBackend();
   const task = await be.getTask(taskId).catch(() => null);
   await notifyLogins([employeeLogin], `📋 <b>Вам делеговано задачу</b> · ${await taskTag(taskId)}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
@@ -180,7 +180,7 @@ export async function delegateToAdmin(taskId: string, adminLogin: string): Promi
   if (!me || me.role !== "contributor") return { error: "Нет прав" };
   const admin = (await getAdmins()).find((a) => a.login === adminLogin);
   if (!admin) return { error: "Адмін не знайдений" };
-  await assignTask(taskId, adminLogin);
+  await assignTask(taskId, adminLogin, { actorLogin: me.youtrackLogin ?? null, actorRole: me.role, trigger: "розробник передав адміну (права поза доступом)" });
   const be = getBackend();
   const task = await be.getTask(taskId).catch(() => null);
   await notifyLogins([adminLogin], `📋 <b>Вам передано задачу</b> · ${await taskTag(taskId)}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
