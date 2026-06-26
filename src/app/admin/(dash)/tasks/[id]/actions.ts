@@ -130,11 +130,14 @@ export async function editPendingComment(commentId: string, taskId: string, text
 /** Клиент (или админ) подтверждает действие по client_action: данные → секреты, задача возвращается разработчику. */
 export async function markClientActionDone(taskId: string, data: string): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
-  if (!me || (me.role !== "client" && me.realRole !== "admin")) return { error: "Нет прав" };
+  const projectKey = taskId.split("-")[0];
+  // Виконати дію може клієнт, адмін АБО співробітник цього проєкту (клієнт делегував йому задачу,
+  // що потребує дії — реєстрація/доступ; делегований співробітник її і виконує).
+  const isProjectMember = (me?.role === "client" || me?.role === "employee") && (me?.projectKey === projectKey || (me?.projectKeys?.includes(projectKey) ?? false));
+  if (!me || (!isProjectMember && me.realRole !== "admin")) return { error: "Нет прав" };
   const be = getBackend();
   const task = await be.getTask(taskId);
   if (!task.clientAction) return { error: "Действие уже выполнено" };
-  const projectKey = taskId.split("-")[0];
   const proj = await getProjectFull(projectKey);
   const value = (data || "").trim();
   // Данные (токен/логины), которые ввёл клиент → деву (видит админ + Claude-код в /api/dev/secrets).
@@ -148,7 +151,8 @@ export async function markClientActionDone(taskId: string, data: string): Promis
     }
   }
   await setClientAction(taskId, null, null, null);
-  await be.addComment(taskId, `✅ <b>Клієнт виконав реєстрацію.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
+  // Нейтральний текст: дію міг виконати і делегований співробітник, не лише клієнт.
+  await be.addComment(taskId, `✅ <b>Реєстрацію виконано.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
   // Возвращаем разработчику: уведомляем ответственного, он продолжает (данные — в /api/dev/secrets).
   const dev = proj?.meta.defaultAssignee;
   if (dev) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${await taskTag(taskId)}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});

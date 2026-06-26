@@ -203,8 +203,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
         <OwnerActionBar taskId={task.id} action={task.ownerAction} canResolve={isSuperAdmin(me)} canToClient={isSuperAdmin(me) && projHasClient} locale={locale} />
       )}
 
-      {/* Нужно действие КЛИЕНТА (зарегистрировать/дать доступ) — клиенту и админу: инструкция + поле + «Готово» */}
-      {task.clientAction && (me.role === "client" || isAdmin) && (
+      {/* Нужно действие КЛИЕНТА (зарегистрировать/дать доступ): инструкция + поле + «Готово».
+          Видно клиенту, админу И сотруднику этого проекта — чтобы клиент мог делегировать сотруднику
+          в т.ч. задачи, требующие его действия (регистрация/доступ), а тот их выполнил. */}
+      {task.clientAction && (isProjectClientSide || isAdmin) && (
         <ClientActionBar taskId={task.id} action={task.clientAction} guide={clientGuide} />
       )}
 

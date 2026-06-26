@@ -188,6 +188,10 @@ from_client, `moderation` publish/autoApprove) вызывают `warnClientUnrea
 - **Сквозной аудит:** `GET /api/admin/pending-client` (ADMIN_API_TOKEN) — все задачи всех проектов с
   `clientAction`/`ownerAction` + флаг `clientReachable` (дошло ли до клиента). Поле `undelivered` — счётчик
   недоставленных.
+- **Делегирование сотруднику:** клиент может делегировать задачу сотруднику своего проекта (`DelegateBar` →
+  `delegateTask`), **в т.ч. задачи, требующие действия клиента** (`clientAction` — регистрация/доступ). Тогда
+  делегированный сотрудник видит `ClientActionBar` и сам выполняет действие (`markClientActionDone` разрешён
+  клиенту, админу и сотруднику этого проекта). Данные так же уходят разработчику в `/api/dev/secrets`.
 
 ## Claude Code разработчика ↔ портал (протокол + эскалация)
 
