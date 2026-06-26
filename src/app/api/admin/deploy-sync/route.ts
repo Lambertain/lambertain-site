@@ -12,6 +12,7 @@ import { listPrStageTasksMulti, listDevStageTasksMulti, listPrsForReviewSync } f
 import { advanceStage } from "@/lib/deploy-stage";
 import { reportTaskError } from "@/lib/task-error";
 import { syncPrReview } from "@/lib/pr-review-sync";
+import { ghFetchRetry } from "@/lib/github";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -29,7 +30,7 @@ function parsePr(prUrl: string): { owner: string; repo: string; num: string } | 
 async function prMerged(prUrl: string): Promise<boolean> {
   const p = parsePr(prUrl);
   if (!p) throw new Error(`не GitHub PR URL: ${prUrl}`);
-  const r = await fetch(`https://api.github.com/repos/${p.owner}/${p.repo}/pulls/${p.num}`, { headers: GH, cache: "no-store" });
+  const r = await ghFetchRetry(`https://api.github.com/repos/${p.owner}/${p.repo}/pulls/${p.num}`, { headers: GH, cache: "no-store" });
   if (!r.ok) throw new Error(`GitHub ${r.status} GET pull #${p.num}: ${(await r.text()).slice(0, 200)}`);
   const j = (await r.json()) as { merged?: boolean; merged_at?: string | null };
   return !!(j.merged || j.merged_at);
@@ -43,13 +44,13 @@ async function prMerged(prUrl: string): Promise<boolean> {
 async function prReachedClientMain(prUrl: string): Promise<boolean> {
   const p = parsePr(prUrl);
   if (!p) throw new Error(`не GitHub PR URL: ${prUrl}`);
-  const pr = await fetch(`https://api.github.com/repos/${p.owner}/${p.repo}/pulls/${p.num}`, { headers: GH, cache: "no-store" });
+  const pr = await ghFetchRetry(`https://api.github.com/repos/${p.owner}/${p.repo}/pulls/${p.num}`, { headers: GH, cache: "no-store" });
   if (!pr.ok) throw new Error(`GitHub ${pr.status} GET pull #${p.num}: ${(await pr.text()).slice(0, 200)}`);
   const j = (await pr.json()) as { merged?: boolean; merge_commit_sha?: string | null; base?: { repo?: { default_branch?: string } } };
   if (!j.merged || !j.merge_commit_sha) return false; // ещё не смержен в develop — рано
   const main = j.base?.repo?.default_branch;
   if (!main) throw new Error(`не визначено main-гілку репо ${p.owner}/${p.repo}`);
-  const cmp = await fetch(`https://api.github.com/repos/${p.owner}/${p.repo}/compare/${encodeURIComponent(main)}...${j.merge_commit_sha}`, { headers: GH, cache: "no-store" });
+  const cmp = await ghFetchRetry(`https://api.github.com/repos/${p.owner}/${p.repo}/compare/${encodeURIComponent(main)}...${j.merge_commit_sha}`, { headers: GH, cache: "no-store" });
   if (!cmp.ok) throw new Error(`GitHub ${cmp.status} compare ${main}...${j.merge_commit_sha.slice(0, 7)}: ${(await cmp.text()).slice(0, 200)}`);
   const status = ((await cmp.json()) as { status?: string }).status;
   return status === "behind" || status === "identical"; // merge-коммит уже в main → опубликовано

@@ -11,6 +11,26 @@ export function repoFromGit(url: string | undefined): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * fetch к GitHub с ретраем на ВРЕМЕННЫЕ сбои, чтобы разовый блип не давал ложную тревогу
+ * (поллеры синка стадий/код-ревью отчитываются об ошибке в задачу — нельзя дёргать на транзиент).
+ * Ретраим: сетевой сбой (throw), 5xx, 429 (rate limit), а также 401/403 — GitHub их иногда отдаёт
+ * на secondary-rate-limit/распространении токена, и они самолечатся. 404/422 — НЕ временные, не ретраим.
+ * Настоящий устойчивый сбой (бэд-токен и т.п.) переживёт ретрай и всё равно всплывёт.
+ */
+const TRANSIENT = (s: number) => s === 401 || s === 403 || s === 429 || s >= 500;
+export async function ghFetchRetry(url: string, init?: RequestInit, retries = 1, delayMs = 1200): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await fetch(url, init);
+      if (!TRANSIENT(r.status) || attempt >= retries) return r;
+    } catch (e) {
+      if (attempt >= retries) throw e;
+    }
+    await new Promise((res) => setTimeout(res, delayMs));
+  }
+}
+
 async function gh(path: string): Promise<Response> {
   return fetch(API + path, {
     headers: {
