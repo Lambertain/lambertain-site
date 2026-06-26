@@ -777,6 +777,10 @@ export async function setTaskPr(taskId: string, prUrl: string): Promise<{ projec
 export async function listPrStageTasks(): Promise<{ readable_id: string; pr_url: string }[]> {
   return q<{ readable_id: string; pr_url: string }>("SELECT readable_id, pr_url FROM tasks WHERE deploy_stage='pr' AND pr_url IS NOT NULL");
 }
+/** Задачи в стадии 'dev' с привязанным PR — для синка «merge доехал до main клиента» → prod. */
+export async function listDevStageTasksWithPr(): Promise<{ readable_id: string; pr_url: string }[]> {
+  return q<{ readable_id: string; pr_url: string }>("SELECT readable_id, pr_url FROM tasks WHERE deploy_stage='dev' AND pr_url IS NOT NULL");
+}
 /** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов). */
 export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod"): Promise<boolean> {
   const r = await q<{ readable_id: string }>("UPDATE tasks SET deploy_stage=$2 WHERE readable_id=$1 AND deploy_stage IS DISTINCT FROM $2 RETURNING readable_id", [taskId, stage]);
