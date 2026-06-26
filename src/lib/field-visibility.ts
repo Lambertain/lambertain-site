@@ -16,6 +16,7 @@ export const FIELD_VIS_DEFAULTS: Record<string, { client: boolean; dev: boolean 
   devAccounts: { client: false, dev: true },
   railway: { client: false, dev: true },
   vercel: { client: false, dev: true },
+  binotel: { client: false, dev: true },
   aiKeys: { client: false, dev: true },
   objectStorage: { client: false, dev: true },
 };

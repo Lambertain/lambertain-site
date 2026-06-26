@@ -59,6 +59,11 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
     { key: "token", label: { uk: "API Token", ru: "API Token", en: "API Token" }, kind: "secret" },
     { key: "board", label: { uk: "Дошка (ID/URL)", ru: "Доска (ID/URL)", en: "Board (ID/URL)" }, kind: "text" },
   ] },
+  // Binotel — телефония клиента (REST API 4.0: история звонков + ссылки на записи). Нужен разработчику/порталу.
+  { key: "binotel", group: "other", label: { uk: "Binotel (телефонія)", ru: "Binotel (телефония)", en: "Binotel (telephony)" }, subs: [
+    { key: "key", label: { uk: "API Key", ru: "API Key", en: "API Key" }, kind: "secret" },
+    { key: "secret", label: { uk: "API Secret", ru: "API Secret", en: "API Secret" }, kind: "secret" },
+  ] },
   { key: "domain", group: "hosting", label: { uk: "Домен / реєстратор", ru: "Домен / регистратор", en: "Domain / registrar" }, subs: [url("Домен", "Домен", "Domain"), { key: "registrar", label: { uk: "Реєстратор", ru: "Регистратор", en: "Registrar" }, kind: "text" }, login, pass] },
   // AI / LLM ключі — потрібні розробнику локально (генерація, агенти). За замовчуванням видно лише розробнику (field-visibility).
   { key: "aiKeys", group: "access", label: { uk: "AI / LLM ключі", ru: "AI / LLM ключи", en: "AI / LLM keys" }, subs: [
