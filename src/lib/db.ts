@@ -1065,6 +1065,12 @@ export async function assignTask(readableId: string, login: string, evt?: TaskEv
   }
 }
 
+/** Сменить видимость задачи: internal=true — клиент не видит; false — видит. Возвращает true, если задача найдена. */
+export async function setTaskInternal(readableId: string, internal: boolean): Promise<boolean> {
+  const r = await q<{ id: number }>("UPDATE tasks SET internal=$2 WHERE readable_id=$1 RETURNING id", [readableId, internal]);
+  return r.length > 0;
+}
+
 /** Назначить постановщика (reporter) задачи по логину. false — логин/задача не найдены. */
 export async function setTaskReporter(readableId: string, login: string): Promise<boolean> {
   const rows = await q<{ id: number }>(

@@ -1,15 +1,18 @@
 /**
  * Создание задачи на портале по глобальному admin-токену (без доступа к БД).
  * POST /api/admin/create-task
- *   { projectKey, title, description?, assigneeLogin?, internal?, recipient? }
+ *   { projectKey, title, description?, assigneeLogin?, internal?, recipient?, reporterLogin? }
  *   Задача сразу назначается разработчику проекта (assigneeLogin или defaultAssignee) и ему уходит пуш —
  *   разбор делает Claude разработчика (читает задачу/код, спрашивает клиента в комментах при необходимости).
  *   recipient:"client" — вопрос/задача КЛИЕНТУ (не назначается разработчику, клиент видит и отвечает).
+ *   reporterLogin — постановщик задачи (логин участника или "client" → клиент проекта). Для КЛИЕНТСКИХ
+ *   проектов ставим постановщиком клиента, чтобы при сдаче задачи клиенту приходило уведомление.
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN> (переменная окружения портала).
  */
 import { NextResponse } from "next/server";
 import { readJsonSmart } from "@/lib/req-body";
 import { getBackend } from "@/lib/tasks";
+import { projectReporterLogin } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -24,13 +27,16 @@ export async function POST(req: Request) {
   const token = bearer(req);
   if (!token || token !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
-  let body: { projectKey?: string; title?: string; description?: string; assigneeLogin?: string; internal?: boolean; recipient?: string };
+  let body: { projectKey?: string; title?: string; description?: string; assigneeLogin?: string; internal?: boolean; recipient?: string; reporterLogin?: string };
   try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   const title = String(body.title || "").trim();
   const description = String(body.description || "");
   const internal = body.internal === true;
   if (!projectKey || !title) return NextResponse.json({ error: "projectKey and title required" }, { status: 400 });
+  // Постановщик: явный логин, или "client" → клиент проекта (для клиентских проектов — чтобы при сдаче клиенту шёл пуш).
+  const rl = String(body.reporterLogin || "").trim();
+  const reporterLogin = rl === "client" ? await projectReporterLogin(projectKey).catch(() => null) : rl || null;
 
   const be = getBackend();
   const project = (await be.listProjects()).find((p) => p.key === projectKey);
@@ -50,7 +56,7 @@ export async function POST(req: Request) {
     const assignee = (body.assigneeLogin ? String(body.assigneeLogin).trim() : "") || project.meta.defaultAssignee || null;
     const task = await be.createTask({
       projectKey, summary: title.slice(0, 120), description,
-      assigneeLogin: assignee, reporterLogin: null, approvalStatus: "approved", createdByRole: "admin", internal,
+      assigneeLogin: assignee, reporterLogin, approvalStatus: "approved", createdByRole: "admin", internal,
     });
     if (assignee) {
       await notifyLogins([assignee], `🆕 <b>Нова задача</b> · ${await taskTag(task.id)}: ${task.summary}\n${PORTAL_BASE}/admin/tasks/${task.id}`).catch(() => {});
