@@ -16,12 +16,21 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
   try {
+    const bucketTarget = statusBucket(status);
+    // DEV-36: клиент не может принять («Готово») или вернуть («Доработка») задачу, пока она не опубликована
+    // (стадия prod = «Опубліковано»). До публикации он ещё не видит результат на рабочем сайте.
+    if (me.role === "client" && (bucketTarget === "done" || bucketTarget === "rework")) {
+      const t = await getBackend().getTask(id).catch(() => null);
+      if (t && t.deployStage !== "prod") {
+        return { error: "Поки задачу не опубліковано, її не можна прийняти або повернути на доопрацювання." };
+      }
+    }
     // DEV-32: актор смены статуса — текущий пользователь (ручная смена в портале).
     const evt = { actorLogin: me.youtrackLogin ?? null, actorRole: me.role ?? "admin", trigger: "ручна зміна у порталі" };
     await getBackend().updateStatus(id, status, evt);
     after(() => syncTaskToTrello(id, status)); // Trello: подвинуть связанную карточку под новый статус
     // Деплой-стадия от статуса: взял в работу → «Готується» (pr); на ревью → «На тестовому» (dev). prod ставит доставка.
-    const bucket = statusBucket(status);
+    const bucket = bucketTarget;
     if (bucket === "inProgress") await setDeployStage(id, "pr", evt).catch(() => {});
     else if (bucket === "review") await advanceStage(id, "dev", "здав на ревʼю у порталі").catch(() => {}); // + коммент клиенту «на тестовому»
     revalidatePath("/admin");

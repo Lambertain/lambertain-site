@@ -813,8 +813,14 @@ export async function setPrReviewSynced(taskId: string, prUrl: string, ts?: stri
 }
 /** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов).
  *  evt — контекст для журнала (DEV-32): кто/почему сменил стадию (по умолчанию актор = система-автоматика). */
-export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod", evt?: TaskEventActor): Promise<boolean> {
+export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod", evt?: TaskEventActor, opts?: { forwardOnly?: boolean }): Promise<boolean> {
   const before = await q<{ deploy_stage: string | null }>("SELECT deploy_stage FROM tasks WHERE readable_id=$1", [taskId]);
+  // DEV-36: forwardOnly — не откатываем стадию назад (опубликованную задачу повторное «На ревью» не возвращает на «тестовий»).
+  if (opts?.forwardOnly) {
+    const ORDER: Record<string, number> = { pr: 0, dev: 1, prod: 2 };
+    const cur = before[0]?.deploy_stage ?? null;
+    if (cur && (ORDER[cur] ?? -1) >= (ORDER[stage] ?? 0)) return false;
+  }
   const r = await q<{ readable_id: string }>("UPDATE tasks SET deploy_stage=$2 WHERE readable_id=$1 AND deploy_stage IS DISTINCT FROM $2 RETURNING readable_id", [taskId, stage]);
   if (r.length > 0) {
     await logTaskEvent(taskId, { type: "stage_change", from: before[0]?.deploy_stage ?? null, to: stage, actorRole: "system", ...evt }).catch(() => {});

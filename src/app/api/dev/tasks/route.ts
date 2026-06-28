@@ -12,7 +12,7 @@ import { statusBucket } from "@/lib/statuses";
 
 // DEV-33: зависимость считается «незакрытой» (блокирующей), пока её статус не в корзине done.
 const depUnfinished = (status: string | null) => statusBucket(status) !== "done";
-import { ESCALATION_MARK } from "@/lib/dev-protocol";
+import { isEscalation } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -43,7 +43,7 @@ export async function GET(req: Request) {
     // Отвечает «сторона пользователя»: клиент ИЛИ сотрудник (в проектах без клиента/с тех-поддержкой отвечает сотрудник —
     // раньше учитывался только client, и ответы сотрудника игнорировались → Claude переспрашивал уже отвеченное).
     const isUserSide = (role?: string) => role === "client" || role === "employee";
-    const escalations = comments.filter((c) => c.text.startsWith(ESCALATION_MARK));
+    const escalations = comments.filter((c) => isEscalation(c.text));
     const lastEsc = escalations[escalations.length - 1];
     const answersAfter = lastEsc ? comments.filter((c) => isUserSide(c.author.role) && c.created > lastEsc.created) : [];
     const awaitingClient = !!lastEsc && answersAfter.length === 0;

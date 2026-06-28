@@ -21,7 +21,8 @@ const NOTE: Record<string, string> = {
  */
 export async function advanceStage(taskId: string, stage: "pr" | "dev" | "prod", trigger?: string): Promise<void> {
   // DEV-32: триггер уходит в журнал стадии (что именно сдвинуло стадию — PR смержен / доставка в прод тощо).
-  const changed = await setDeployStage(taskId, stage, { actorRole: "system", trigger });
+  // DEV-36: forwardOnly — стадия не откатывается назад (prod→dev при повторном «На ревью» опубликованной задачи).
+  const changed = await setDeployStage(taskId, stage, { actorRole: "system", trigger }, { forwardOnly: true });
   if (!changed) return;
   const note = NOTE[stage];
   if (!note) return;

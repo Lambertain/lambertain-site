@@ -8,11 +8,10 @@
 import { NextResponse } from "next/server";
 import { getProjectKeyByToken, logTaskEvent } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { draftClientQuestion } from "@/lib/replies";
 import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
-import { ESCALATION_MARK, PORTAL_BASE } from "@/lib/dev-protocol";
+import { escalationMark, PORTAL_BASE } from "@/lib/dev-protocol";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -41,7 +40,7 @@ export async function POST(req: Request) {
   // Кнопка «Відкрити задачу» → страница задачи в браузере (где коммент с эскалацией).
   const openBtn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
   try {
-    const [task, comments] = await Promise.all([be.getTask(taskId), be.getComments(taskId)]);
+    const task = await be.getTask(taskId);
 
     if (kind === "admin") {
       // Вопрос/решение — ПОСТАНОВЩИКУ задачи (кто её создал), а не глобально супер-админу.
@@ -55,12 +54,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, escalatedTo: task.reporter?.login || "admin" });
     }
 
-    // client: оформляем вопрос от лица агентства → на МОДЕРАЦИЮ супер-админу (клиент увидит после апрува). Задача блокируется до ответа.
-    const polished = await draftClientQuestion(task, question, comments);
-    await submitForModeration(taskId, `${ESCALATION_MARK}\n\n${polished}`, { taskSummary: task.summary, devAuthored: true });
+    // client: вопрос уходит на МОДЕРАЦИЮ супер-админу (клиент увидит после апрува). Задача блокируется до ответа.
+    // DEV-35/DEV-37: НЕ переписываем текст через LLM — он уже согласован разработчиком и идёт через модерацию;
+    // повторная переформулировка расходилась с утверждённым и обрезалась лимитом токенов (вопрос приходил усечённым).
+    // Заголовок — в языке самого вопроса (укр. по умолчанию), а не хардкод «Вопрос».
+    const mark = escalationMark(question);
+    await submitForModeration(taskId, `${mark}\n\n${question}`, { taskSummary: task.summary, devAuthored: true });
     await logTaskEvent(taskId, { type: "escalation", actorRole: "contributor", trigger: "escalate(client) → Blocked", details: { kind: "client", question: question.slice(0, 300) } });
     await be.updateStatus(taskId, "Blocked", { actorRole: "contributor", trigger: "escalate(client): питання клієнту" }).catch(() => {});
-    return NextResponse.json({ ok: true, escalatedTo: "client (на модерации)", posted: polished });
+    return NextResponse.json({ ok: true, escalatedTo: "client (на модерации)", posted: question });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });
   }
