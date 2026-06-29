@@ -5,7 +5,7 @@ import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
-import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, getDepsFor, getEnabledGuides, guideText, commentTimesByTasks } from "@/lib/db";
+import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, doneCountsByProjectDay, getDepsFor, getEnabledGuides, guideText, commentTimesByTasks } from "@/lib/db";
 import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
 import { ProjectInfoCard } from "./project-info-card";
@@ -29,12 +29,17 @@ export default async function HomePage() {
 
   // —— Админ: дашборд загрузки разработчиков ——
   if (me.realRole === "admin" && me.role === "admin") {
-    let projects, counts, users;
+    let projects, counts, users, doneDaily;
     try {
-      [projects, counts, users] = await Promise.all([listProjectsWithMeta(), taskCountsByProject(), be.listUsers()]);
+      [projects, counts, users, doneDaily] = await Promise.all([listProjectsWithMeta(), taskCountsByProject(), be.listUsers(), doneCountsByProjectDay(7)]);
     } catch (e) {
       return <p style={{ color: "#ff5b5b", fontSize: 14 }}>{e instanceof Error ? e.message : "—"}</p>;
     }
+    // 7 календарних днів (Київ TZ), від старого до сьогодні — підписи для недільного графіка.
+    const nowDash = nowMs();
+    const days = Array.from({ length: 7 }, (_, i) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Kyiv", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(nowDash - (6 - i) * 86400000)),
+    );
     const countMap = new Map(counts.map((c) => [c.projectKey, c]));
     const dash: DashProject[] = projects
       .filter((p) => !p.archived)
@@ -62,7 +67,7 @@ export default async function HomePage() {
             <ChatModal projects={chatProjects} locale={locale} isAdmin={isSuperAdmin(me)} role={me.role} feedbackKey={projects.find((p) => p.meta.feedback)?.key} />
           </div>
         </div>
-        <DevDashboard projects={dash} devNames={devNames} now={nowMs()} locale={locale} />
+        <DevDashboard projects={dash} devNames={devNames} now={nowDash} locale={locale} days={days} doneDaily={doneDaily} />
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ProjectMeta } from "@/lib/tasks/types";
 import { t, type Locale } from "@/lib/i18n";
+import { DevActivityChart } from "./dev-activity-chart";
 import { ui } from "../ui-styles";
 
 export type DashProject = {
@@ -156,11 +157,15 @@ function DevBlock({
   projects,
   now,
   locale,
+  days,
+  doneMap,
 }: {
   title: string;
   projects: DashProject[];
   now: number;
   locale: Locale;
+  days: string[];
+  doneMap: Record<string, Record<string, number>>;
 }) {
   const currency = projects.find((p) => p.meta.currency)?.meta.currency || "₴";
   const totalCost = projects.reduce((s, p) => s + (Number.isFinite(p.meta.cost) ? (p.meta.cost as number) : 0), 0);
@@ -184,6 +189,7 @@ function DevBlock({
           )}
         </div>
       </div>
+      <DevActivityChart projects={projects.map((p) => ({ key: p.key, name: p.name }))} days={days} doneMap={doneMap} locale={locale} />
       <div className="pm-grid-2" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12, marginTop: 14 }}>
         {projects.map((p) => (
           <ProjectCard key={p.key} p={p} now={now} locale={locale} />
@@ -198,16 +204,26 @@ export function DevDashboard({
   devNames,
   now,
   locale,
+  days,
+  doneDaily,
 }: {
   projects: DashProject[];
   /** login → отображаемое имя разработчика. */
   devNames: Record<string, string>;
   now: number;
   locale: Locale;
+  /** 7 дат YYYY-MM-DD (Київ TZ), от старой к новой — для недельного графика активности. */
+  days: string[];
+  /** Выполнено задач по проекту и дню (история из task_events). */
+  doneDaily: { projectKey: string; day: string; count: number }[];
 }) {
   if (!projects.length) {
     return <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 16 }}>{t(locale, "dash.empty")}</p>;
   }
+
+  // projectKey → (день → кол-во выполненных) — для графика по каждому разработчику.
+  const doneMap: Record<string, Record<string, number>> = {};
+  for (const r of doneDaily) (doneMap[r.projectKey] ??= {})[r.day] = r.count;
 
   // Группировка по ответственному разработчику.
   const groups = new Map<string, DashProject[]>();
@@ -228,10 +244,10 @@ export function DevDashboard({
     <div>
       <FinBlock projects={projects} locale={locale} />
       {devLogins.map((login) => (
-        <DevBlock key={login} title={devNames[login] || login} projects={groups.get(login)!} now={now} locale={locale} />
+        <DevBlock key={login} title={devNames[login] || login} projects={groups.get(login)!} now={now} locale={locale} days={days} doneMap={doneMap} />
       ))}
       {unassigned.length > 0 && (
-        <DevBlock title={t(locale, "dash.unassigned")} projects={unassigned} now={now} locale={locale} />
+        <DevBlock title={t(locale, "dash.unassigned")} projects={unassigned} now={now} locale={locale} days={days} doneMap={doneMap} />
       )}
     </div>
   );

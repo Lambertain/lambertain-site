@@ -736,6 +736,33 @@ export async function taskCountsByProject(): Promise<{ projectKey: string; total
   return rows.map((r) => ({ projectKey: r.project_key, total: Number(r.total), done: Number(r.done) }));
 }
 
+// Ключевые слова статуса «выполнено» — те же, что в корзине done (statuses.ts) и в taskCountsByProject.
+const DONE_STATUS_RE = "(done|закры|готов|fixed|complete|verified|выполн)";
+
+/**
+ * Сколько задач переведено в статус «выполнено» — по проекту и календарному дню (Київ TZ)
+ * за последние `days` дней. Источник — журнал task_events (переход status_change в done-статус),
+ * т.е. реальная история, без эвристик. Считаем ТОЛЬКО входы в done из не-done (без двойного счёта
+ * при переходах между done-подстатусами и при повторных закрытиях того же статуса).
+ */
+export async function doneCountsByProjectDay(days = 7): Promise<{ projectKey: string; day: string; count: number }[]> {
+  const rows = await q<{ project_key: string; day: string; count: string }>(
+    `SELECT p.key AS project_key,
+            to_char((te.created_at AT TIME ZONE 'Europe/Kyiv')::date, 'YYYY-MM-DD') AS day,
+            count(*) AS count
+       FROM task_events te
+       JOIN tasks t ON t.id = te.task_id
+       JOIN projects p ON p.id = t.project_id
+      WHERE te.type = 'status_change'
+        AND te.to_val ~* '${DONE_STATUS_RE}'
+        AND (te.from_val IS NULL OR te.from_val !~* '${DONE_STATUS_RE}')
+        AND te.created_at >= now() - (($1::int + 1) * interval '1 day')
+      GROUP BY p.key, day`,
+    [days],
+  );
+  return rows.map((r) => ({ projectKey: r.project_key, day: r.day, count: Number(r.count) }));
+}
+
 /**
  * Задать точный набор проектов разработчика (один дев на проект, но дев ведёт несколько проектов).
  * Делает его ответственным (defaultAssignee) на проектах из keys и снимает с остальных,
