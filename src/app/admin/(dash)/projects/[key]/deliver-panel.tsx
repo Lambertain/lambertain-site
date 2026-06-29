@@ -2,18 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { previewDeliver, runDeliver, setAutoDeliver, type DeliverResultUI } from "./deliver-actions";
-import type { DeliveryPreview } from "@/lib/deliver";
+import type { DeliveryPreview, AutoDeliverIssue } from "@/lib/deliver";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../../../ui-styles";
 
-export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver, deliverBranch }: { projectKey: string; locale: Locale; autoMigrate?: boolean; autoDeliver?: boolean; deliverBranch?: string }) {
+export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver, deliverBranch, initialIssues }: { projectKey: string; locale: Locale; autoMigrate?: boolean; autoDeliver?: boolean; deliverBranch?: string; initialIssues?: AutoDeliverIssue[] | null }) {
   const [auto, setAuto] = useState(!!autoDeliver);
+  const [issues, setIssues] = useState<AutoDeliverIssue[] | null>(initialIssues ?? null);
   const [, startAuto] = useTransition();
   function toggleAuto(next: boolean) {
     setAuto(next); // оптимистично
+    if (!next) setIssues(null);
     startAuto(async () => {
       const r = await setAutoDeliver(projectKey, next);
-      if (r.error) setAuto(!next); // откат при ошибке
+      if (r.error) { setAuto(!next); return; } // откат при ошибке
+      if (next) setIssues(r.issues ?? []); // показать чего не хватает (или ✓ если всё ок)
     });
   }
   const [preview, setPreview] = useState<DeliveryPreview | null>(null);
@@ -60,6 +63,25 @@ export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver, del
           <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "deliver.autoHint")}</span>
         </span>
       </label>
+
+      {auto && issues && (
+        <div style={{ ...ui.card, padding: 12, marginTop: 10, borderColor: issues.some((i) => i.level === "error") ? "#ff5b5b" : issues.length ? "#e8b339" : "var(--accent-line)" }}>
+          {issues.length === 0 ? (
+            <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)" }}>✓ {t(locale, "deliver.chk.ready")}</div>
+          ) : (
+            <>
+              <div style={{ ...ui.monoLabel, color: issues.some((i) => i.level === "error") ? "#ff5b5b" : "#e8b339" }}>{t(locale, "deliver.chk.title")}</div>
+              <ul style={{ margin: "8px 0 0", paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+                {issues.map((iss, idx) => (
+                  <li key={iss.code + idx} style={{ ...ui.monoLabel, textTransform: "none", color: iss.level === "error" ? "#ff5b5b" : "#e8b339", lineHeight: 1.5 }}>
+                    {iss.level === "error" ? "✖ " : "⚠ "}{t(locale, `deliver.chk.${iss.code}`, iss.fields ? { fields: iss.fields } : undefined)}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
 
       {!preview && !results && (
         <button onClick={open} disabled={loading} style={{ ...ui.btnAccent, marginTop: 12, opacity: loading ? 0.5 : 1 }}>

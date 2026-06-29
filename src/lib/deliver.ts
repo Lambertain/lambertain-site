@@ -454,3 +454,50 @@ export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(Deliv
   }
   return out;
 }
+
+// ---- Готовность к автодоставке: чего не хватает в настройках (для тумблера на проекте) ----
+export interface AutoDeliverIssue {
+  /** error = автодоставка НЕ запустится; warn = запустится, но с оговоркой. */
+  level: "error" | "warn";
+  /** Код для перевода в UI: i18n-ключ deliver.chk.<code>. */
+  code: "noPairs" | "gitflowConflict" | "noAutoApprove" | "directNoDeploy" | "railwayIncomplete";
+  /** Доп. данные для шаблона (напр. список недостающих Railway-полей). */
+  fields?: string;
+}
+
+/**
+ * Проверка готовности проекта к автодоставке — зеркалит реальные условия autoDeliverIfConfigured()
+ * и триггера авто-приёмки (/api/dev/status). Пустой массив = всё настроено, автодоставка сработает.
+ * error — блокирует запуск; warn — доставка пойдёт, но часть пути (деплой/часть задач) не автоматизируется.
+ */
+export function autoDeliverReadiness(meta: ProjectMeta): AutoDeliverIssue[] {
+  const issues: AutoDeliverIssue[] = [];
+
+  // 1. Хотя бы одна полная пара репо dev→client (основная + extraRepos) — иначе доставлять нечего.
+  const pairs = [{ dev: meta.devGit, client: meta.clientGit }, ...(meta.extraRepos ?? [])]
+    .filter((p) => !!p.dev && !!p.client);
+  if (!pairs.length) issues.push({ level: "error", code: "noPairs" });
+
+  // 2. Режимы доставки взаимоисключающие: в /api/dev/status gitflow проверяется первым и перехватывает.
+  if (meta.gitflowDelivery) issues.push({ level: "warn", code: "gitflowConflict" });
+
+  // 3. Триггер: автодоставка идёт на авто-приёмке (meta.autoApprove или task.autoDone). Без autoApprove
+  //    обычные задачи уходят на ручную приёмку и сами не доставляются.
+  if (!meta.autoApprove) issues.push({ level: "warn", code: "noAutoApprove" });
+
+  // 4. Деплой-креды: в прямом режиме (squash в main) без Railway/Vercel autoDeliverIfConfigured вернёт null.
+  if (!meta.clientDeliverPR) {
+    const cd = meta.clientDeploy;
+    const hasRailway = !!cd?.railwayToken;
+    const hasVercel = !!meta.clientVercel?.token;
+    if (!hasRailway && !hasVercel) {
+      issues.push({ level: "error", code: "directNoDeploy" });
+    } else if (hasRailway) {
+      // Авто-апрув Railway-деплоя требует полного набора (см. approveClientDeploy/cdOk).
+      const miss = (["projectId", "environmentId", "serviceId"] as const).filter((k) => !cd?.[k]);
+      if (miss.length) issues.push({ level: "warn", code: "railwayIncomplete", fields: miss.join(", ") });
+    }
+  }
+
+  return issues;
+}

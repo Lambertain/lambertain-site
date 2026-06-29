@@ -3,18 +3,22 @@
 import { requireAdmin } from "@/lib/principal";
 import { getProjectFull, setProjectMeta } from "@/lib/db";
 import { publishProjectToProd } from "@/lib/deploy-stage";
-import { previewDelivery, deliverDevToClient, approveClientDeploy, clientDeployStatus, vercelDeployStatus, type DeliveryPreview, type DeployStatus } from "@/lib/deliver";
+import { previewDelivery, deliverDevToClient, approveClientDeploy, clientDeployStatus, vercelDeployStatus, autoDeliverReadiness, type DeliveryPreview, type DeployStatus, type AutoDeliverIssue } from "@/lib/deliver";
 import { revalidatePath } from "next/cache";
 
-/** Вкл/выкл автодоставку проекта (meta.autoDeliver): при приёмке задачи код доставляется клиенту сам. */
-export async function setAutoDeliver(key: string, value: boolean): Promise<{ ok?: boolean; error?: string }> {
+/**
+ * Вкл/выкл автодоставку проекта (meta.autoDeliver): при приёмке задачи код доставляется клиенту сам.
+ * При включении возвращает issues — чего не хватает в настройках, чтобы автодоставка реально сработала.
+ */
+export async function setAutoDeliver(key: string, value: boolean): Promise<{ ok?: boolean; error?: string; issues?: AutoDeliverIssue[] }> {
   try {
     await requireAdmin();
     const proj = await getProjectFull(key);
     if (!proj) return { error: "Проект не найден" };
-    await setProjectMeta(key, proj.name, { ...proj.meta, autoDeliver: value || undefined });
+    const meta = { ...proj.meta, autoDeliver: value || undefined };
+    await setProjectMeta(key, proj.name, meta);
     revalidatePath(`/admin/projects/${key}`);
-    return { ok: true };
+    return { ok: true, issues: value ? autoDeliverReadiness(meta) : [] };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };
   }

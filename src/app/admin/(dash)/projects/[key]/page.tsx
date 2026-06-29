@@ -12,6 +12,7 @@ import { MetaForm } from "./meta-form";
 import { ProjectTypeToggle } from "./project-type-toggle";
 import { KickoffPanel } from "./kickoff-panel";
 import { DeliverPanel } from "./deliver-panel";
+import { autoDeliverReadiness } from "@/lib/deliver";
 import { TokenRow } from "../token-row";
 import { ui } from "../../../ui-styles";
 
@@ -70,7 +71,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
       </div>
 
       {/* Доставка dev→client — первым блоком (частое действие). */}
-      {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} autoMigrate={!!proj.meta.clientAutoMigrate} autoDeliver={!!proj.meta.autoDeliver} deliverBranch={proj.meta.deliverBranch} />}
+      {proj.meta.devGit && proj.meta.clientGit && <DeliverPanel projectKey={key} locale={locale} autoMigrate={!!proj.meta.clientAutoMigrate} autoDeliver={!!proj.meta.autoDeliver} deliverBranch={proj.meta.deliverBranch} initialIssues={proj.meta.autoDeliver ? autoDeliverReadiness(proj.meta) : null} />}
 
       <MetaForm projectKey={key} initialName={proj.name} initialMeta={proj.meta} contributors={contributors} locale={locale} />
 
