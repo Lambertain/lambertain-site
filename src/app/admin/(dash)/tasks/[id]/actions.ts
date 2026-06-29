@@ -151,6 +151,12 @@ export async function markClientActionDone(taskId: string, data: string): Promis
     }
   }
   await setClientAction(taskId, null, null, null);
+  // Дані надано → повертаємо задачу в роботу: вона чекала на клієнта (Blocked) або висіла в ревʼю.
+  // Без цього задача лишалась «Blocked» навіть після виконання дії (як коли клієнт відповідає коментарем).
+  try {
+    const bucket = statusBucket(task.state);
+    if (bucket === "blocked" || bucket === "review") await be.updateStatus(taskId, "In Progress");
+  } catch { /* best-effort, статус вторинний до збереження даних */ }
   // Нейтральний текст: дію міг виконати і делегований співробітник, не лише клієнт.
   await be.addComment(taskId, `✅ <b>Реєстрацію виконано.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
   // Возвращаем разработчику: уведомляем ответственного, он продолжает (данные — в /api/dev/secrets).
