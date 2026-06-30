@@ -4,9 +4,12 @@
  * (approved=false): клиент его НЕ видит и НЕ получает пуш. Уведомление уходит супер-админу (Никите) на модерацию.
  * После апрува/правки коммент публикуется и клиент получает уведомление. Server-side only.
  */
+import { after } from "next/server";
 import { getBackend } from "./tasks";
 import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag, warnClientUnreachable } from "./notify";
 import { q, getProjectFull, logTaskEvent } from "./db";
+import { statusBucket } from "./statuses";
+import { autoDeliverAndNotify } from "./auto-deliver";
 import { PORTAL_BASE } from "./dev-protocol";
 
 const taskBtn = (taskId: string) => ({ text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
@@ -34,10 +37,10 @@ export async function submitForModeration(taskId: string, body: string, opts?: {
   await notifyAdmin(`🛡 <b>Коммент на модерацию</b> · ${await taskTag(taskId)}: ${summary}\n${body.slice(0, 400)}`, taskBtn(taskId)).catch(() => {});
 }
 
-type Row = { id: number; body: string; readable_id: string; project_key: string; project_name: string; summary: string };
+type Row = { id: number; body: string; readable_id: string; project_key: string; project_name: string; summary: string; dev_authored: boolean; status: string | null };
 async function commentInfo(commentId: string): Promise<Row | null> {
   const rows = await q<Row>(
-    `SELECT c.id, c.body, t.readable_id, p.key AS project_key, p.name AS project_name, t.title AS summary
+    `SELECT c.id, c.body, c.dev_authored, t.status, t.readable_id, p.key AS project_key, p.name AS project_name, t.title AS summary
      FROM comments c JOIN tasks t ON t.id = c.task_id JOIN projects p ON p.id = t.project_id
      WHERE c.id = $1`,
     [commentId],
@@ -45,13 +48,8 @@ async function commentInfo(commentId: string): Promise<Row | null> {
   return rows[0] ?? null;
 }
 
-/** Одобрить pending-коммент → публикуется клиенту + пуш. */
-export async function approveModeratedComment(commentId: string): Promise<{ taskId: string } | { error: string }> {
-  const r = await commentInfo(commentId);
-  if (!r) return { error: "not found" };
-  await q("UPDATE comments SET approved = true WHERE id = $1", [commentId]);
-  // DEV-32: журнал — коммент команды одобрен модерацией и стал виден клиенту.
-  await logTaskEvent(r.readable_id, { type: "comment_moderated", to: "approved", actorRole: "admin", trigger: "Lambertain схвалив → опубліковано клієнту", details: { commentId } });
+/** Опубликовать одобренный коммент клиенту проекта (+ пуш, с обработкой недостижимости). */
+async function publishApprovedToClient(r: Row): Promise<void> {
   const reached = await notifyProjectClients(
     r.project_key,
     `💬 <b>${r.project_name} · ${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
@@ -62,6 +60,37 @@ export async function approveModeratedComment(commentId: string): Promise<{ task
     const p = await getProjectFull(r.project_key).catch(() => null);
     await warnClientUnreachable(r.project_key, r.readable_id, r.summary, p?.meta.defaultAssignee).catch(() => {});
   }
+}
+
+/**
+ * Одобрить pending-коммент → публикуется клиенту + пуш.
+ * Ручная доставка (проект БЕЗ autoDeliver/gitflow): одобрение итог-коммента разработчика «Готово до перевірки»
+ * (dev_authored + задача в Review) ЗАПУСКАЕТ доставку, а клиент видит «готово» ТОЛЬКО ПОСЛЕ доставки.
+ * Так не нужно отдельно «принимать» и потом вручную жать «Доставити» в проекте.
+ */
+export async function approveModeratedComment(commentId: string): Promise<{ taskId: string } | { error: string }> {
+  const r = await commentInfo(commentId);
+  if (!r) return { error: "not found" };
+  const proj = await getProjectFull(r.project_key).catch(() => null);
+  const manualDelivery = !!proj && !proj.meta.autoDeliver && !proj.meta.gitflowDelivery;
+  const isReadiness = r.dev_authored && statusBucket(r.status) === "review";
+
+  if (proj && manualDelivery && isReadiness) {
+    // Коммент держим непубличным до завершения доставки, затем публикуем клиенту (в фоне, чтобы не блокировать апрув).
+    const meta = proj.meta;
+    after(async () => {
+      try { await autoDeliverAndNotify(r.project_key, meta, r.readable_id); } catch { /* ошибки авто-доставки репортятся внутри */ }
+      await q("UPDATE comments SET approved = true WHERE id = $1", [commentId]).catch(() => {});
+      await logTaskEvent(r.readable_id, { type: "comment_moderated", to: "approved", actorRole: "admin", trigger: "Lambertain схвалив → доставка → публікація клієнту", details: { commentId } }).catch(() => {});
+      await publishApprovedToClient(r).catch(() => {});
+    });
+    return { taskId: r.readable_id };
+  }
+
+  await q("UPDATE comments SET approved = true WHERE id = $1", [commentId]);
+  // DEV-32: журнал — коммент команды одобрен модерацией и стал виден клиенту.
+  await logTaskEvent(r.readable_id, { type: "comment_moderated", to: "approved", actorRole: "admin", trigger: "Lambertain схвалив → опубліковано клієнту", details: { commentId } });
+  await publishApprovedToClient(r);
   return { taskId: r.readable_id };
 }
 

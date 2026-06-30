@@ -50,20 +50,27 @@ export async function POST(req: Request) {
       if ((task.autoDone || proj?.meta.autoApprove) && task.reporter?.role !== "client") {
         await be.updateStatus(taskId, "Done", { actorRole: "system", trigger: task.autoDone ? "автоздача за спекою (autoDone)" : "gitflow: авто-приймання (autoApprove)" });
         after(() => syncTaskToTrello(taskId, "Done")); // Trello: карточку → «Виконано»
-        await advanceStage(taskId, "dev", "розробник здав на ревʼю").catch(() => {}); // готово и на дев-мейн → «На тестовому» + коммент клиенту; авто-доставка ниже переведёт в «Опубліковано»
-        if (summary) await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true);
-        if (summary) await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
+        await advanceStage(taskId, "dev", "розробник здав на ревʼю").catch(() => {}); // готово и на дев-мейн → «На тестовому»; авто-доставка ниже переведёт в «Опубліковано»
         await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+        // Клиенту «Виконано» сообщаем ТОЛЬКО ПОСЛЕ доставки (иначе клиент идёт проверять до публикации и «не бачить змін»).
+        const notifyClientDone = async () => {
+          if (!summary) return;
+          await be.addComment(taskId, `✅ <b>Виконано:</b>\n\n${summary}`, "client", undefined, true, true).catch(() => {});
+          await notifyProjectClients(task.projectKey, `✅ <b>${await taskTag(taskId)}</b>: ${task.summary}\n\n${summary.slice(0, 400)}`).catch(() => {});
+        };
         // Авто-доставка на репо клиента (squash-пуш/PR + апрув деплоя/мониторинг; миграция — через preDeploy
-        // клиентского деплоя) — только если включён флаг autoDeliver. Фоном (after) — не блокируем ответ дев-Клоду.
+        // клиентского деплоя). Фоном (after) — не блокируем ответ дев-Клоду; «Виконано» клиенту — ПОСЛЕ доставки.
         // gitflow-режим (meta.gitflowDelivery): доставляем feature-ветку разработчика как PR в develop клиента.
         // Иначе — legacy squash-доставка (meta.autoDeliver). Режимы взаимоисключающие.
         if (proj?.meta?.gitflowDelivery && branch) {
           const meta = proj.meta;
-          after(() => deliverGitflowAndNotify(projectKey, meta, branch, taskId));
+          after(async () => { await deliverGitflowAndNotify(projectKey, meta, branch, taskId); await notifyClientDone(); });
         } else if (proj?.meta?.autoDeliver) {
           const meta = proj.meta;
-          after(() => autoDeliverAndNotify(projectKey, meta, taskId));
+          after(async () => { await autoDeliverAndNotify(projectKey, meta, taskId); await notifyClientDone(); });
+        } else {
+          // Нет авто-доставки (доставка вручную) — сообщаем клиенту сразу, как раньше.
+          await notifyClientDone();
         }
         return NextResponse.json({ ok: true, status: "Done", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : (proj?.meta?.autoDeliver ? "squash" : "none") });
       }
