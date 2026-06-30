@@ -5,7 +5,7 @@ import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny, makeCommentClientVisible } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue } from "@/lib/db";
+import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue, reopenDeployStage } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
@@ -89,6 +89,10 @@ export async function addTaskComment(
         const bucket = statusBucket(t.state);
         if (bucket === "blocked" || bucket === "done" || bucket === "review") await getBackend().updateStatus(id, "In Progress");
       } catch { /* best-effort */ }
+      // DEV-39: клиент пишет (новые правки) по опубликованной задаче → сбрасываем стадию,
+      // чтобы следующая доставка снова уведомила клиента «Опубліковано» (иначе залипает на prod).
+      // Self-guarded (сработает только если стадия = prod), поэтому безопасно на любой клиентский коммент.
+      await reopenDeployStage(id, { actorRole: "system", trigger: "клієнт написав нові правки по опублікованій задачі" }).catch(() => {});
     }
     // Уведомления (best-effort): адресно по ролям + картинки задачи.
     try {
@@ -342,6 +346,9 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
       }
     } else {
       await be.updateStatus(id, "Rework", { ...evt, trigger: "постановник повернув на доопрацювання" });
+      // DEV-39: повернення опублікованої задачі на доопрацювання = новий круг → скидаємо стадію,
+      // щоб після повторної доставки клієнт знову отримав «Опубліковано» (forwardOnly інакше тримає prod).
+      await reopenDeployStage(id, { actorRole: me.role ?? "admin", actorLogin: me.youtrackLogin ?? null, trigger: "повернуто на доопрацювання" }).catch(() => {});
       after(() => syncTaskToTrello(id, "Rework")); // Trello: карточку → назад в работу
       if (note?.trim()) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${note.trim()}`, "internal");
       if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${await taskTag(id)}: ${task.summary}${note?.trim() ? `\n${note.trim().slice(0, 300)}` : ""}`).catch(() => {});

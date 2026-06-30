@@ -855,6 +855,25 @@ export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod
   return r.length > 0;
 }
 
+/**
+ * DEV-39: новий круг правок клієнта по ВЖЕ опублікованій задачі — скидаємо стадію (prod → null).
+ * Без цього forwardOnly (DEV-36) тримає стадію на 'prod' назавжди: наступна доставка не дає
+ * сигналу «Опубліковано» (advanceStage('prod') бачить, що стадія вже prod, і мовчить), а в прямому
+ * режимі доставки (без PR) стадія більше ніколи не повертається на 'dev'. Скидання дозволяє циклу
+ * пройти заново: dev (нова доставка) → prod (повторне «Опубліковано» клієнту). Не чіпає forwardOnly —
+ * захист DEV-36 від відкату при «повторному На ревью» БЕЗ нової доставки лишається.
+ */
+export async function reopenDeployStage(taskId: string, evt?: TaskEventActor): Promise<boolean> {
+  const r = await q<{ readable_id: string }>(
+    "UPDATE tasks SET deploy_stage = NULL WHERE readable_id=$1 AND deploy_stage='prod' RETURNING readable_id",
+    [taskId],
+  );
+  if (r.length > 0) {
+    await logTaskEvent(taskId, { type: "stage_change", from: "prod", to: null, actorRole: "system", ...evt }).catch(() => {});
+  }
+  return r.length > 0;
+}
+
 // ---- DEV-32: журнал событий задачи (audit/activity timeline; только для разработчиков) ----
 export interface TaskEventActor { actorLogin?: string | null; actorRole?: string | null; trigger?: string | null }
 export interface TaskEventInput extends TaskEventActor { type: string; from?: string | null; to?: string | null; details?: Record<string, unknown> | null }
