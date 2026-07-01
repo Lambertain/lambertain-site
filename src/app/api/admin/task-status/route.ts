@@ -10,6 +10,7 @@ import { readJsonSmart } from "@/lib/req-body";
 import { getBackend } from "@/lib/tasks";
 import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
+import { syncTaskToTrello } from "@/lib/trello";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { revalidatePath } from "next/cache";
 
@@ -39,6 +40,8 @@ export async function POST(req: Request) {
   try { task = await be.getTask(readableId); } catch { return NextResponse.json({ error: `Задача ${readableId} не найдена` }, { status: 404 }); }
   // DEV-32: атрибуция в журнал — смена через admin-API (актор = агентство/постановщик).
   await be.updateStatus(readableId, status, { actorRole: "admin", trigger: "зміна через admin-API" });
+  // Синк Trello-дошки клиента (если подключена): двигаем карточку в колонку по статусу.
+  await syncTaskToTrello(readableId, status).catch(() => {});
   const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
 
   // Review → постановщику (reporter) на приёмку: комментарий-итог + пуш.
