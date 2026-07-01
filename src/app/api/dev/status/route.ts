@@ -78,23 +78,30 @@ export async function POST(req: Request) {
       await be.updateStatus(taskId, "Review", { actorRole: "contributor", trigger: "розробник здав на ревʼю" });
       after(() => syncTaskToTrello(taskId, "Review")); // Trello: карточку → колонка тестирования
       await advanceStage(taskId, "dev", "розробник здав на ревʼю").catch(() => {}); // сдал на ревью = на дев-мейн → «На тестовому сайті» + коммент клиенту
-      // Итог клиенту — на МОДЕРАЦИЮ супер-админу (клиент увидит и получит пуш после апрува).
-      if (summary) {
+      const meta = proj?.meta;
+      const clientReporter = task.reporter?.role === "client";
+      // DEV-40: клиентская задача (reporter=client) + прямая автодоставка → доставляем и ПУБЛИКУЕМ на клиентский
+      // прод СРАЗУ (не ждём приёмки), чтобы клиент увидел изменения на своём сайте и лише тоді натиснув «Готово».
+      // Иначе — deadlock: клиент не может принять то, чего не видит (у него нет отдельного staging — только прод).
+      // Задача остаётся в Review (её закрывает клиент), итог-коммент клиенту — ПОСЛЕ публикации.
+      const clientAutoPublish = clientReporter && !!meta?.autoDeliver && !meta?.gitflowDelivery;
+      // Итог клиенту (готово до перевірки). На проекте без autoApprove идёт на модерацию супер-админу.
+      const postReviewSummary = async () => {
+        if (!summary) return;
         await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary, devAuthored: true });
+      };
+      if (clientAutoPublish && meta) {
+        after(async () => { await autoDeliverAndNotify(projectKey, meta, taskId); await postReviewSummary(); });
+      } else {
+        await postReviewSummary();
+        // gitflow-доставка и на ручной приёмке (проект без autoApprove): открываем PR в develop из ветки разработчика.
+        if (meta?.gitflowDelivery && branch) { const m = meta; after(() => deliverGitflowAndNotify(projectKey, m, branch, taskId)); }
       }
-      // Постановщик-член команды (админ, напр. Настя) — адресное уведомление: для неё это единственный способ
-      // узнать, что задача готова (модерация-итог уходит супер-админу). НО постановщику-КЛИЕНТУ/СОТРУДНИКУ это
-      // уведомление НЕ шлём: он не должен знать о готовности, пока супер-админ не одобрил итог-коммент на модерации
-      // (иначе клиент идёт «проверять» до публикации результата). Он узнает после апрува — через notifyProjectClients.
+      // Постановщик-член команды (не клиент/сотрудник, напр. Настя) — адресное уведомление о готовности к проверке.
       if (task.reporter?.login && task.reporter.role !== "client" && task.reporter.role !== "employee") {
         await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(taskId)}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
       }
-      // gitflow-доставка и на ручной приёмке (проект без autoApprove): открываем PR в develop из ветки разработчика.
-      if (proj?.meta?.gitflowDelivery && branch) {
-        const meta = proj.meta;
-        after(() => deliverGitflowAndNotify(projectKey, meta, branch, taskId));
-      }
-      return NextResponse.json({ ok: true, status: "Review", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : "none" });
+      return NextResponse.json({ ok: true, status: "Review", delivery: clientAutoPublish ? "squash" : (meta?.gitflowDelivery && branch ? "gitflow" : "none") });
     }
     await be.updateStatus(taskId, status, { actorRole: "contributor", trigger: status === "In Progress" ? "розробник взяв у роботу" : undefined });
     after(() => syncTaskToTrello(taskId, status)); // Trello: карточку под новый статус (напр. «В процесі»)
