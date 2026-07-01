@@ -80,6 +80,13 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
     { key: "endpoint", label: { uk: "Endpoint (S3 API)", ru: "Endpoint (S3 API)", en: "Endpoint (S3 API)" }, kind: "text" },
     { key: "publicUrl", label: { uk: "Public URL", ru: "Public URL", en: "Public URL" }, kind: "url" },
   ] },
+  // Cloudflare — акаунтний інфра-креденшел (зони/DNS/R2/токени). Спільний на аккаунт, тримаємо в реєстрі.
+  { key: "cloudflare", group: "hosting", label: { uk: "Cloudflare (API)", ru: "Cloudflare (API)", en: "Cloudflare (API)" }, subs: [
+    { key: "accountId", label: { uk: "Account ID", ru: "Account ID", en: "Account ID" }, kind: "text" },
+    { key: "apiToken", label: { uk: "API Token", ru: "API Token", en: "API Token" }, kind: "secret" },
+    { key: "globalKey", label: { uk: "Global API Key", ru: "Global API Key", en: "Global API Key" }, kind: "secret" },
+    { key: "email", label: { uk: "Акаунт (email)", ru: "Аккаунт (email)", en: "Account (email)" }, kind: "text" },
+  ] },
 ];
 
 export function getFieldDef(key: string): ProjectFieldDef | undefined {
