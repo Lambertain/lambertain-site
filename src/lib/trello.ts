@@ -7,16 +7,17 @@ import { getBackend } from "./tasks";
 import { getProjectFull } from "./db";
 import { statusBucket, type Bucket } from "./statuses";
 import type { ProjectMeta } from "./tasks/types";
+import { PORTAL_BASE } from "./dev-protocol";
 
-interface TrelloCfg { key: string; token: string; board: string }
+export interface TrelloCfg { key: string; token: string; board: string }
 
-function trelloCfg(meta: ProjectMeta): TrelloCfg | null {
+export function trelloCfg(meta: ProjectMeta): TrelloCfg | null {
   const t = meta.customFields?.trello;
   return t?.key && t?.token && t?.board ? { key: t.key, token: t.token, board: t.board } : null;
 }
 
-/** id карточки из текста (ссылка trello.com/c/<id>). */
-function cardIdFromText(text: string): string | null {
+/** id/shortLink карточки из текста (ссылка trello.com/c/<id>). */
+export function cardIdFromText(text: string): string | null {
   const m = String(text || "").match(/trello\.com\/c\/([A-Za-z0-9]+)/);
   return m ? m[1] : null;
 }
@@ -38,6 +39,58 @@ async function trello(cfg: TrelloCfg, method: string, path: string, params: Reco
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
   const r = await fetch(u, { method, cache: "no-store" });
   return r.ok ? r.json().catch(() => null) : null;
+}
+
+/** id участника Trello, которому принадлежит наш токен (кэш по токену). Нужно вебхуку, чтобы
+ *  НЕ втягивать обратно на портал наши же зеркалированные комменты (защита от петли). */
+const memberIdCache = new Map<string, string>();
+export async function trelloMemberId(cfg: TrelloCfg): Promise<string | null> {
+  const cached = memberIdCache.get(cfg.token);
+  if (cached) return cached;
+  const me = (await trello(cfg, "GET", "/members/me", { fields: "id" })) as { id?: string } | null;
+  if (me?.id) memberIdCache.set(cfg.token, me.id);
+  return me?.id ?? null;
+}
+
+/** HTML портального коммента → текст для Trello-коммента (Markdown Trello). */
+function htmlToTrello(html: string): string {
+  return String(html || "")
+    .replace(/<br\s*\/?>(?!\n)/gi, "\n")
+    .replace(/<\/(p|div)>/gi, "\n")
+    .replace(/<(b|strong)>/gi, "**").replace(/<\/(b|strong)>/gi, "**")
+    .replace(/<(i|em)>/gi, "_").replace(/<\/(i|em)>/gi, "_")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/\/api\/files\//g, `${PORTAL_BASE}/api/files/`)
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Добавить коммент на карточку. */
+export async function trelloComment(cfg: TrelloCfg, cardId: string, text: string): Promise<void> {
+  if (!text.trim()) return;
+  await trello(cfg, "POST", `/cards/${cardId}/actions/comments`, { text: text.slice(0, 16000) });
+}
+
+/**
+ * Зеркалирование портал → Trello: наш/командный клиент-видимый коммент по задаче →
+ * комментом на связанной Trello-карточке. Best-effort, no-op если у проекта нет Trello или связи с карточкой.
+ * Петля не образуется: вебхук пропускает комменты, автор которых = наш Trello-аккаунт (trelloMemberId).
+ */
+export async function mirrorCommentToTrello(taskId: string, body: string): Promise<void> {
+  try {
+    const task = await getBackend().getTask(taskId).catch(() => null);
+    if (!task) return;
+    const cardId = cardIdFromText(task.description || "");
+    if (!cardId) return;
+    const proj = await getProjectFull(task.projectKey).catch(() => null);
+    const cfg = proj ? trelloCfg(proj.meta) : null;
+    if (!cfg) return;
+    const text = htmlToTrello(body);
+    if (text) await trelloComment(cfg, cardId, text);
+  } catch {
+    // best-effort — не валим основной поток
+  }
 }
 
 /** Переместить Trello-карточку задачи в колонку, соответствующую корзине статуса. Best-effort (тихо выходит, если нет конфига/карточки/колонки). */

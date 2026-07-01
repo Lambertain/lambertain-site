@@ -10,7 +10,7 @@ import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskT
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
 import { autoDeliverAndNotify } from "@/lib/auto-deliver";
-import { syncTaskToTrello } from "@/lib/trello";
+import { syncTaskToTrello, mirrorCommentToTrello } from "@/lib/trello";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
@@ -78,6 +78,8 @@ export async function addTaskComment(
     }
     // Автор коммента = текущий член (по логину); супер-админ без логина → Lambertain. Клиент видит команду как «Lambertain» (маскируется при выводе).
     await getBackend().addComment(id, body, visibility, me.youtrackLogin);
+    // Портал → Trello: клиент-видимый коммент (клиент/сотрудник-как-клиент или супер-админ клиенту) зеркалим на карточку.
+    if (visibility === "client") await mirrorCommentToTrello(id, body).catch(() => {});
     revalidatePath(`/admin/tasks/${id}`);
     // Клиент (или сотрудник-как-клиент) ответил → мяч у нас, возвращаем в работу:
     // - blocked (ответ на эскалацию), done (DEV-19: новый коммент на Done — не висеть закрытой),

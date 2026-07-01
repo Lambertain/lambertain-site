@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { readJsonSmart } from "@/lib/req-body";
 import { getBackend } from "@/lib/tasks";
 import { notifyProjectClients, notifyLogins, taskTag, attachmentIdsIn } from "@/lib/notify";
+import { mirrorCommentToTrello } from "@/lib/trello";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { revalidatePath } from "next/cache";
 
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
   await be.addComment(readableId, body, visible ? "client" : "internal", undefined, true, false);
   const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
   if (visible) {
+    await mirrorCommentToTrello(readableId, body).catch(() => {}); // портал → Trello (если подключена доска)
     await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(readableId)}</b>: ${task.summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), link).catch(() => {});
   }
   // Уведомить постановщика (если он не клиент — клиентов уже покрыл notifyProjectClients): новый коммент по его задаче.

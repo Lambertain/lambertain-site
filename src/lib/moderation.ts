@@ -10,6 +10,7 @@ import { notifyAdmin, notifyProjectClients, attachmentIdsIn, taskTag, warnClient
 import { q, getProjectFull, logTaskEvent } from "./db";
 import { statusBucket } from "./statuses";
 import { autoDeliverAndNotify } from "./auto-deliver";
+import { mirrorCommentToTrello } from "./trello";
 import { PORTAL_BASE } from "./dev-protocol";
 
 const taskBtn = (taskId: string) => ({ text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` });
@@ -27,6 +28,7 @@ export async function submitForModeration(taskId: string, body: string, opts?: {
   if (proj?.meta.autoApprove) {
     // Доверенный разработчик — без модерации: публикуем клиенту сразу.
     await getBackend().addComment(taskId, body, "client", opts?.authorLogin, true, dev);
+    await mirrorCommentToTrello(taskId, body).catch(() => {}); // портал → Trello (если подключена доска)
     if (task) {
       const reached = await notifyProjectClients(task.projectKey, `💬 <b>${await taskTag(taskId)}</b>: ${summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), taskBtn(taskId)).catch(() => 0);
       if (!reached) await warnClientUnreachable(task.projectKey, taskId, summary, proj?.meta.defaultAssignee).catch(() => {});
@@ -50,6 +52,7 @@ async function commentInfo(commentId: string): Promise<Row | null> {
 
 /** Опубликовать одобренный коммент клиенту проекта (+ пуш, с обработкой недостижимости). */
 async function publishApprovedToClient(r: Row): Promise<void> {
+  await mirrorCommentToTrello(r.readable_id, r.body).catch(() => {}); // портал → Trello (если подключена доска)
   const reached = await notifyProjectClients(
     r.project_key,
     `💬 <b>${r.project_name} · ${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
@@ -186,6 +189,7 @@ export async function makeCommentClientVisible(commentId: string, body: string):
   await q("UPDATE comments SET body = $2, visibility = 'client', approved = true WHERE id = $1", [commentId, body]);
   const r = await commentInfo(commentId);
   if (!r) return { error: "not found" };
+  await mirrorCommentToTrello(r.readable_id, r.body).catch(() => {}); // портал → Trello (если подключена доска)
   await notifyProjectClients(
     r.project_key,
     `💬 <b>${r.project_name} · ${r.readable_id}</b>: ${r.summary}\n${r.body.slice(0, 400)}`,
