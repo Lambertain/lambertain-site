@@ -1,7 +1,7 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setTaskDeps, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, projectReporterLogin } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, projectReporterLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins, notifyProjectClients } from "@/lib/notify";
@@ -82,12 +82,8 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
       await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (Array.isArray(tk.skills) ? tk.skills : []).filter(Boolean) });
       ids.push(task.id);
     }
-    // Зависимости (правильный порядок выполнения).
-    for (let i = 0; i < tasks.length; i++) {
-      const deps = (tasks[i].dependsOn || []).filter((j) => j >= 0 && j < ids.length && j !== i).map((j) => ids[j]);
-      if (deps.length) await setTaskDeps(ids[i], deps).catch(() => {});
-    }
-    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай по порядку — блокеры расставлены.`).catch(() => {});
+    // Блокеры НЕ ставим: задачи созданы в порядке выполнения (по номерам) — разработчик делает их подряд.
+    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай ПО ПОРЯДКУ (по номерам), не жди приёмки предыдущей.`).catch(() => {});
     if (clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: по проєкту створено ${ids.length} задач — роботу розпочато. Стежте за прогресом у порталі.`).catch(() => {});
     revalidatePath("/admin");
     revalidatePath(`/admin/projects/${projectKey}`);
