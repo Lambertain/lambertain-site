@@ -13,17 +13,39 @@ import type { ProjectMeta } from "./tasks/types";
 
 const API = "https://api.github.com";
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * fetch к GitHub с ретраями. Доставка большого репо = сотни вызовов; один сетевой сбой
+ * ("fetch failed"/ECONNRESET) или вторичный rate-limit (429/403 при remaining=0) не должен ронять всю доставку.
+ * Ретраим сетевые ошибки, 429, 5xx и 403-rate-limit с экспоненциальным бэкоффом; финальную ошибку — с контекстом.
+ */
 async function gh(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(API + path, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-    },
-    cache: "no-store",
-  });
+  const headers = {
+    Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    ...(init?.body ? { "Content-Type": "application/json" } : {}),
+  };
+  const MAX = 4;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < MAX; attempt++) {
+    try {
+      const r = await fetch(API + path, { ...init, headers, cache: "no-store" });
+      const rateLimited = r.status === 429 || (r.status === 403 && r.headers.get("x-ratelimit-remaining") === "0");
+      if ((rateLimited || r.status >= 500) && attempt < MAX - 1) {
+        const ra = Number(r.headers.get("retry-after"));
+        await sleep(ra > 0 ? Math.min(ra * 1000, 15000) : 700 * 2 ** attempt);
+        continue;
+      }
+      return r;
+    } catch (e) {
+      lastErr = e; // сетевой сбой (fetch failed / ECONNRESET / таймаут) — ретраим
+      if (attempt < MAX - 1) { await sleep(700 * 2 ** attempt); continue; }
+    }
+  }
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  throw new Error(`GitHub мережевий збій (${init?.method || "GET"} ${path}) після ${MAX} спроб: ${msg}`);
 }
 async function ghJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   const r = await gh(path, init);
@@ -235,6 +257,7 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
       }),
     );
     entries.push(...made.filter((x): x is TreeEntry => x !== null));
+    if (i + batch < blobs.length) await sleep(120); // мягкая пауза между батчами — меньше риск вторичного rate-limit
   }
 
   // 3. Дерево + коммит в client. Родитель — текущий HEAD ветки-приёмника (или дефолтной, если ветки нет).
