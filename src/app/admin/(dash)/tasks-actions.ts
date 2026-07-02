@@ -2,8 +2,9 @@
 
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage, getProjectFull } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
+import { autoDeliverAndNotify } from "@/lib/auto-deliver";
 import { assignProjectDevAndNotify } from "@/lib/task-intake";
 import { statusBucket } from "@/lib/statuses";
 import { notifyProjectClients, notifyLogins, taskTag } from "@/lib/notify";
@@ -35,11 +36,20 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
     else if (bucket === "review") await advanceStage(id, "dev", "здав на ревʼю у порталі").catch(() => {}); // + коммент клиенту «на тестовому»
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
-    // Задача готова → уведомляем клиента проекта (best-effort).
+    // Задача готова.
     if (bucket === "done") {
       try {
         const task = await getBackend().getTask(id);
-        await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${await taskTag(id)}: ${task.summary}`);
+        const proj = await getProjectFull(task.projectKey).catch(() => null);
+        // Ручной перевод в «Готово» в портале ТОЖЕ должен доставлять код клиенту (если включена автодоставка),
+        // иначе изменения зависают недоставленными (разработчик потом просит «доставить ещё раз»).
+        // gitflow доставляет PR-ом на ревью — его тут не трогаем. Уже опубликованное (deployStage=prod) — пропускаем.
+        if (proj?.meta.autoDeliver && !proj.meta.gitflowDelivery && task.deployStage !== "prod") {
+          const meta = proj.meta;
+          after(() => autoDeliverAndNotify(task.projectKey, meta, id)); // доставит + опубликует + уведомит (сам шлёт «Опубліковано»)
+        } else {
+          await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${await taskTag(id)}: ${task.summary}`);
+        }
       } catch {
         // best-effort
       }

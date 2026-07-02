@@ -203,6 +203,9 @@ export function MetaForm({
 
   function buildMeta(): ProjectMeta {
     return {
+      // Сохраняем ВСЕ поля, которыми форма НЕ управляет (иначе save затирает их): autoDeliver (панель доставки),
+      // customFields.trello (через API) и т.п. Поля формы ниже перекрывают нужные.
+      ...m,
       showOnboarding: showOnboarding || undefined,
       onboardingSetToken: m.onboardingSetToken, // набор инструкций (если привязан) — не теряем при сохранении
       clientGit: clientGit || undefined,
