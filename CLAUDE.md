@@ -45,6 +45,12 @@
 `internal:true` — задача разработчику **мимо клиента**: клиент её не видит, а разработчик получает (dev API пускает internal-задачи с `created_by_role=admin/super`). В портале то же делает чекбокс «Внутрішня — клієнт не бачить» при создании задачи (для админов).
 Задача **сразу назначается разработчику проекта** (`assigneeLogin` или `meta.defaultAssignee`) и ему уходит пуш в Telegram. **ИИ-триажа нет** — разбор делает Claude разработчика: он читает задачу, смотрит код и задаёт клиенту уточнения в комментах только если что-то непонятно. Возвращает `{ id, url }`. НЕ ходить в БД напрямую для создания задач.
 
+**Управление задачей по API** (те же `ADMIN_API_TOKEN`, без БД):
+- `POST /api/admin/task-edit` `{ readableId, title?, description?, priority?, assigneeLogin? }` → правит переданные поля задачи (`priority`: `""`|`Critical`|`Major`|`Normal`|`Minor`; `assigneeLogin:null` снимает исполнителя). Меняются только присланные поля.
+- `POST /api/admin/task-status` `{ readableId, status, summary? }` → смена статуса (+синк Trello-карточки).
+- `POST /api/admin/task-deps` `{ readableId, dependsOn: ["1A-1", ...] }` → **полностью заменяет** набор блокеров (только из того же проекта).
+- `POST /api/admin/comment` `{ readableId, body, visibleToClient?, review? }` → коммент от агентства (зеркалится в Trello при `visibleToClient`).
+
 **Заведение/привязка проекта по API** (тоже `ADMIN_API_TOKEN`, не БД):
 - `POST /api/admin/project/link` `{ projectKey, devGit?, clientGit?, defaultAssignee? }` → проставляет meta, возвращает **токен проекта**, раскладывает bootstrap CLAUDE.md в `Lambertain/*` дев-репо (layProtocol).
 - `POST /api/admin/project/spec` `{ projectKey, spec }` / `GET ?projectKey=` → записать/прочитать `meta.spec` (спеку пишет Claude Code).
