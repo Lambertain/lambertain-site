@@ -81,16 +81,22 @@ export async function addTaskComment(
     // Портал → Trello: клиент-видимый коммент (клиент/сотрудник-как-клиент или супер-админ клиенту) зеркалим на карточку.
     if (visibility === "client") await mirrorCommentToTrello(id, body).catch(() => {});
     revalidatePath(`/admin/tasks/${id}`);
-    // Клиент (или сотрудник-как-клиент) ответил → мяч у нас, возвращаем в работу:
+    // Коммент от «замовника» задачи (клиент/сотрудник-как-клиент, постановщик-член ИЛИ супер-админ как владелец)
+    // при закрытой/ожидающей задаче возвращает её в работу:
     // - blocked (ответ на эскалацию), done (DEV-19: новый коммент на Done — не висеть закрытой),
-    // - review (DEV-24: задача ушла в ревью с вопросом клиенту; клиент ответил → «In Progress».
-    //   Приёмку «всё ок» клиент делает кнопкой «Готово», а не комментарием — поэтому коммент = вернуть в работу).
+    // - review (DEV-24: приёмку «всё ок» постановщик делает кнопкой «Готово», а коммент = нужны правки → в работу).
+    try {
+      const t = await getBackend().getTask(id);
+      const bucket = statusBucket(t.state);
+      // Автор — постановщик этой задачи? Клиент/член по логину, ИЛИ супер-админ, когда постановщика нет/он сам.
+      const meIsReporter =
+        (!!me.youtrackLogin && t.reporter?.login === me.youtrackLogin) ||
+        (isSuperAdmin(me) && (!t.reporter?.login || t.reporter.role === "admin"));
+      if ((clientSide || meIsReporter) && (bucket === "blocked" || bucket === "done" || bucket === "review")) {
+        await getBackend().updateStatus(id, "In Progress", { actorLogin: me.youtrackLogin ?? null, actorRole: clientSide ? "client" : "admin", trigger: "постановник написав коментар — повернуто в роботу" });
+      }
+    } catch { /* best-effort */ }
     if (clientSide) {
-      try {
-        const t = await getBackend().getTask(id);
-        const bucket = statusBucket(t.state);
-        if (bucket === "blocked" || bucket === "done" || bucket === "review") await getBackend().updateStatus(id, "In Progress");
-      } catch { /* best-effort */ }
       // DEV-39: клиент пишет (новые правки) по опубликованной задаче → сбрасываем стадию,
       // чтобы следующая доставка снова уведомила клиента «Опубліковано» (иначе залипает на prod).
       // Self-guarded (сработает только если стадия = prod), поэтому безопасно на любой клиентский коммент.
