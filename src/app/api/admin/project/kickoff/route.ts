@@ -7,7 +7,7 @@
  */
 import { NextResponse } from "next/server";
 import { readJsonSmart } from "@/lib/req-body";
-import { getProjectFull, setTaskTags, setTaskDeps, projectReporterLogin } from "@/lib/db";
+import { getProjectFull, setTaskTags, projectReporterLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins, notifyProjectClients } from "@/lib/notify";
@@ -53,12 +53,9 @@ export async function POST(req: Request) {
       await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (Array.isArray(tk.skills) ? tk.skills : []).filter(Boolean) });
       ids.push(task.id);
     }
-    // Зависимости (правильный порядок выполнения).
-    for (let i = 0; i < tasks.length; i++) {
-      const deps = (tasks[i].dependsOn || []).filter((j) => j >= 0 && j < ids.length && j !== i).map((j) => ids[j]);
-      if (deps.length) await setTaskDeps(ids[i], deps).catch(() => {});
-    }
-    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай по порядку — блокеры расставлены.`).catch(() => {});
+    // Блокеры НЕ ставим: задачи созданы в порядке выполнения (по номерам). Разработчик делает их ПОДРЯД,
+    // не дожидаясь приёмки предыдущей (см. dev-protocol). Порядок = очередь номеров задач.
+    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай ПО ПОРЯДКУ (по номерам), не жди приёмки предыдущей.`).catch(() => {});
     // Клиент-постановщик — пуш, что по проекту начали работу (вовлечённость + видно прогресс).
     if (clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: по проєкту створено ${ids.length} задач — роботу розпочато. Стежте за прогресом у порталі.`).catch(() => {});
     return NextResponse.json({ ok: true, created: ids.length, ids });
