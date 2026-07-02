@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { saveMeta } from "../actions";
 import { uploadProjectFile } from "../../project-actions";
 import type { ProjectMeta } from "@/lib/tasks/types";
@@ -201,10 +201,8 @@ export function MetaForm({
     });
   }
 
-  function save() {
-    setSaved(false);
-    setError(null);
-    const meta: ProjectMeta = {
+  function buildMeta(): ProjectMeta {
+    return {
       showOnboarding: showOnboarding || undefined,
       onboardingSetToken: m.onboardingSetToken, // набор инструкций (если привязан) — не теряем при сохранении
       clientGit: clientGit || undefined,
@@ -256,12 +254,30 @@ export function MetaForm({
         return Object.keys(c).length ? c : undefined;
       })(),
     };
+  }
+
+  function save() {
+    setSaved(false);
+    setError(null);
+    const meta = buildMeta();
     start(async () => {
       const r = await saveMeta(projectKey, name, meta);
       if (r.error) setError(r.error);
       else setSaved(true);
     });
   }
+
+  // Автозбереження: дебаунс 800 мс після останньої зміни поля (замість кнопки «Зберегти»).
+  const snapshot = JSON.stringify({ name, meta: buildMeta() });
+  const firstRun = useRef(true);
+  const savedSnap = useRef(snapshot);
+  useEffect(() => {
+    if (firstRun.current) { firstRun.current = false; return; }
+    if (snapshot === savedSnap.current) return;
+    const id = setTimeout(() => { savedSnap.current = snapshot; save(); }, 800);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot]);
 
   return (
     <div style={{ ...ui.card, marginTop: 16 }}>
@@ -478,11 +494,10 @@ export function MetaForm({
         </span>
       </label>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 18 }}>
-        <button onClick={save} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>
-          {pending ? "…" : t(locale, "projects.save")}
-        </button>
-        {saved && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "projects.saved")}</span>}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 18, minHeight: 22 }}>
+        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, "projects.autosave")}</span>
+        {pending && <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>{t(locale, "projects.saving")}</span>}
+        {saved && !pending && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "projects.saved")}</span>}
         {error && <span style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none" }}>{error}</span>}
       </div>
     </div>

@@ -371,6 +371,8 @@ export const DICT: Record<string, Entry> = {
   "projects.open": { uk: "Відкрити", ru: "Открыть", en: "Open" },
   "projects.save": { uk: "Зберегти", ru: "Сохранить", en: "Save" },
   "projects.saved": { uk: "Збережено ✓", ru: "Сохранено ✓", en: "Saved ✓" },
+  "projects.saving": { uk: "Зберігаю…", ru: "Сохраняю…", en: "Saving…" },
+  "projects.autosave": { uk: "Зміни зберігаються автоматично", ru: "Изменения сохраняются автоматически", en: "Changes save automatically" },
   "projects.repos": { uk: "Репозиторії", ru: "Репозитории", en: "Repositories" },
   "projects.clientGit": { uk: "Git клієнта", ru: "Git клиента", en: "Client git" },
   "projects.devGit": { uk: "Dev git (команда)", ru: "Dev git (команда)", en: "Dev git (team)" },
