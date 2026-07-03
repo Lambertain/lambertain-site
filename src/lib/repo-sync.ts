@@ -79,6 +79,22 @@ const cache = new Map<string, { at: number; val: RepoSyncStatus }>();
 const TTL = 5 * 60 * 1000; // успешный статус живёт 5 мин
 const ERR_TTL = 30 * 1000; // ошибку перепроверяем через 30 c
 
+/** Посчитать статус синка БЕЗ кэша. Для поллера авто-синка (ему нужен свежий, не кэшированный). Никогда не бросает. */
+export async function computeProjectRepoSync(meta: ProjectMeta): Promise<RepoSyncStatus> {
+  const pairs = collectPairs(meta);
+  if (!pairs.length) return { configured: false, synced: false, ahead: 0, capped: false, error: false };
+
+  const clientBranchPref = meta.gitflowDelivery ? "develop" : undefined; // gitflow доставляет в client/develop
+  try {
+    const res = await withTimeout(Promise.all(pairs.map((p) => pairAhead(p.dev, p.client, clientBranchPref))), 8000);
+    const ahead = res.reduce((s, r) => s + r.ahead, 0);
+    const capped = res.some((r) => r.capped);
+    return { configured: true, synced: ahead === 0, ahead, capped, error: false };
+  } catch {
+    return { configured: true, synced: false, ahead: 0, capped: false, error: true };
+  }
+}
+
 /** Статус синка проекта (кэш в памяти). Никогда не бросает — при сбое возвращает error:true. */
 export async function getProjectRepoSync(projectKey: string, meta: ProjectMeta): Promise<RepoSyncStatus> {
   const pairs = collectPairs(meta);
@@ -87,16 +103,12 @@ export async function getProjectRepoSync(projectKey: string, meta: ProjectMeta):
   const hit = cache.get(projectKey);
   if (hit && Date.now() - hit.at < (hit.val.error ? ERR_TTL : TTL)) return hit.val;
 
-  const clientBranchPref = meta.gitflowDelivery ? "develop" : undefined; // gitflow доставляет в client/develop
-  let val: RepoSyncStatus;
-  try {
-    const res = await withTimeout(Promise.all(pairs.map((p) => pairAhead(p.dev, p.client, clientBranchPref))), 8000);
-    const ahead = res.reduce((s, r) => s + r.ahead, 0);
-    const capped = res.some((r) => r.capped);
-    val = { configured: true, synced: ahead === 0, ahead, capped, error: false };
-  } catch {
-    val = { configured: true, synced: false, ahead: 0, capped: false, error: true };
-  }
+  const val = await computeProjectRepoSync(meta);
   cache.set(projectKey, { at: Date.now(), val });
   return val;
+}
+
+/** Сбросить кэш синка проекта (после авто-доставки — чтобы бейдж сразу показал «синхронізовано»). */
+export function invalidateSyncCache(projectKey: string): void {
+  cache.delete(projectKey);
 }

@@ -8,10 +8,14 @@
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse } from "next/server";
-import { listPrStageTasksMulti, listDevStageTasksMulti, listPrsForReviewSync } from "@/lib/db";
+import { listPrStageTasksMulti, listDevStageTasksMulti, listPrsForReviewSync, listProjectsWithMeta, bumpFailStreak, clearFailStreak } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { reportPollError, clearPollError } from "@/lib/task-error";
 import { syncPrReview } from "@/lib/pr-review-sync";
+import { computeProjectRepoSync, invalidateSyncCache } from "@/lib/repo-sync";
+import { autoDeliverIfConfigured } from "@/lib/deliver";
+import { notifyAdmin } from "@/lib/notify";
+import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { ghFetchRetry, GitHubError } from "@/lib/github";
 
 function bearer(req: Request): string | null {
@@ -103,5 +107,36 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, checkedPrTasks: prTasks.length, promotedToDev, checkedDevTasks: devTasks.length, promotedToProd, checkedReviewPrs: reviewPrs.length, mirroredReviews });
+  // 4. Авто-синк dev→client для autoDeliver-проектов: доставка следует за КОДОМ в dev-репо, а не за ручным
+  //    шагом «сдать на ревью». Если dev main впереди клиентского репо — доставляем (+публикуем прод) сразу.
+  //    Так запушенный фикс попадает клиенту без отдельного клика, и клиент тестирует реальный результат.
+  //    Самоограничение: после доставки клиентский HEAD новее → ahead=0 → повторно не доставляем.
+  const autoDeliverProjects = (await listProjectsWithMeta()).filter(
+    (p) => !p.archived && p.meta.autoDeliver && !p.meta.gitflowDelivery,
+  );
+  let autoSynced = 0;
+  for (const p of autoDeliverProjects) {
+    const streakKey = `autosync:${p.key}`;
+    try {
+      const s = await computeProjectRepoSync(p.meta); // свежий статус (без кэша)
+      if (!s.configured || s.synced || s.error) { await clearFailStreak(streakKey); continue; }
+      // dev впереди клиентского → доставляем и публикуем клиентский прод
+      const res = await autoDeliverIfConfigured(p.meta);
+      invalidateSyncCache(p.key); // бейдж должен сразу показать «синхронізовано»
+      await clearFailStreak(streakKey);
+      if (res && res.length) {
+        autoSynced++;
+        const lines = res.map((r) => `• ${r.clientRepo}: ${r.files} файлів${r.deploy ? `, деплой ${r.deploy.status ?? "—"}` : ""}${r.prUrl ? `, PR ${r.prUrl}` : ""}`).join("\n");
+        await notifyAdmin(`🚀 <b>Авто-синк dev→client</b> · ${p.key} (dev було попереду на ${s.ahead})\n${lines}`, { text: "Відкрити проєкти", url: `${PORTAL_BASE}/admin` }).catch(() => {});
+      }
+    } catch (e) {
+      // Не спамим админа: уведомляем на 1-м сбое и далее раз в ~час (каждый 12-й проход поллера).
+      const streak = await bumpFailStreak(streakKey).catch(() => 1);
+      if (streak === 1 || streak % 12 === 0) {
+        await notifyAdmin(`⚠️ <b>Авто-синк dev→client не вдався</b> · ${p.key} (спроба ${streak})\n${e instanceof Error ? e.message : String(e)}`).catch(() => {});
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, checkedPrTasks: prTasks.length, promotedToDev, checkedDevTasks: devTasks.length, promotedToProd, checkedReviewPrs: reviewPrs.length, mirroredReviews, autoDeliverProjects: autoDeliverProjects.length, autoSynced });
 }
