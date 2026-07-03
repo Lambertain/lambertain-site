@@ -181,6 +181,9 @@ export default async function HomePage() {
     const myProjects = visible.filter((p) => !p.meta.feedback);
     // Lamb.dev (фидбек) — последней карточкой, как и у остальных участников (без доступов/прод-ссылки).
     const fbProject = visible.find((p) => p.meta.feedback);
+    // Статус синка dev↔client репо — чтобы разработчик сам видел, всё ли доставлено клиенту (не спрашивал админа).
+    const devSyncs = await Promise.all(myProjects.map((p) => getProjectRepoSync(p.key, p.meta)));
+    const devSyncByKey = new Map(myProjects.map((p, i) => [p.key, devSyncs[i]]));
     return (
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -196,7 +199,7 @@ export default async function HomePage() {
             <>
               {myProjects.map((p) => {
                 const { counts, newCount } = projCounts(p.key);
-                return <ProjectInfoCard key={p.key} project={p} canEdit showDevLink counts={counts} newCount={newCount} now={now} locale={locale} />;
+                return <ProjectInfoCard key={p.key} project={p} canEdit showDevLink counts={counts} newCount={newCount} now={now} locale={locale} sync={devSyncByKey.get(p.key)} />;
               })}
               {fbProject && (() => {
                 const { counts, newCount } = projCounts(fbProject.key);

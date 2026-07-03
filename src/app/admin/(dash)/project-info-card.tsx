@@ -5,8 +5,10 @@ import type { ProjectMeta } from "@/lib/tasks/types";
 import { fieldVisible } from "@/lib/field-visibility";
 import { getFieldDef } from "@/lib/project-fields";
 import { BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
+import { type RepoSyncStatus } from "@/lib/repo-sync";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "./markdown";
+import { SyncBadge } from "./sync-badge";
 import { ui } from "../ui-styles";
 
 const DAY = 86400000;
@@ -74,7 +76,7 @@ function CustomFieldView({ fieldKey, values, locale }: { fieldKey: string; value
 }
 
 export function ProjectInfoCard({
-  project, showDevLink, counts, newCount, now, locale,
+  project, showDevLink, counts, newCount, now, locale, sync,
 }: {
   project: { key: string; name: string; meta: ProjectMeta };
   canEdit?: boolean;
@@ -83,6 +85,8 @@ export function ProjectInfoCard({
   newCount?: number;
   now: number;
   locale: Locale;
+  /** Статус синка dev↔client репо — показываем только dev/админу (showDevLink). */
+  sync?: RepoSyncStatus;
 }) {
   const m = project.meta;
   const [open, setOpen] = useState(false);
@@ -112,6 +116,8 @@ export function ProjectInfoCard({
             <strong style={{ fontSize: 16 }}>{project.name}</strong>
           </a>
           {!!newCount && <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 7px", borderRadius: 3, fontWeight: 600 }}>{newCount} NEW</span>}
+          {/* Синхронизация dev↔client репо — только dev/админу (клиенту не показываем). */}
+          {viewerDev && <SyncBadge s={sync} locale={locale} />}
         </div>
 
         {counts && (
