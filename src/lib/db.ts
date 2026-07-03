@@ -1601,6 +1601,23 @@ export async function setState(key: string, value: string): Promise<void> {
   );
 }
 
+// ---- Счётчик подряд идущих транзитных сбоев поллера (терпимость к блипам GitHub, DEV-40) ----
+// Храним в poller_state под ключами "ghfail:*" — эти ключи ведут только bump/clear, значение всегда числовое.
+/** Инкремент счётчика сбоев по ключу. Возвращает новое значение (с 1). */
+export async function bumpFailStreak(key: string): Promise<number> {
+  const rows = await q<{ value: string }>(
+    `INSERT INTO poller_state (key, value) VALUES ($1, '1')
+       ON CONFLICT (key) DO UPDATE SET value = (poller_state.value::int + 1)::text
+       RETURNING value`,
+    [key],
+  );
+  return parseInt(rows[0]?.value ?? "1", 10);
+}
+/** Сброс счётчика сбоев по ключу (успешный проход поллера). */
+export async function clearFailStreak(key: string): Promise<void> {
+  await q("DELETE FROM poller_state WHERE key = $1", [key]);
+}
+
 // ——— Брифы лидов (до клиента/проекта) ———
 export interface Brief {
   id: number;

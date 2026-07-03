@@ -27,8 +27,28 @@ export async function ghFetchRetry(url: string, init?: RequestInit, retries = 1,
     } catch (e) {
       if (attempt >= retries) throw e;
     }
-    await new Promise((res) => setTimeout(res, delayMs));
+    await new Promise((res) => setTimeout(res, delayMs * 2 ** attempt)); // экспоненциальный бэкофф: 503 GitHub держится дольше фикс-паузы
   }
+}
+
+/** Ошибка ответа GitHub с сохранённым HTTP-статусом — чтобы вызывающий отличал транзитный сбой от устойчивого. */
+export class GitHubError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+    this.name = "GitHubError";
+  }
+  /** Транзитный ли статус — блип, который самолечится ретраем/следующим проходом поллера. */
+  get transient(): boolean { return TRANSIENT(this.status); }
+}
+
+/**
+ * Транзитная (самоисправляющаяся) ошибка GitHub — на неё поллер НЕ должен сразу эскалировать админу.
+ * GitHubError → по статусу (5xx/429/401/403); сетевой сбой fetch (TypeError) → да;
+ * всё остальное (логика/конфиг, 404/422) → нет, эскалируем сразу.
+ */
+export function isTransientGhError(err: unknown): boolean {
+  if (err instanceof GitHubError) return err.transient;
+  return err instanceof TypeError; // fetch network reject
 }
 
 async function gh(path: string): Promise<Response> {

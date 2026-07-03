@@ -10,7 +10,7 @@
  */
 import { getBackend } from "./tasks";
 import { setPrReviewSynced } from "./db";
-import { ghFetchRetry } from "./github";
+import { ghFetchRetry, GitHubError } from "./github";
 
 const API = "https://api.github.com";
 const GH = { Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
@@ -21,8 +21,8 @@ function parsePr(prUrl: string): { owner: string; repo: string; num: string } | 
 }
 
 async function ghJson<T>(path: string): Promise<T> {
-  const r = await ghFetchRetry(API + path, { headers: GH, cache: "no-store" }); // ретрай на транзиентные 401/403/429/5xx
-  if (!r.ok) throw new Error(`GitHub ${r.status} GET ${path}: ${(await r.text()).slice(0, 200)}`);
+  const r = await ghFetchRetry(API + path, { headers: GH, cache: "no-store" }, 3); // 3 ретрая с бэкоффом на транзиентные 401/403/429/5xx
+  if (!r.ok) throw new GitHubError(r.status, `GitHub ${r.status} GET ${path}: ${(await r.text()).slice(0, 200)}`);
   return r.json() as Promise<T>;
 }
 

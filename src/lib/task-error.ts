@@ -10,6 +10,8 @@
 import { getBackend } from "./tasks";
 import { notifyAdmin, taskTag } from "./notify";
 import { PORTAL_BASE } from "./dev-protocol";
+import { isTransientGhError } from "./github";
+import { bumpFailStreak, clearFailStreak } from "./db";
 
 const MARK = "⚠️ <b>Помилка"; // префикс коммента-ошибки (для дедупа)
 
@@ -43,4 +45,30 @@ export async function reportTaskError(
     `⚠️ <b>${await taskTag(taskId).catch(() => taskId)}</b> · ${where}\n${msg}`,
     { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` },
   ).catch(() => {});
+}
+
+/** Порог: сколько проходов поллера подряд должен держаться ТРАНЗИТНЫЙ сбой GitHub, прежде чем эскалировать. */
+const TRANSIENT_ESCALATE_AT = 3;
+
+/**
+ * Репорт ошибки из ПОЛЛЕРА (deploy-sync и т.п.), терпимый к транзитным сбоям GitHub.
+ * Транзитный блип (5xx/429/сеть) самоисправляется следующим проходом — курсоры не двигаются, потерь нет,
+ * поэтому админа сразу не дёргаем: копим счётчик per-ключ и эскалируем, только если сбой держится
+ * TRANSIENT_ESCALATE_AT проходов подряд (устойчивая деградация). Неретрайные/логические ошибки
+ * (404/422/бэд-URL) — эскалируем сразу. На успешном проходе вызвать clearPollError(streakKey).
+ * @param streakKey стабильный ключ единицы работы, напр. "ghfail:review:SAD-21:<prUrl>".
+ * @returns true, если ошибку эскалировали.
+ */
+export async function reportPollError(streakKey: string, taskId: string, where: string, err: unknown): Promise<boolean> {
+  if (isTransientGhError(err)) {
+    const streak = await bumpFailStreak(streakKey).catch(() => TRANSIENT_ESCALATE_AT); // не смогли посчитать → лучше показать
+    if (streak < TRANSIENT_ESCALATE_AT) return false; // самоисправляющийся блип — тихо, следующий проход подтянет
+  }
+  await reportTaskError(taskId, where, err);
+  return true;
+}
+
+/** Сбросить счётчик транзитных сбоев (успешный проход поллера по этому ключу). */
+export async function clearPollError(streakKey: string): Promise<void> {
+  await clearFailStreak(streakKey).catch(() => {});
 }
