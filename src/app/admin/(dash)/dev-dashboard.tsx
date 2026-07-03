@@ -4,6 +4,7 @@ import { type RepoSyncStatus } from "@/lib/repo-sync";
 import { t, type Locale } from "@/lib/i18n";
 import { DevActivityChart } from "./dev-activity-chart";
 import { SyncBadge } from "./sync-badge";
+import { ProjectTimeline } from "./project-timeline";
 import { ui } from "../ui-styles";
 
 export type DashProject = {
@@ -28,27 +29,7 @@ function metrics(p: DashProject, now: number) {
   const deadlineMs = p.meta.deadline ? new Date(p.meta.deadline).getTime() : null;
   const daysRunning = startedMs != null ? Math.max(0, daysBetween(startedMs, now)) : null;
   const daysLeft = deadlineMs != null ? daysBetween(now, deadlineMs) : null; // <0 → просрочка
-  const timePct =
-    startedMs != null && deadlineMs != null && deadlineMs > startedMs
-      ? Math.min(100, Math.max(0, Math.round(((now - startedMs) / (deadlineMs - startedMs)) * 100)))
-      : null;
-  const taskPct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
-  return { daysRunning, daysLeft, timePct, taskPct };
-}
-
-function Bar({ pct, label, danger }: { pct: number; label: string; danger?: boolean }) {
-  const color = danger ? "#ff5b5b" : "var(--accent)";
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", ...ui.monoLabel, textTransform: "none", marginBottom: 4 }}>
-        <span>{label}</span>
-        <span style={{ color }}>{pct}%</span>
-      </div>
-      <div style={{ height: 6, background: "var(--surface-2)", border: "1px solid var(--border-2)", overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
-      </div>
-    </div>
-  );
+  return { startedMs, deadlineMs, daysRunning, daysLeft };
 }
 
 function money(cost: number | undefined, currency: string | undefined): string | null {
@@ -113,10 +94,7 @@ function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: 
         </span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-        {m.timePct != null && <Bar pct={m.timePct} label={t(locale, "dash.byTime")} danger={m.daysLeft != null && m.daysLeft < 0} />}
-        <Bar pct={m.taskPct} label={t(locale, "dash.byTasks")} />
-      </div>
+      <ProjectTimeline startedMs={m.startedMs} deadlineMs={m.deadlineMs} now={now} locale={locale} />
     </Link>
   );
 }

@@ -9,9 +9,8 @@ import { type RepoSyncStatus } from "@/lib/repo-sync";
 import { t, type Locale } from "@/lib/i18n";
 import { Markdown } from "./markdown";
 import { SyncBadge } from "./sync-badge";
+import { ProjectTimeline } from "./project-timeline";
 import { ui } from "../ui-styles";
-
-const DAY = 86400000;
 
 function ExtLink({ href, label }: { href: string; label: string }) {
   return (
@@ -19,20 +18,6 @@ function ExtLink({ href, label }: { href: string; label: string }) {
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
       {label}
     </a>
-  );
-}
-
-function Bar({ pct, label, danger }: { pct: number; label: string; danger?: boolean }) {
-  const color = danger ? "#ff5b5b" : "var(--accent)";
-  return (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", ...ui.monoLabel, textTransform: "none", marginBottom: 4 }}>
-        <span>{label}</span><span style={{ color }}>{pct}%</span>
-      </div>
-      <div style={{ height: 6, background: "var(--surface-2)", border: "1px solid var(--border-2)", overflow: "hidden" }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
-      </div>
-    </div>
   );
 }
 
@@ -94,9 +79,6 @@ export function ProjectInfoCard({
 
   const startedMs = m.startedAt ? new Date(m.startedAt).getTime() : null;
   const deadlineMs = m.deadline ? new Date(m.deadline).getTime() : null;
-  const daysLeft = deadlineMs != null ? Math.round((deadlineMs - now) / DAY) : null;
-  const timePct = startedMs != null && deadlineMs != null && deadlineMs > startedMs
-    ? Math.min(100, Math.max(0, Math.round(((now - startedMs) / (deadlineMs - startedMs)) * 100))) : null;
 
   const devUrl = m.apps?.dev?.url;
   const prodUrl = m.apps?.prod?.url;
@@ -131,14 +113,7 @@ export function ProjectInfoCard({
           </div>
         )}
 
-        {(timePct != null) && (
-          <div style={{ marginTop: 12, maxWidth: 360 }}>
-            <Bar pct={timePct} label={t(locale, "dash.byTime")} danger={daysLeft != null && daysLeft < 0} />
-            <div style={{ ...ui.monoLabel, textTransform: "none", marginTop: 4, color: daysLeft != null && daysLeft < 0 ? "#ff5b5b" : "var(--muted)" }}>
-              {daysLeft != null && (daysLeft >= 0 ? `${daysLeft} ${t(locale, "dash.daysLeft")}` : `${-daysLeft} ${t(locale, "dash.overdueDays")}`)}
-            </div>
-          </div>
-        )}
+        <ProjectTimeline startedMs={startedMs} deadlineMs={deadlineMs} now={now} locale={locale} />
       </div>
 
       {/* аккордеон: описание со ссылками и аккаунтами */}
