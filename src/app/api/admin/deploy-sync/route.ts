@@ -7,7 +7,7 @@
  * Ошибки по конкретной задаче не глотаются — видны на портале (internal-коммент) + уведомление админа.
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { listPrStageTasksMulti, listDevStageTasksMulti, listPrsForReviewSync, listProjectsWithMeta, bumpFailStreak, clearFailStreak } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { reportPollError, clearPollError } from "@/lib/task-error";
@@ -114,29 +114,32 @@ export async function POST(req: Request) {
   const autoDeliverProjects = (await listProjectsWithMeta()).filter(
     (p) => !p.archived && p.meta.autoDeliver && !p.meta.gitflowDelivery,
   );
-  let autoSynced = 0;
+  let autoSyncQueued = 0;
   for (const p of autoDeliverProjects) {
     const streakKey = `autosync:${p.key}`;
-    try {
-      const s = await computeProjectRepoSync(p.meta); // свежий статус (без кэша)
-      if (!s.configured || s.synced || s.error) { await clearFailStreak(streakKey); continue; }
-      // dev впереди клиентского → доставляем и публикуем клиентский прод
-      const res = await autoDeliverIfConfigured(p.meta);
-      invalidateSyncCache(p.key); // бейдж должен сразу показать «синхронізовано»
-      await clearFailStreak(streakKey);
-      if (res && res.length) {
-        autoSynced++;
-        const lines = res.map((r) => `• ${r.clientRepo}: ${r.files} файлів${r.deploy ? `, деплой ${r.deploy.status ?? "—"}` : ""}${r.prUrl ? `, PR ${r.prUrl}` : ""}`).join("\n");
-        await notifyAdmin(`🚀 <b>Авто-синк dev→client</b> · ${p.key} (dev було попереду на ${s.ahead})\n${lines}`, { text: "Відкрити проєкти", url: `${PORTAL_BASE}/admin` }).catch(() => {});
+    const s = await computeProjectRepoSync(p.meta).catch(() => null); // свежий статус (GitHub reads — быстро)
+    if (!s || !s.configured || s.synced || s.error) { await clearFailStreak(streakKey).catch(() => {}); continue; }
+    autoSyncQueued++;
+    // Сама доставка (squash 150+ файлов + публикация клиентского прода) ДОЛГАЯ — выносим в after(),
+    // чтобы не держать ответ поллера и не ловить gateway-timeout. Доезжает в фоне; self-limiting (ahead=0 после).
+    after(async () => {
+      try {
+        const res = await autoDeliverIfConfigured(p.meta);
+        invalidateSyncCache(p.key); // бейдж должен сразу показать «синхронізовано»
+        await clearFailStreak(streakKey);
+        if (res && res.length) {
+          const lines = res.map((r) => `• ${r.clientRepo}: ${r.files} файлів${r.deploy ? `, деплой ${r.deploy.status ?? "—"}` : ""}${r.prUrl ? `, PR ${r.prUrl}` : ""}`).join("\n");
+          await notifyAdmin(`🚀 <b>Авто-синк dev→client</b> · ${p.key} (dev було попереду на ${s.ahead})\n${lines}`, { text: "Відкрити проєкти", url: `${PORTAL_BASE}/admin` }).catch(() => {});
+        }
+      } catch (e) {
+        // Не спамим админа: уведомляем на 1-м сбое и далее раз в ~час (каждый 12-й проход поллера).
+        const streak = await bumpFailStreak(streakKey).catch(() => 1);
+        if (streak === 1 || streak % 12 === 0) {
+          await notifyAdmin(`⚠️ <b>Авто-синк dev→client не вдався</b> · ${p.key} (спроба ${streak})\n${e instanceof Error ? e.message : String(e)}`).catch(() => {});
+        }
       }
-    } catch (e) {
-      // Не спамим админа: уведомляем на 1-м сбое и далее раз в ~час (каждый 12-й проход поллера).
-      const streak = await bumpFailStreak(streakKey).catch(() => 1);
-      if (streak === 1 || streak % 12 === 0) {
-        await notifyAdmin(`⚠️ <b>Авто-синк dev→client не вдався</b> · ${p.key} (спроба ${streak})\n${e instanceof Error ? e.message : String(e)}`).catch(() => {});
-      }
-    }
+    });
   }
 
-  return NextResponse.json({ ok: true, checkedPrTasks: prTasks.length, promotedToDev, checkedDevTasks: devTasks.length, promotedToProd, checkedReviewPrs: reviewPrs.length, mirroredReviews, autoDeliverProjects: autoDeliverProjects.length, autoSynced });
+  return NextResponse.json({ ok: true, checkedPrTasks: prTasks.length, promotedToDev, checkedDevTasks: devTasks.length, promotedToProd, checkedReviewPrs: reviewPrs.length, mirroredReviews, autoDeliverProjects: autoDeliverProjects.length, autoSyncQueued });
 }
