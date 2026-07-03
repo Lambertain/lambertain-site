@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { ProjectMeta } from "@/lib/tasks/types";
+import { type RepoSyncStatus } from "@/lib/repo-sync";
 import { t, type Locale } from "@/lib/i18n";
 import { DevActivityChart } from "./dev-activity-chart";
+import { SyncBadge } from "./sync-badge";
 import { ui } from "../ui-styles";
 
 export type DashProject = {
@@ -11,6 +13,8 @@ export type DashProject = {
   createdAt: string | null;
   total: number;
   done: number;
+  /** Статус синка dev↔client репо (только для админского дашборда). */
+  sync?: RepoSyncStatus;
 };
 
 const DAY = 86400000;
@@ -77,8 +81,12 @@ function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: 
           <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{p.key}</span>
           <strong style={{ fontSize: 15 }}>{p.name}</strong>
         </div>
-        {/* Стоимость — только на админском дашборде (исполнитель/клиент сюда доступа не имеют). */}
-        {cost && <span style={{ ...ui.monoLabel, color: "var(--text)", fontSize: 12 }}>{cost}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {/* Синхронизация dev↔client репо (доставлено ли всё клиенту). */}
+          <SyncBadge s={p.sync} locale={locale} />
+          {/* Стоимость — только на админском дашборде (исполнитель/клиент сюда доступа не имеют). */}
+          {cost && <span style={{ ...ui.monoLabel, color: "var(--text)", fontSize: 12 }}>{cost}</span>}
+        </div>
       </div>
 
       {pay.isClient && (

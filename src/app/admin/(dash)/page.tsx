@@ -6,6 +6,7 @@ import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
 import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, doneCountsByProjectDay, getDepsFor, getEnabledGuides, guideText, commentTimesByTasks } from "@/lib/db";
+import { getProjectRepoSync } from "@/lib/repo-sync";
 import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
 import { ProjectInfoCard } from "./project-info-card";
@@ -47,6 +48,9 @@ export default async function HomePage() {
         const c = countMap.get(p.key);
         return { key: p.key, name: p.name, meta: p.meta, createdAt: p.createdAt, total: c?.total ?? 0, done: c?.done ?? 0 };
       });
+    // Статус синка dev↔client репо на карточку (параллельно, с кэшем в памяти 5 мин).
+    const syncs = await Promise.all(dash.map((p) => getProjectRepoSync(p.key, p.meta)));
+    dash.forEach((p, i) => { p.sync = syncs[i]; });
     const devNames: Record<string, string> = Object.fromEntries(users.map((u) => [u.login, u.alias || u.fullName]));
     // Селект создания задачи: фидбек-проект (Lamb.dev) — последним, не дефолтом.
     const chatProjects = dash
