@@ -62,8 +62,6 @@ export function CommentBox({ id, locale, canChooseVisibility, canHideFromDev }: 
     </>
   );
 
-  const hint = mode === "client_nodev" ? t(locale, "comment.willSeeClientNoDev") : mode === "client" ? t(locale, "comment.willSeeClient") : t(locale, "comment.internalOnly");
-
   return (
     <div style={{ marginTop: 16 }}>
       <label style={ui.fieldLabel}>{t(locale, "task.addComment")}</label>
