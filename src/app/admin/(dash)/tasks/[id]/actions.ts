@@ -47,6 +47,7 @@ export async function addTaskComment(
   text: string,
   visibleToClient?: boolean,
   attachments?: { localId: string; mime: string; data: string; name: string; image: boolean }[],
+  hideFromDev?: boolean,
 ): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
@@ -54,8 +55,15 @@ export async function addTaskComment(
   // Клиент всегда пишет клиент-видимый коммент. Сотрудник в проекте БЕЗ клиента приравнивается к клиенту
   // (он — пользователь/постановщик, фидбечит; не на стороне разраба) → его коммент тоже клиент-видимый, без модерации.
   // Остальная команда (разраб/админ) выбирает: по умолчанию внутренний.
+  // client_nodev — комментарий супер-админа КЛИЕНТУ, но СКРЫТЫЙ от разработчика (фин-вопросы мимо дева).
   const clientSide = me.role === "client" || (me.role === "employee" && !(await projectHasClient(id.split("-")[0])));
-  const visibility: "client" | "internal" = clientSide ? "client" : visibleToClient ? "client" : "internal";
+  const visibility: "client" | "internal" | "client_nodev" = clientSide
+    ? "client"
+    : hideFromDev && isSuperAdmin(me)
+      ? "client_nodev"
+      : visibleToClient
+        ? "client"
+        : "internal";
   try {
     // Сохраняем вложения и подставляем реальные ссылки вместо маркеров att:<localId>.
     let body = text;
@@ -79,7 +87,8 @@ export async function addTaskComment(
     // Автор коммента = текущий член (по логину); супер-админ без логина → Lambertain. Клиент видит команду как «Lambertain» (маскируется при выводе).
     await getBackend().addComment(id, body, visibility, me.youtrackLogin);
     // Портал → Trello: клиент-видимый коммент (клиент/сотрудник-как-клиент или супер-админ клиенту) зеркалим на карточку.
-    if (visibility === "client") await mirrorCommentToTrello(id, body).catch(() => {});
+    // client_nodev тоже клиент-видимый (Trello — клиентская доска, разраб её не видит) → зеркалим.
+    if (visibility === "client" || visibility === "client_nodev") await mirrorCommentToTrello(id, body).catch(() => {});
     revalidatePath(`/admin/tasks/${id}`);
     // Коммент от «замовника» задачи (клиент/сотрудник-как-клиент, постановщик-член ИЛИ супер-админ как владелец)
     // при закрытой/ожидающей задаче возвращает её в работу:
@@ -92,7 +101,7 @@ export async function addTaskComment(
       const meIsReporter =
         (!!me.youtrackLogin && t.reporter?.login === me.youtrackLogin) ||
         (isSuperAdmin(me) && (!t.reporter?.login || t.reporter.role === "admin"));
-      if ((clientSide || meIsReporter) && (bucket === "blocked" || bucket === "done" || bucket === "review")) {
+      if ((clientSide || meIsReporter) && visibility !== "client_nodev" && (bucket === "blocked" || bucket === "done" || bucket === "review")) {
         await getBackend().updateStatus(id, "In Progress", { actorLogin: me.youtrackLogin ?? null, actorRole: clientSide ? "client" : "admin", trigger: "постановник написав коментар — повернуто в роботу" });
       }
     } catch { /* best-effort */ }
@@ -114,8 +123,8 @@ export async function addTaskComment(
         // Клиент (или сотрудник-как-клиент) написал → ответственному разработчику + админу.
         await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${projName} · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn, authorTg);
         await notifyAdmin(`💬 <b>Вопрос клиента</b> · ${projName} · ${id}: ${task.summary}`, openBtn, authorTg);
-      } else if (visibility === "client") {
-        // Команда ответила клиенту → клиенту/сотруднику проекта.
+      } else if (visibility === "client" || visibility === "client_nodev") {
+        // Команда/супер-админ ответили клиенту → клиенту/сотруднику проекта (client_nodev — тоже клиенту, но разработчику НЕ шлём).
         await notifyProjectClients(task.projectKey, `💬 <b>${projName} · ${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn, authorTg);
       } else if (task.assignee?.login && task.assignee.login !== me.youtrackLogin) {
         // Внутренний коммент → ответственному разработчику.

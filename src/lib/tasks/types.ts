@@ -162,7 +162,7 @@ export interface Comment {
   created: number;
   author: { login: string; fullName: string; role: Role };
   /** "client" — видно клиенту; "internal" — только команде (дев/админ). По умолчанию client. */
-  visibility?: "client" | "internal";
+  visibility?: "client" | "internal" | "client_nodev";
   /** false — на модерации (клиент не видит, без пуша) до апрува супер-админом. По умолчанию true. */
   approved?: boolean;
   /** true — коммент создан через dev-API (Claude разработчика); его можно править/удалять (dev-API и разработчик в UI). */
@@ -215,7 +215,7 @@ export interface TasksBackend {
     autoDone?: boolean;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
-  addComment(id: string, text: string, visibility?: "client" | "internal", authorLogin?: string, approved?: boolean, devAuthored?: boolean): Promise<Comment>;
+  addComment(id: string, text: string, visibility?: "client" | "internal" | "client_nodev", authorLogin?: string, approved?: boolean, devAuthored?: boolean): Promise<Comment>;
   // evt (DEV-32) — контекст для журнала событий: кто/почему сменил статус (актор/триггер).
   updateStatus(id: string, status: string, evt?: { actorLogin?: string | null; actorRole?: string | null; trigger?: string | null }): Promise<void>;
   deleteTask(id: string): Promise<void>;

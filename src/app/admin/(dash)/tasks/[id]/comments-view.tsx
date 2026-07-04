@@ -13,7 +13,7 @@ export type ViewComment = {
   created: number;
   authorName: string;
   authorRole: string;
-  visibility?: "client" | "internal";
+  visibility?: "client" | "internal" | "client_nodev";
   approved: boolean;
   canEditOwn?: boolean;
   canEdit?: boolean;
@@ -125,6 +125,7 @@ export function CommentsView({
           if (item.kind === "event") return <SystemEventRow key={`e${item.e.id}`} e={item.e} locale={locale} />;
           const c = item.c;
           const internal = c.visibility === "internal";
+          const clientNoDev = c.visibility === "client_nodev"; // клиенту, но скрыт от разработчика
           const pending = !c.approved;
           return (
             <div
@@ -140,6 +141,10 @@ export function CommentsView({
                 {c.isNew && <span style={{ ...ui.monoLabel, color: "#000", background: "var(--accent)", padding: "1px 6px", borderRadius: 3, fontWeight: 600 }}>NEW</span>}
                 {internal && !isClient && (
                   <span style={{ ...ui.monoLabel, color: "#e8b339", border: "1px solid #e8b339", padding: "1px 6px" }}>{t(locale, "comment.internalBadge")}</span>
+                )}
+                {/* client_nodev: клиент видит как обычный коммент (без бейджа); команде/админу — метка, что скрыт от разработчика. */}
+                {clientNoDev && !isClient && (
+                  <span style={{ ...ui.monoLabel, color: "#5b9cff", border: "1px solid #5b9cff", padding: "1px 6px" }}>{t(locale, "comment.clientNoDevBadge")}</span>
                 )}
                 {pending && (
                   <span style={{ ...ui.monoLabel, color: "#e8b339", border: "1px solid #e8b339", padding: "1px 6px" }}>{t(locale, "mod.pendingBadge")}</span>

@@ -92,11 +92,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const prevRead = reads.get(id) ?? 0;
   const myLogin = me.youtrackLogin;
   // Время последнего коммента от ДРУГОГО автора (ответа) — свой коммент правим, только пока ответа нет.
-  const lastOtherCreated = comments.reduce((max, c) => (myLogin && c.author.login !== myLogin ? Math.max(max, c.created) : max), 0);
+  // client_nodev — комменты супер-админа клиенту МИМО разработчика: контрибьютору (разработчику) их не показываем (server-side).
+  const visibleComments = me.role === "contributor" ? comments.filter((c) => c.visibility !== "client_nodev") : comments;
+  const lastOtherCreated = visibleComments.reduce((max, c) => (myLogin && c.author.login !== myLogin ? Math.max(max, c.created) : max), 0);
   // Итог разраба ещё на модерации (клиент-facing коммент approved=false): результат клиенту НЕ показан.
   // Пока так — клиент-постановщик НЕ должен видеть блок приёмки (разраб ставит Review сразу, но итог ждёт апрува).
   const pendingClientResult = comments.some((c) => c.visibility === "client" && c.approved === false);
-  const viewComments: ViewComment[] = comments.map((c) => ({
+  const viewComments: ViewComment[] = visibleComments.map((c) => ({
     id: c.id,
     text: c.text,
     created: c.created,
@@ -300,7 +302,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           {t(locale, "task.comments")} · {shownCount}
         </div>
         <CommentsView taskId={task.id} comments={viewComments} events={viewEvents} isClient={me.role === "client"} canModerate={isSuperAdmin(me)} canManageDev={canManageDev} locale={locale} />
-        <CommentBox id={task.id} locale={locale} canChooseVisibility={!clientSide} />
+        <CommentBox id={task.id} locale={locale} canChooseVisibility={!clientSide} canHideFromDev={isSuperAdmin(me) && projHasClient} />
       </div>
     </div>
   );

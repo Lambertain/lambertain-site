@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   if (!expected) return NextResponse.json({ error: "ADMIN_API_TOKEN not configured" }, { status: 503 });
   if (bearer(req) !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
-  let b: { readableId?: string; body?: string; visibleToClient?: boolean; review?: boolean };
+  let b: { readableId?: string; body?: string; visibleToClient?: boolean; hideFromDev?: boolean; review?: boolean };
   try { b = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const readableId = String(b.readableId || "").trim();
   const body = String(b.body || "").trim();
@@ -33,9 +33,12 @@ export async function POST(req: Request) {
   let task;
   try { task = await be.getTask(readableId); } catch { return NextResponse.json({ error: `Задача ${readableId} не найдена` }, { status: 404 }); }
 
-  const visible = b.visibleToClient === true;
+  // hideFromDev — коммент КЛИЕНТУ, но СКРЫТЫЙ от разработчика (фин-вопросы мимо дева): client_nodev.
+  const hideFromDev = b.hideFromDev === true;
+  const vis: "client" | "internal" | "client_nodev" = hideFromDev ? "client_nodev" : b.visibleToClient === true ? "client" : "internal";
+  const visible = vis === "client" || vis === "client_nodev"; // клиент видит (client_nodev тоже клиент-видимый, но не разработчик)
   // Коммент от супер-админа (агентства): без member-логина, approved сразу (модерация супер-админа не нужна).
-  await be.addComment(readableId, body, visible ? "client" : "internal", undefined, true, false);
+  await be.addComment(readableId, body, vis, undefined, true, false);
   const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${readableId}` };
   if (visible) {
     await mirrorCommentToTrello(readableId, body).catch(() => {}); // портал → Trello (если подключена доска)

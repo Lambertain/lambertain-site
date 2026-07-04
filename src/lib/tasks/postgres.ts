@@ -208,7 +208,7 @@ export const postgresBackend: TasksBackend = {
         text: c.body,
         created: ms(c.created_at) ?? 0,
         author: { login, fullName, role },
-        visibility: c.visibility === "internal" ? "internal" : "client",
+        visibility: c.visibility === "internal" ? "internal" : c.visibility === "client_nodev" ? "client_nodev" : "client",
         approved: c.approved,
         devAuthored: c.dev_authored === true,
       };
@@ -233,7 +233,7 @@ export const postgresBackend: TasksBackend = {
     await q("DELETE FROM tasks WHERE id = $1", [rows[0].id]);
   },
 
-  async addComment(id: string, text: string, visibility: "client" | "internal" = "client", authorLogin?: string, approved: boolean = true, devAuthored: boolean = false): Promise<Comment> {
+  async addComment(id: string, text: string, visibility: "client" | "internal" | "client_nodev" = "client", authorLogin?: string, approved: boolean = true, devAuthored: boolean = false): Promise<Comment> {
     const task = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id = $1", [id]);
     if (!task[0]) throw new Error(`Задача ${id} не найдена`);
     // Автор: член по логину (клиент/разработчик/сотрудник/админ-член). Без логина (бот/супер-админ) — Lambertain.

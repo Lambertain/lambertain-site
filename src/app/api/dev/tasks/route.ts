@@ -34,7 +34,9 @@ export async function GET(req: Request) {
     if (!id.startsWith(projectKey + "-")) {
       return NextResponse.json({ error: "task not in project" }, { status: 403 });
     }
-    const [task, comments, tags, proj, events, deps] = await Promise.all([be.getTask(id), be.getComments(id), getTaskTags(id), getProjectFull(projectKey), getTaskEvents(id), getTaskDeps(id)]);
+    const [task, commentsRaw, tags, proj, events, deps] = await Promise.all([be.getTask(id), be.getComments(id), getTaskTags(id), getProjectFull(projectKey), getTaskEvents(id), getTaskDeps(id)]);
+    // client_nodev — комментарии админа клиенту МИМО разработчика (фин-вопросы и т.п.): дев-Claude их не получает.
+    const comments = commentsRaw.filter((c) => c.visibility !== "client_nodev");
     // DEV-33: зависимости задачи + вычисляемая блокировка по ним (агент не видел этого → брал де-факто заблокированные).
     const dependsOn = deps.map((d) => d.id);
     const blockedBy = deps.filter((d) => depUnfinished(d.status)).map((d) => ({ id: d.id, summary: d.summary, status: d.status }));
