@@ -338,7 +338,12 @@ export async function moderateReject(commentId: string, taskId: string): Promise
  * Постановщик проверил задачу в «Ревью»: принять (→ Готово) или вернуть на доработку (→ Доработка).
  * Право: автор задачи (reporter) или админ.
  */
-export async function reviewTask(id: string, accept: boolean, note?: string): Promise<{ ok?: boolean; error?: string }> {
+export async function reviewTask(
+  id: string,
+  accept: boolean,
+  note?: string,
+  attachments?: { localId: string; mime: string; data: string; name: string; image: boolean }[],
+): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
   const be = getBackend();
@@ -367,8 +372,15 @@ export async function reviewTask(id: string, accept: boolean, note?: string): Pr
       // щоб після повторної доставки клієнт знову отримав «Опубліковано» (forwardOnly інакше тримає prod).
       await reopenDeployStage(id, { actorRole: me.role ?? "admin", actorLogin: me.youtrackLogin ?? null, trigger: "повернуто на доопрацювання" }).catch(() => {});
       after(() => syncTaskToTrello(id, "Rework")); // Trello: карточку → назад в работу
-      if (note?.trim()) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${note.trim()}`, "internal");
-      if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${await taskTag(id)}: ${task.summary}${note?.trim() ? `\n${note.trim().slice(0, 300)}` : ""}`).catch(() => {});
+      // Заметка «на доработку» со вложениями (скрины) — сохраняем и подставляем ссылки вместо att:<localId>, как в комментариях.
+      let body = (note ?? "").trim();
+      for (const a of attachments ?? []) {
+        const aid = await saveAttachment(id, a.mime, a.data, a.name);
+        if (aid) body = body.replaceAll(`att:${a.localId}`, `/api/files/${aid}`);
+      }
+      const imgs = attachmentIdsIn(body);
+      if (body) await be.addComment(id, `🔧 <b>На доработку:</b>\n\n${body}`, "internal");
+      if (task.assignee?.login) await notifyLogins([task.assignee.login], `🔧 <b>На доработку</b> · ${await taskTag(id)}: ${task.summary}${body ? `\n${body.slice(0, 300)}` : ""}`, imgs).catch(() => {});
     }
     revalidatePath(`/admin/tasks/${id}`);
     revalidatePath("/admin");
