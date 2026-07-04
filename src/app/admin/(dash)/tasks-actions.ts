@@ -2,7 +2,7 @@
 
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage, getProjectFull } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage, getProjectFull, createProject, generateProjectKey } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { autoDeliverAndNotify } from "@/lib/auto-deliver";
 import { assignProjectDevAndNotify } from "@/lib/task-intake";
@@ -93,6 +93,28 @@ export async function moveTask(id: string, targetProjectKey: string): Promise<{ 
   revalidatePath("/admin/tasks");
   revalidatePath(`/admin/tasks/${res.to}`);
   return { ok: true, to: res.to };
+}
+
+/** Создать новый проект из задачи и перенести задачу в него (первой задачей проекта). Только супер-админ. */
+export async function createProjectFromTask(id: string, name?: string): Promise<{ ok?: boolean; to?: string; key?: string; error?: string }> {
+  const me = await getPrincipal();
+  if (!me) return { error: "Не авторизован" };
+  if (!isSuperAdmin(me)) return { error: "Нет прав" };
+  try {
+    const task = await getBackend().getTask(id);
+    const projName = (name ?? task.summary ?? "").trim().slice(0, 120) || "Новий проєкт";
+    const key = await generateProjectKey(projName);
+    await createProject(key, projName);
+    const res = await moveTaskToProject(id, key);
+    if ("error" in res) return { error: res.error };
+    revalidatePath("/admin");
+    revalidatePath("/admin/tasks");
+    revalidatePath("/admin/projects");
+    revalidatePath(`/admin/tasks/${res.to}`);
+    return { ok: true, to: res.to, key };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
 }
 
 /** Перевод задачи в «Ревью» с опциональной ссылкой на код. ИИ-ревью запустит поллер. */

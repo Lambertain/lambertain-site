@@ -18,6 +18,7 @@ import { DelegateBar } from "./delegate-bar";
 import { EscalateBar } from "./escalate-bar";
 import { TaskEdit } from "./task-edit";
 import { MoveTask } from "./move-task";
+import { CreateProjectFromTask } from "./create-project-from-task";
 import { StatusPicker } from "./status-picker";
 import { BackButton } from "./back-button";
 import { ScrollTop } from "./scroll-top";
@@ -265,10 +266,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       )}
 
 
-      {/* Перенос задачи в другой проект — только супер-админ (если задача села не в тот проект). */}
-      {isSuperAdmin(me) && projects.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <MoveTask taskId={task.id} projects={projects.filter((p) => p.key !== task.projectKey).map((p) => ({ key: p.key, name: p.name }))} />
+      {/* Проєкт задачі — тільки супер-адмін: перенести в наявний проект або створити новий із задачі. */}
+      {isSuperAdmin(me) && (
+        <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {projects.length > 0 && (
+            <MoveTask taskId={task.id} projects={projects.filter((p) => p.key !== task.projectKey).map((p) => ({ key: p.key, name: p.name }))} />
+          )}
+          <CreateProjectFromTask taskId={task.id} defaultName={task.summary} />
         </div>
       )}
 

@@ -34,6 +34,8 @@ export function CommentBox({ id, locale, canChooseVisibility, canHideFromDev }: 
   // Предупреждение о женском роде — только для команды в клиент-видимом комментарии.
   const femWords = canChooseVisibility && visibleToClient ? detectFeminine(bodyText) : [];
 
+  const hint = mode === "client_nodev" ? t(locale, "comment.willSeeClientNoDev") : mode === "client" ? t(locale, "comment.willSeeClient") : t(locale, "comment.internalOnly");
+
   const controls = (
     <>
       <button onClick={send} disabled={pending || empty} style={{ ...ui.btnAccent, opacity: pending || empty ? 0.5 : 1 }}>
@@ -44,7 +46,8 @@ export function CommentBox({ id, locale, canChooseVisibility, canHideFromDev }: 
         <select
           value={mode}
           onChange={(e) => setMode(e.target.value as Mode)}
-          style={{ ...ui.monoLabel, textTransform: "none", padding: "6px 8px", background: "var(--surface-2)", color: "var(--text)", border: "1px solid var(--border-2)", borderRadius: 4, cursor: "pointer" }}
+          title={hint}
+          style={{ ...ui.monoLabel, textTransform: "none", padding: "4px 6px", maxWidth: 150, background: "var(--surface-2)", color: mode === "client_nodev" ? "#5b9cff" : "var(--text)", border: `1px solid ${mode === "client_nodev" ? "#5b9cff" : "var(--border-2)"}`, borderRadius: 4, cursor: "pointer" }}
         >
           <option value="internal">{t(locale, "comment.mode.internal")}</option>
           <option value="client">{t(locale, "comment.mode.client")}</option>
