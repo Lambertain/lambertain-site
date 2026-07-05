@@ -52,6 +52,11 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
   { key: "telegram", group: "messenger", label: { uk: "Telegram", ru: "Telegram", en: "Telegram" }, subs: [{ key: "handle", label: { uk: "@юзернейм/бот", ru: "@юзернейм/бот", en: "@username/bot" }, kind: "text" }, { key: "token", label: { uk: "Токен бота", ru: "Токен бота", en: "Bot token" }, kind: "secret" }] },
   { key: "viber", group: "messenger", label: { uk: "Viber", ru: "Viber", en: "Viber" }, subs: [{ key: "phone", label: { uk: "Номер", ru: "Номер", en: "Phone" }, kind: "text" }] },
   { key: "email", group: "access", label: { uk: "Email", ru: "Email", en: "Email" }, subs: [{ key: "address", label: { uk: "Адреса", ru: "Адрес", en: "Address" }, kind: "text" }, pass] },
+  { key: "resend", group: "access", label: { uk: "Resend (пошта форм)", ru: "Resend (почта форм)", en: "Resend (form email)" }, subs: [
+    { key: "apiKey", label: { uk: "API Key", ru: "API Key", en: "API Key" }, kind: "secret" },
+    { key: "from", label: { uk: "From (адреса відправника)", ru: "From (адрес отправителя)", en: "From (sender address)" }, kind: "text" },
+    { key: "managerInbox", label: { uk: "Email менеджера (куди заявки)", ru: "Email менеджера (куда заявки)", en: "Manager email (leads)" }, kind: "text" },
+  ] },
   { key: "googleAnalytics", group: "analytics", label: { uk: "Google Analytics", ru: "Google Analytics", en: "Google Analytics" }, subs: [{ key: "id", label: { uk: "Measurement ID", ru: "Measurement ID", en: "Measurement ID" }, kind: "text" }] },
   // Trello — таск-трекер клиента (портал тянет/синкает задачи с доски). Нужен разработчику/порталу.
   { key: "trello", group: "other", label: { uk: "Trello", ru: "Trello", en: "Trello" }, subs: [
