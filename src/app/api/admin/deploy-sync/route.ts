@@ -147,8 +147,12 @@ export async function POST(req: Request) {
           }
         } catch (e) {
           const streak = await bumpFailStreak(streakKey).catch(() => 1);
-          // Экспоненциальный бэкофф: 10мин × 2^(streak-1), потолок 2 часа — не долбим тяжёлую доставку в стену.
-          const backoffMs = Math.min(10 * 60_000 * 2 ** (streak - 1), 2 * 60 * 60_000);
+          // Rate-limit/транзитный сбой — КОРОТКИЙ бэкофф (10 мин): общий гейт по квоте уже держит паузу при
+          // низком остатке, квота сбрасывается раз в час — не копим часы из-за временного лимита. Генуинный
+          // сбой (доступ/конфликт) — экспоненциально до 2ч, чтобы не долбить тяжёлую доставку в стену.
+          const msg = e instanceof Error ? e.message : String(e);
+          const rateLimited = /\b40[13]\b|rate limit|API rate|exceeded/i.test(msg);
+          const backoffMs = rateLimited ? 10 * 60_000 : Math.min(10 * 60_000 * 2 ** (streak - 1), 2 * 60 * 60_000);
           await setState(`autosync:retryafter:${p.key}`, String(Date.now() + backoffMs)).catch(() => {});
           if (streak === 1 || streak % 12 === 0) {
             await notifyAdmin(`⚠️ <b>Авто-синк dev→client не вдався</b> · ${p.key} (спроба ${streak}, пауза ~${Math.round(backoffMs / 60000)}хв)\n${e instanceof Error ? e.message : String(e)}`).catch(() => {});
