@@ -8,7 +8,7 @@
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
 import { NextResponse, after } from "next/server";
-import { listPrStageTasksMulti, listDevStageTasksMulti, listPrsForReviewSync, listProjectsWithMeta, bumpFailStreak, clearFailStreak } from "@/lib/db";
+import { listPrStageTasksMulti, listDevStageTasksMulti, listPrsForReviewSync, listProjectsWithMeta, bumpFailStreak, clearFailStreak, getState, setState } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { reportPollError, clearPollError } from "@/lib/task-error";
 import { syncPrReview } from "@/lib/pr-review-sync";
@@ -16,7 +16,7 @@ import { computeProjectRepoSync, invalidateSyncCache } from "@/lib/repo-sync";
 import { autoDeliverIfConfigured } from "@/lib/deliver";
 import { notifyAdmin } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { ghFetchRetry, GitHubError } from "@/lib/github";
+import { ghFetchRetry, GitHubError, githubCoreRemaining } from "@/lib/github";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -115,31 +115,48 @@ export async function POST(req: Request) {
     (p) => !p.archived && p.meta.autoDeliver && !p.meta.gitflowDelivery,
   );
   let autoSyncQueued = 0;
-  for (const p of autoDeliverProjects) {
-    const streakKey = `autosync:${p.key}`;
-    const s = await computeProjectRepoSync(p.meta).catch(() => null); // свежий статус (GitHub reads — быстро)
-    if (!s || !s.configured || s.synced || s.error) { await clearFailStreak(streakKey).catch(() => {}); continue; }
-    autoSyncQueued++;
-    // Сама доставка (squash 150+ файлов + публикация клиентского прода) ДОЛГАЯ — выносим в after(),
-    // чтобы не держать ответ поллера и не ловить gateway-timeout. Доезжает в фоне; self-limiting (ahead=0 после).
-    after(async () => {
-      try {
-        const res = await autoDeliverIfConfigured(p.meta);
-        invalidateSyncCache(p.key); // бейдж должен сразу показать «синхронізовано»
-        await clearFailStreak(streakKey);
-        if (res && res.length) {
-          const lines = res.map((r) => `• ${r.clientRepo}: ${r.files} файлів${r.deploy ? `, деплой ${r.deploy.status ?? "—"}` : ""}${r.prUrl ? `, PR ${r.prUrl}` : ""}`).join("\n");
-          await notifyAdmin(`🚀 <b>Авто-синк dev→client</b> · ${p.key} (dev було попереду на ${s.ahead})\n${lines}`, { text: "Відкрити проєкти", url: `${PORTAL_BASE}/admin` }).catch(() => {});
+  // ГЕЙТ по квоте GitHub: доставка тяжёлая (~150-300 blob-вызовов на проект). Если остаток API мал — НЕ
+  // начинаем авто-синк вовсе, иначе доставка падает 403 rate-limit, а поллер долбит её каждые 5 мин и добивает
+  // лимит для ВСЕХ операций (ревью-синк, проверки мержа, доставки всех проектов). Квота сама восстановится за час.
+  const rateLeft = await githubCoreRemaining();
+  const rateLow = rateLeft !== null && rateLeft < 1000;
+  if (rateLow) {
+    const st = await bumpFailStreak("autosync:ratelimit").catch(() => 1);
+    if (st === 1 || st % 12 === 0) await notifyAdmin(`⏳ <b>Авто-синк на паузі</b>: залишок GitHub API ${rateLeft} — чекаю відновлення квоти, щоб не добивати ліміт.`).catch(() => {});
+  } else {
+    await clearFailStreak("autosync:ratelimit").catch(() => {});
+    for (const p of autoDeliverProjects) {
+      const streakKey = `autosync:${p.key}`;
+      // Бэкофф после неудач: не долбим тяжёлую доставку каждые 5 мин — ждём retryAfter (экспоненциально по стрику).
+      const until = Number(await getState(`autosync:retryafter:${p.key}`).catch(() => "0")) || 0;
+      if (Date.now() < until) continue;
+      const s = await computeProjectRepoSync(p.meta).catch(() => null); // свежий статус (GitHub reads — быстро)
+      if (!s || !s.configured || s.synced || s.error) { await clearFailStreak(streakKey).catch(() => {}); await setState(`autosync:retryafter:${p.key}`, "0").catch(() => {}); continue; }
+      autoSyncQueued++;
+      // Сама доставка (squash 150+ файлов + публикация клиентского прода) ДОЛГАЯ — выносим в after(),
+      // чтобы не держать ответ поллера и не ловить gateway-timeout. Доезжает в фоне; self-limiting (ahead=0 после).
+      after(async () => {
+        try {
+          const res = await autoDeliverIfConfigured(p.meta);
+          invalidateSyncCache(p.key); // бейдж должен сразу показать «синхронізовано»
+          await clearFailStreak(streakKey);
+          await setState(`autosync:retryafter:${p.key}`, "0").catch(() => {});
+          if (res && res.length) {
+            const lines = res.map((r) => `• ${r.clientRepo}: ${r.files} файлів${r.deploy ? `, деплой ${r.deploy.status ?? "—"}` : ""}${r.prUrl ? `, PR ${r.prUrl}` : ""}`).join("\n");
+            await notifyAdmin(`🚀 <b>Авто-синк dev→client</b> · ${p.key} (dev було попереду на ${s.ahead})\n${lines}`, { text: "Відкрити проєкти", url: `${PORTAL_BASE}/admin` }).catch(() => {});
+          }
+        } catch (e) {
+          const streak = await bumpFailStreak(streakKey).catch(() => 1);
+          // Экспоненциальный бэкофф: 10мин × 2^(streak-1), потолок 2 часа — не долбим тяжёлую доставку в стену.
+          const backoffMs = Math.min(10 * 60_000 * 2 ** (streak - 1), 2 * 60 * 60_000);
+          await setState(`autosync:retryafter:${p.key}`, String(Date.now() + backoffMs)).catch(() => {});
+          if (streak === 1 || streak % 12 === 0) {
+            await notifyAdmin(`⚠️ <b>Авто-синк dev→client не вдався</b> · ${p.key} (спроба ${streak}, пауза ~${Math.round(backoffMs / 60000)}хв)\n${e instanceof Error ? e.message : String(e)}`).catch(() => {});
+          }
         }
-      } catch (e) {
-        // Не спамим админа: уведомляем на 1-м сбое и далее раз в ~час (каждый 12-й проход поллера).
-        const streak = await bumpFailStreak(streakKey).catch(() => 1);
-        if (streak === 1 || streak % 12 === 0) {
-          await notifyAdmin(`⚠️ <b>Авто-синк dev→client не вдався</b> · ${p.key} (спроба ${streak})\n${e instanceof Error ? e.message : String(e)}`).catch(() => {});
-        }
-      }
-    });
+      });
+    }
   }
 
-  return NextResponse.json({ ok: true, checkedPrTasks: prTasks.length, promotedToDev, checkedDevTasks: devTasks.length, promotedToProd, checkedReviewPrs: reviewPrs.length, mirroredReviews, autoDeliverProjects: autoDeliverProjects.length, autoSyncQueued });
+  return NextResponse.json({ ok: true, checkedPrTasks: prTasks.length, promotedToDev, checkedDevTasks: devTasks.length, promotedToProd, checkedReviewPrs: reviewPrs.length, mirroredReviews, autoDeliverProjects: autoDeliverProjects.length, autoSyncQueued, githubRateLeft: rateLeft, autoSyncPaused: rateLow });
 }

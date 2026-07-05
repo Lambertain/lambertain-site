@@ -51,6 +51,25 @@ export function isTransientGhError(err: unknown): boolean {
   return err instanceof TypeError; // fetch network reject
 }
 
+/**
+ * Остаток квоты GitHub REST API (core) для токена. Сам эндпоинт rate_limit квоту НЕ расходует.
+ * null — если запрос не удался (тогда вызывающий решает не блокироваться). Для гейта тяжёлых операций
+ * (авто-доставка = 150-300 вызовов): если остаток мал — не начинать, иначе добьём лимит и словим 403 у всех.
+ */
+export async function githubCoreRemaining(): Promise<number | null> {
+  try {
+    const r = await fetch(`${API}/rate_limit`, {
+      headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`, Accept: "application/vnd.github+json" },
+      cache: "no-store",
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { resources?: { core?: { remaining?: number } } };
+    return j.resources?.core?.remaining ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function gh(path: string): Promise<Response> {
   return fetch(API + path, {
     headers: {
