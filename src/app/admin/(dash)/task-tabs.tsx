@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { updateTaskStatus, markProjectOpened, deleteTask, moveToReview } from "./tasks-actions";
+import { updateTaskStatus, markProjectOpened, deleteTask, moveToReview, searchTasks } from "./tasks-actions";
 import { DeployBadge } from "./deploy-badge";
 import { AddresseeBadge } from "./addressee-badge";
 import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
@@ -252,11 +252,24 @@ export function TaskTabs({
   };
 
   // Поиск по слагу (id) или названию — по ВСЕМ задачам, поверх табов/корзин.
+  // Мгновенно фильтруем подгруженные (первые 300), а параллельно (debounce) дёргаем server-search по ВСЕЙ базе,
+  // иначе задачи вне первых 300 по updated не находятся (баг: искали RAC-14 → «ничего не найдено»).
   const q = query.trim().toLowerCase();
   const searchResults = useMemo(
     () => (q ? tasks.filter((tk) => tk.id.toLowerCase().includes(q) || tk.summary.toLowerCase().includes(q)) : []),
     [tasks, q],
   );
+  const [serverResults, setServerResults] = useState<BoardTask[] | null>(null);
+  const [searching, startSearch] = useTransition();
+  useEffect(() => {
+    const s = query.trim();
+    if (s.length < 2) { setServerResults(null); return; }
+    setServerResults(null); // сбрасываем прошлый результат, пока грузим новый
+    const h = setTimeout(() => { startSearch(async () => { setServerResults(await searchTasks(s)); }); }, 250);
+    return () => clearTimeout(h);
+  }, [query]);
+  // Пока сервер не ответил — показываем мгновенный клиентский результат; ответил — авторитетный серверный.
+  const results = q ? (serverResults ?? searchResults) : [];
 
   function openProject(key: string) {
     if (onProjectChange) onProjectChange(key); else setInternalProject(key);
@@ -315,12 +328,13 @@ export function TaskTabs({
       )}
 
       {q ? (
-        searchResults.length === 0 ? (
-          <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, "tasks.searchNone")}</p>
+        results.length === 0 ? (
+          // Пока идёт server-search (или ещё не пришёл ответ) — не пишем «ничего не найдено» преждевременно.
+          <p style={{ color: "var(--muted)", fontSize: 14 }}>{t(locale, (searching || serverResults === null) ? "tasks.searching" : "tasks.searchNone")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>{t(locale, "tasks.searchFound")}: {searchResults.length}</span>
-            {searchResults.map((tk) => (
+            <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>{t(locale, "tasks.searchFound")}: {results.length}</span>
+            {results.map((tk) => (
               <Row key={tk.id} task={tk} locale={locale} canEditStatus={canEditStatus} canDelete={canDelete} mode="open" />
             ))}
           </div>

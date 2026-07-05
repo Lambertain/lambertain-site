@@ -2,6 +2,8 @@
 
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
+import { visibleProjects } from "@/lib/scope";
+import type { BoardTask } from "./task-tabs";
 import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage, getProjectFull, createProject, generateProjectKey } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { autoDeliverAndNotify } from "@/lib/auto-deliver";
@@ -183,4 +185,34 @@ export async function markProjectOpened(projectKey: string): Promise<void> {
   const me = await getPrincipal();
   if (!me) return;
   await markProjectSeen(me.youtrackLogin || me.fullName || "admin", projectKey);
+}
+
+/**
+ * Поиск задач по слагу (readable id, напр. RAC-14) или названию — SERVER-side, по ВСЕМ задачам в области
+ * видимости смотрящего, а не только по подгруженным на доску (лимит 300). Иначе поиск не находил задачи
+ * вне первых 300 по updated_at. Видимость internal — как на доске (клиент не видит internal вовсе).
+ */
+export async function searchTasks(query: string): Promise<BoardTask[]> {
+  const me = await getPrincipal();
+  if (!me) return [];
+  const s = query.trim();
+  if (s.length < 2) return [];
+  const be = getBackend();
+  const scope = me.realRole === "admin" ? undefined : visibleProjects(me, await be.listProjects()).map((p) => p.key);
+  const tasks = await be.listTasks({ search: s, projectKeys: scope, order: "updated_desc", limit: 50 });
+  const visible =
+    me.role === "client"
+      ? tasks.filter((tk) => !tk.internal)
+      : me.realRole === "admin"
+        ? tasks
+        : tasks.filter((tk) => !tk.internal || tk.createdByRole === "admin" || tk.createdByRole === "super");
+  return visible.map((tk) => ({
+    id: tk.id,
+    projectKey: tk.projectKey,
+    summary: tk.summary,
+    status: tk.state || "Open",
+    deployStage: tk.deployStage,
+    blocked: false,
+    blockers: [],
+  }));
 }

@@ -191,6 +191,8 @@ export interface TaskFilter {
   reporterIsNull?: boolean;
   /** Только нерешённые (открытые). */
   unresolvedOnly?: boolean;
+  /** Текстовый поиск по слагу (readable_id) или названию (ILIKE). */
+  search?: string;
   order?: "updated_desc" | "updated_asc" | "created_desc";
   limit?: number;
 }

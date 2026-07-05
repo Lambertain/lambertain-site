@@ -119,6 +119,11 @@ export const postgresBackend: TasksBackend = {
     if (filter.reporterLogin) add("r.login = $$", filter.reporterLogin);
     if (filter.reporterIsNull) where.push("r.login IS NULL");
     if (filter.unresolvedOnly) where.push("t.resolved_at IS NULL");
+    if (filter.search?.trim()) {
+      params.push(`%${filter.search.trim()}%`);
+      const p = `$${params.length}`;
+      where.push(`(t.readable_id ILIKE ${p} OR t.title ILIKE ${p})`);
+    }
     const order =
       filter.order === "updated_asc"
         ? "t.updated_at ASC NULLS LAST"
