@@ -24,7 +24,9 @@ export async function POST(req: Request) {
   const blocks = Array.isArray(body.blocks) ? body.blocks : [];
   if (!projectKey || !title) return NextResponse.json({ error: "projectKey и title обязательны" }, { status: 400 });
 
-  const res = await createRequestTaskCore(me, projectKey, title, blocks, body.recipient, body.internal === true);
+  // Флаг internal из формы больше не влияет: задача от админа по умолчанию внутренняя (клиент не видит),
+  // клиент-видимость дают только recipient client/from_client. Логика — в createRequestTaskCore.
+  const res = await createRequestTaskCore(me, projectKey, title, blocks, body.recipient);
   if (res.error) return NextResponse.json({ error: res.error }, { status: 400 });
   return NextResponse.json(res);
 }

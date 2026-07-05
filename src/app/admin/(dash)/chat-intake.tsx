@@ -18,7 +18,6 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
   const [projectKey, setProjectKey] = useState(lockedProject ?? (projects.find((p) => p.key !== feedbackKey) ?? projects[0])?.key ?? "");
   const [recipient, setRecipient] = useState<"admin" | "client">("admin");
   const [selfTask, setSelfTask] = useState(false);
-  const [internalTask, setInternalTask] = useState(false); // админ: задача разработчику мимо клиента
   const [clientTask, setClientTask] = useState(false); // супер-админ/админ: задача-вопрос клиенту
   const [fromClientTask, setFromClientTask] = useState(false); // супер-админ/админ: задача разработчику ОТ ИМЕНИ клиента
   const [title, setTitle] = useState("");
@@ -71,13 +70,13 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
     setTitleInvalid(false);
     start(async () => {
       const rcpt = showRecipient ? recipient : showSelf && selfTask ? "self" : showSelf && clientTask ? "client" : showSelf && fromClientTask ? "from_client" : undefined;
-      const wantInternal = showSelf && internalTask && !selfTask && !clientTask && !fromClientTask; // задача разработчику, скрытая от клиента
       try {
         // fetch к API-роуту (не Server Action): деплой не форсит перезагрузку, скрины не теряются.
+        // Без выбора клиент-facing (client/from_client) задача от админа — внутренняя (клиент не видит), это дефолт в бэке.
         const r = await fetch("/api/portal/create-task", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectKey, title: title.trim(), blocks, recipient: rcpt, internal: wantInternal }),
+          body: JSON.stringify({ projectKey, title: title.trim(), blocks, recipient: rcpt }),
         });
         const res = (await r.json().catch(() => ({}))) as { id?: string; url?: string; error?: string };
         if (res.error) setError(res.error);
@@ -132,24 +131,34 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
         )}
       </div>
 
-      {/* супер-админ/админ: куда адресовать задачу — себе / клиенту / от клиента / внутр. разработчику. Взаимоисключающие. */}
+      {/* супер-админ/админ: куда адресовать задачу — себе / клиенту / от клиента. Взаимоисключающие.
+          Без выбора — внутренняя задача разработчику (клиент не видит); клиент-видимость дают только client/from_client. */}
       {showSelf && (() => {
         const opts = [
           { key: "self", on: selfTask, set: setSelfTask, label: "newtask.self", hint: "newtask.selfHint" },
           { key: "client", on: clientTask, set: setClientTask, label: "newtask.client", hint: "newtask.clientHint" },
           { key: "from_client", on: fromClientTask, set: setFromClientTask, label: "newtask.fromClient", hint: "newtask.fromClientHint" },
-          { key: "internal", on: internalTask, set: setInternalTask, label: "newtask.internal", hint: "newtask.internalHint" },
         ] as const;
-        const clearOthers = (keep: string) => { if (keep !== "self") setSelfTask(false); if (keep !== "client") setClientTask(false); if (keep !== "from_client") setFromClientTask(false); if (keep !== "internal") setInternalTask(false); };
-        return opts.map((o) => (
-          <div key={o.key} style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", ...ui.monoLabel, textTransform: "none" }}>
-              <input type="checkbox" checked={o.on} onChange={(e) => { o.set(e.target.checked); if (e.target.checked) clearOthers(o.key); }} />
-              {t(locale, o.label)}
-            </label>
-            <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, o.hint)}</span>
-          </div>
-        ));
+        const clearOthers = (keep: string) => { if (keep !== "self") setSelfTask(false); if (keep !== "client") setClientTask(false); if (keep !== "from_client") setFromClientTask(false); };
+        return (
+          <>
+            {opts.map((o) => (
+              <div key={o.key} style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", ...ui.monoLabel, textTransform: "none" }}>
+                  <input type="checkbox" checked={o.on} onChange={(e) => { o.set(e.target.checked); if (e.target.checked) clearOthers(o.key); }} />
+                  {t(locale, o.label)}
+                </label>
+                <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{t(locale, o.hint)}</span>
+              </div>
+            ))}
+            {/* Дефолт, когда ничего не выбрано. */}
+            {!selfTask && !clientTask && !fromClientTask && (
+              <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", ...ui.monoLabel, textTransform: "none", color: "#5b9cff" }}>
+                {t(locale, "newtask.defaultInternal")}
+              </div>
+            )}
+          </>
+        );
       })()}
 
       {/* адресат (только разработчик в обычном проекте): админ (приватно) или клиент (вопрос) */}

@@ -14,11 +14,10 @@ export async function createRequestTask(
   title: string,
   blocks: ReqBlock[],
   recipient?: "admin" | "client" | "self" | "from_client",
-  internal?: boolean,
 ): Promise<{ id?: string; url?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
-  return createRequestTaskCore(me, projectKey, title, blocks, recipient, internal);
+  return createRequestTaskCore(me, projectKey, title, blocks, recipient);
 }
 
 /** Структурировать произвольный текст в черновик задачи (превью перед созданием). */

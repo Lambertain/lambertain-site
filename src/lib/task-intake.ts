@@ -81,7 +81,6 @@ export async function createRequestTaskCore(
   title: string,
   blocks: ReqBlock[],
   recipient?: "admin" | "client" | "self" | "from_client",
-  internal?: boolean,
 ): Promise<{ id?: string; url?: string; error?: string }> {
   if (!title.trim()) return { error: "Пустой заголовок" };
   try {
@@ -170,9 +169,11 @@ export async function createRequestTaskCore(
     const appr = isFeedback
       ? { approvalStatus: "approved" as const, createdByRole: me.role, pending: false, approver: null }
       : await approvalFor(me, projectKey);
-    // Внутренняя задача (клиент не видит) — только когда её ставит админ/супер-админ. Разработчик такую
-    // задачу получит (dev API пускает internal с created_by_role=admin/super), а клиент — нет.
-    const wantInternal = internal === true && !isFeedback && (isSuperAdmin(me) || me.realRole === "admin");
+    // Дефолт для админа/супер-админа: задача разработчику ВНУТРЕННЯЯ (клиент не видит). Сюда попадаем, только
+    // если НЕ выбрали клиент-facing («Клиенту»/«От клиента» — recipient client/from_client — обработаны выше и
+    // вернулись). Значит клиент-видимость включают ТОЛЬКО те чекбоксы; без выбора задача не «протекает» клиенту.
+    // (Флаг `internal` из формы для админа больше не нужен — дев такую задачу видит по created_by_role=admin/super.)
+    const wantInternal = !isFeedback && (isSuperAdmin(me) || me.realRole === "admin");
     const task = await be.createTask({
       projectKey,
       summary,
