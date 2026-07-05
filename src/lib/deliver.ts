@@ -8,6 +8,7 @@
  *
  * Требует: GITHUB_TOKEN с доступом (push) к обоим репо (мы коллабораторы клиентских репо).
  */
+import { createHash } from "node:crypto";
 import { repoFromGit } from "./github";
 import type { ProjectMeta } from "./tasks/types";
 
@@ -228,7 +229,35 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
 
   const blobs = devTree.tree.filter((e) => e.type === "blob" && e.sha);
 
-  // 2. Переносим блобы в client-репо (контент одинаковый → sha совпадёт; создаём, чтобы существовали).
+  // 2. Родитель (HEAD ветки-приёмника или дефолтной) + ТЕКУЩЕЕ дерево клиента — чтобы переносить ТОЛЬКО
+  //    изменённые файлы. Раньше на КАЖДЫЙ файл было 2 вызова (read dev + create client) КАЖДУЮ доставку →
+  //    ~2×N вызовов на репо и упор в GitHub rate-limit. git-sha контента одинаков в dev и client, поэтому
+  //    неизменённые блобы ссылаем по sha (0 вызовов); читаем/создаём только дельту. Масштабируется по числу
+  //    изменённых файлов, а не по размеру репо.
+  let parentSha: string | null = null;
+  let branchExists = false;
+  const refResp = await gh(`/repos/${clientRepo}/git/ref/heads/${targetBranch}`);
+  if (refResp.ok) {
+    parentSha = ((await refResp.json()) as { object: { sha: string } }).object.sha;
+    branchExists = true;
+  } else {
+    const def = await ghJson<{ object: { sha: string } }>(`/repos/${clientRepo}/git/ref/heads/${clientInfo.default_branch}`);
+    parentSha = def.object.sha;
+  }
+  // Карта path → blob-sha текущего клиентского дерева (для дельты). Truncated-дерево → карта пустая (безопасный
+  // фолбэк на полный перенос).
+  const clientBlobByPath = new Map<string, string>();
+  if (parentSha) {
+    const pc = await ghJson<{ tree: { sha: string } }>(`/repos/${clientRepo}/git/commits/${parentSha}`);
+    const ct = await ghJson<{ tree: TreeEntry[]; truncated?: boolean }>(`/repos/${clientRepo}/git/trees/${pc.tree.sha}?recursive=1`);
+    if (!ct.truncated) for (const e of ct.tree) if (e.type === "blob" && e.sha) clientBlobByPath.set(e.path, e.sha);
+  }
+  // git blob sha = sha1("blob <len>\0<content>") — считаем локально для санитайз-файлов (их контент меняется).
+  const gitBlobSha = (content: string): string => {
+    const buf = Buffer.from(content, "utf-8");
+    return createHash("sha1").update(`blob ${buf.length}\0`).update(buf).digest("hex");
+  };
+
   const batch = 8;
   const entries: TreeEntry[] = [];
   for (let i = 0; i < blobs.length; i += batch) {
@@ -242,12 +271,17 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
           let text = Buffer.from(blob.content, (blob.encoding as BufferEncoding) || "base64").toString("utf-8");
           text = text.replace(PROTOCOL_BLOCK_RE, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
           if (!text.trim()) return null; // после очистки пусто — файл не кладём
+          const content = text + "\n";
+          const sha = gitBlobSha(content);
+          if (clientBlobByPath.get(e.path) === sha) return { path: e.path, mode: e.mode, type: "blob", sha }; // не изменился
           const created = await ghJson<{ sha: string }>(`/repos/${clientRepo}/git/blobs`, {
             method: "POST",
-            body: JSON.stringify({ content: Buffer.from(text + "\n", "utf-8").toString("base64"), encoding: "base64" }),
+            body: JSON.stringify({ content: Buffer.from(content, "utf-8").toString("base64"), encoding: "base64" }),
           });
           return { path: e.path, mode: e.mode, type: "blob", sha: created.sha };
         }
+        // Обычный файл: если у клиента по этому пути уже тот же sha — блоб существует, ссылаемся по sha (0 вызовов).
+        if (e.sha && clientBlobByPath.get(e.path) === e.sha) return { path: e.path, mode: e.mode, type: "blob", sha: e.sha };
         const blob = await ghJson<{ content: string; encoding: string }>(`/repos/${devRepo}/git/blobs/${e.sha}`);
         const created = await ghJson<{ sha: string }>(`/repos/${clientRepo}/git/blobs`, {
           method: "POST",
@@ -260,23 +294,11 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
     if (i + batch < blobs.length) await sleep(120); // мягкая пауза между батчами — меньше риск вторичного rate-limit
   }
 
-  // 3. Дерево + коммит в client. Родитель — текущий HEAD ветки-приёмника (или дефолтной, если ветки нет).
+  // 3. Дерево + коммит в client (родитель — parentSha, выбран выше).
   const clientTree = await ghJson<{ sha: string }>(`/repos/${clientRepo}/git/trees`, {
     method: "POST",
     body: JSON.stringify({ tree: entries }),
   });
-
-  let parentSha: string | null = null;
-  let branchExists = false;
-  const refResp = await gh(`/repos/${clientRepo}/git/ref/heads/${targetBranch}`);
-  if (refResp.ok) {
-    parentSha = ((await refResp.json()) as { object: { sha: string } }).object.sha;
-    branchExists = true;
-  } else {
-    const def = await ghJson<{ object: { sha: string } }>(`/repos/${clientRepo}/git/ref/heads/${clientInfo.default_branch}`);
-    parentSha = def.object.sha;
-  }
-
   const commit = await ghJson<{ sha: string; html_url: string }>(`/repos/${clientRepo}/git/commits`, {
     method: "POST",
     body: JSON.stringify({ message: input.message, tree: clientTree.sha, parents: parentSha ? [parentSha] : [] }),
