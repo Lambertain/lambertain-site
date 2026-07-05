@@ -63,6 +63,10 @@ export async function reportPollError(streakKey: string, taskId: string, where: 
   if (isTransientGhError(err)) {
     const streak = await bumpFailStreak(streakKey).catch(() => TRANSIENT_ESCALATE_AT); // не смогли посчитать → лучше показать
     if (streak < TRANSIENT_ESCALATE_AT) return false; // самоисправляющийся блип — тихо, следующий проход подтянет
+    // Уже эскалировали — НЕ долбим админа каждый проход поллера (5 мин): сообщаем на 1-й эскалации (streak===3)
+    // и далее лишь раз в ~час (каждый 12-й проход). Иначе стойкий сбой GitHub (напр. rate-limit на 2 часа)
+    // заваливает уведомлениями по каждому PR × каждый проход (был флуд ~200 повідомлень).
+    if (streak > TRANSIENT_ESCALATE_AT && (streak - TRANSIENT_ESCALATE_AT) % 12 !== 0) return false;
   }
   await reportTaskError(taskId, where, err);
   return true;
