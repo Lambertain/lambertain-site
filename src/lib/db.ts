@@ -1372,6 +1372,40 @@ export async function markAllNotificationsRead(recipientTgId: number): Promise<v
   await q("UPDATE notifications SET read_at = now() WHERE recipient_tg_id = $1 AND read_at IS NULL", [recipientTgId]);
 }
 
+/**
+ * Сигнатуры уведомлений-ошибок ПОЛЛЕРА/авто-синка (в заголовке колокольчика). Нужны, чтобы
+ * точечно «прочитать» флуд разрешённых сбоев (напр. шторм GitHub rate-limit), НЕ трогая
+ * настоящие уведомления (комменты, задачи, ответы клиента, «клієнт не отримав», «деплой не опубліковано»).
+ * Заголовок формируется из текста notifyAdmin: `⚠️ <ярлык> · <що зірвалось> …` / `⏳ Авто-синк на паузі …`.
+ */
+const POLLER_ERROR_TITLE_PATTERNS = [
+  "%Авто-синк%",             // «Авто-синк dev→client не вдався» + «Авто-синк на паузі»
+  "%зеркалювання код-рев%",  // синк код-ревью PR
+  "%перевірка мержу PR%",    // pr→dev
+  "%перевірка публікації%",  // dev→prod
+];
+
+/** Непрочитанные уведомления-ошибки поллера/авто-синка (для предпросмотра перед пометкой). */
+export async function listPollerErrorNotifications(recipientTgId: number): Promise<Notification[]> {
+  const conds = POLLER_ERROR_TITLE_PATTERNS.map((_, i) => `title ILIKE $${i + 2}`).join(" OR ");
+  return q<Notification>(
+    `SELECT id, task_id, project_key, title, link, 1 AS count, created_at FROM notifications
+     WHERE recipient_tg_id = $1 AND read_at IS NULL AND (${conds}) ORDER BY created_at DESC`,
+    [recipientTgId, ...POLLER_ERROR_TITLE_PATTERNS],
+  );
+}
+
+/** Пометить прочитанными только уведомления-ошибки поллера/авто-синка. Возвращает число помеченных. */
+export async function markPollerErrorNotificationsRead(recipientTgId: number): Promise<number> {
+  const conds = POLLER_ERROR_TITLE_PATTERNS.map((_, i) => `title ILIKE $${i + 2}`).join(" OR ");
+  const r = await q<{ id: number }>(
+    `UPDATE notifications SET read_at = now()
+     WHERE recipient_tg_id = $1 AND read_at IS NULL AND (${conds}) RETURNING id`,
+    [recipientTgId, ...POLLER_ERROR_TITLE_PATTERNS],
+  );
+  return r.length;
+}
+
 // ---- Правка/удаление комментов Клода (dev-API + вебинтерфейс разработчика) ----
 /** Коммент создан через dev-API (dev_authored) и относится к задаче проекта? Для авторизации правок. */
 export async function getDevCommentMeta(commentId: number, projectKey: string): Promise<{ approved: boolean; visibility: string } | null> {
