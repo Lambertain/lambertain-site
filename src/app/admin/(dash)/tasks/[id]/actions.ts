@@ -42,6 +42,38 @@ export async function handStepToClient(taskId: string): Promise<{ ok?: boolean; 
   }
 }
 
+/**
+ * DEV-47: чистая благодарность/подтверждение (без запроса правок)? Коммент замовника под ПРИНЯТОЙ
+ * (Done) задачей не должен авто-возвращать её в работу, если это просто «дякую / працює як треба».
+ * Консервативно: ack = есть маркер благодарности/подтверждения И нет маркера запроса/проблемы/вопроса
+ * И коротко И без вложений (скрин обычно = свидетельство проблемы). Default (не распознали) = НЕ ack →
+ * прежнее поведение (вернуть в работу), чтобы реальные правки НЕ терялись. uk/ru/en, стемы + токены.
+ */
+function isAcknowledgement(text: string, hasAttachments: boolean): boolean {
+  if (hasAttachments) return false;
+  const t = text.replace(/<[^>]+>/g, " ").replace(/\/api\/files\/\d+/g, " ").replace(/att:[\w-]+/g, " ").trim().toLowerCase();
+  if (!t || t.length > 250) return false;
+  if (t.includes("?")) return false;
+  // Явные маркеры запроса/проблемы (фразы + токены). НЕ включаем модальные треба/потрібно/нужно/надо —
+  // они амбивалентны («працює як потрібно» = подтверждение, а не запрос).
+  if (/(не працює|не работает|не пашет|перестал|does ?n'?t|not work)/i.test(t)) return false;
+  const words = new Set(t.split(/[^a-zа-яёіїєґ0-9]+/iu).filter(Boolean));
+  const REQ = ["але", "однак", "проте", "но", "однако", "ще", "еще", "також", "также",
+    "добав", "добавь", "додай", "додати", "дороби", "доробити", "зроби", "зробіть", "зробити",
+    "сделай", "сделать", "виправ", "виправте", "виправити", "исправь", "исправить", "поправ", "поправь", "поправити",
+    "переробити", "переделай", "перероби", "помилка", "помилки", "помилку", "ошибка", "ошибки", "ошибку",
+    "баг", "баги", "bug", "bugs", "error", "issue", "проблема", "проблеми", "проблему", "проблемы",
+    "fix", "add", "change", "змінити", "изменить", "чому", "почему"];
+  if (REQ.some((w) => words.has(w))) return false;
+  const GRAT = ["дякую", "дяки", "дякуємо", "дякуючи", "спасибо", "спасибі", "вдячний", "вдячна", "вдячні",
+    "thanks", "thank", "thx", "супер", "чудово", "класно", "відмінно", "отлично", "прекрасно", "прекрасно",
+    "працює", "запрацювало", "запрацював", "заработало", "работает", "works", "прийнято", "принято",
+    "нарешті", "наконец", "ок", "окей", "ok", "okay"];
+  const gratWord = GRAT.some((w) => words.has(w));
+  const gratEmoji = /[👍🙏❤✅🔥😊🙂]|все ок|всё ок|все добре|все гаразд|все супер|как треба|як треба|як потрібно/i.test(t);
+  return gratWord || gratEmoji;
+}
+
 export async function addTaskComment(
   id: string,
   text: string,
@@ -90,10 +122,13 @@ export async function addTaskComment(
     // client_nodev тоже клиент-видимый (Trello — клиентская доска, разраб её не видит) → зеркалим.
     if (visibility === "client" || visibility === "client_nodev") await mirrorCommentToTrello(id, body).catch(() => {});
     revalidatePath(`/admin/tasks/${id}`);
+    // DEV-47: благодарность/подтверждение под ПРИНЯТОЙ задачей — не «правки». Считаем один раз и для
+    // возврата в работу, и для сброса deploy-стадии (thank-you не должен переоткрывать задачу/стадию).
+    const isAck = isAcknowledgement(body, (attachments?.length ?? 0) > 0);
     // Коммент от «замовника» задачи (клиент/сотрудник-как-клиент, постановщик-член ИЛИ супер-админ как владелец)
     // при закрытой/ожидающей задаче возвращает её в работу:
-    // - blocked (ответ на эскалацию), done (DEV-19: новый коммент на Done — не висеть закрытой),
-    // - review (DEV-24: приёмку «всё ок» постановщик делает кнопкой «Готово», а коммент = нужны правки → в работу).
+    // - blocked (ответ на эскалацию), review (DEV-24: приёмку «всё ок» постановщик делает кнопкой «Готово», а коммент = нужны правки → в работу),
+    // - done (DEV-19: новый коммент на Done — не висеть закрытой), НО DEV-47: пропускаем, если это чистая благодарность/подтверждение.
     try {
       const t = await getBackend().getTask(id);
       const bucket = statusBucket(t.state);
@@ -101,14 +136,15 @@ export async function addTaskComment(
       const meIsReporter =
         (!!me.youtrackLogin && t.reporter?.login === me.youtrackLogin) ||
         (isSuperAdmin(me) && (!t.reporter?.login || t.reporter.role === "admin"));
-      if ((clientSide || meIsReporter) && visibility !== "client_nodev" && (bucket === "blocked" || bucket === "done" || bucket === "review")) {
+      const shouldReopen = bucket === "blocked" || bucket === "review" || (bucket === "done" && !isAck);
+      if ((clientSide || meIsReporter) && visibility !== "client_nodev" && shouldReopen) {
         await getBackend().updateStatus(id, "In Progress", { actorLogin: me.youtrackLogin ?? null, actorRole: clientSide ? "client" : "admin", trigger: "постановник написав коментар — повернуто в роботу" });
       }
     } catch { /* best-effort */ }
-    if (clientSide) {
+    if (clientSide && !isAck) {
       // DEV-39: клиент пишет (новые правки) по опубликованной задаче → сбрасываем стадию,
       // чтобы следующая доставка снова уведомила клиента «Опубліковано» (иначе залипает на prod).
-      // Self-guarded (сработает только если стадия = prod), поэтому безопасно на любой клиентский коммент.
+      // Self-guarded (сработает только если стадия = prod). DEV-47: чистую благодарность стадией не трогаем.
       await reopenDeployStage(id, { actorRole: "system", trigger: "клієнт написав нові правки по опублікованій задачі" }).catch(() => {});
     }
     // Уведомления (best-effort): адресно по ролям + картинки задачи.
