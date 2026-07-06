@@ -360,6 +360,30 @@ export interface DeployStatus {
   note?: string;
 }
 
+/**
+ * Терминальный «успешно опубликовано» статус клиентского деплоя. Railway отдаёт SUCCESS, Vercel — READY.
+ * Раньше проверялся только SUCCESS → успешный Vercel-деплой ложно помечался «НЕ опубліковано, перевір».
+ */
+export function isDeployPublished(status: string): boolean {
+  return status === "SUCCESS" || status === "READY";
+}
+
+/**
+ * Достижим ли коммит `ancestor` из `head` в репо (т.е. head СОДЕРЖИТ ancestor). Нужно, чтобы отличить
+ * реальный «задеплоен не наш коммит» от гонки доставок: если более поздняя доставка обогнала нашу,
+ * задеплоенный коммит — потомок нашего, наш контент уже в проде. compare/base...head: ahead/identical = содержит.
+ */
+async function commitReachable(repo: string, ancestor: string, head: string): Promise<boolean> {
+  if (!repo || !ancestor || !head) return false;
+  if (ancestor.startsWith(head) || head.startsWith(ancestor)) return true;
+  try {
+    const j = await ghJson<{ status?: string }>(`/repos/${repo}/compare/${ancestor}...${head}`);
+    return j.status === "ahead" || j.status === "identical";
+  } catch {
+    return false;
+  }
+}
+
 async function railwayGql(token: string, query: string, variables: Record<string, unknown>): Promise<{ data?: Record<string, unknown>; errors?: unknown }> {
   const r = await fetch("https://backboard.railway.app/graphql/v2", {
     method: "POST",
@@ -493,6 +517,11 @@ export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(Deliv
         deploy = await vercelDeployStatus(meta.clientVercel).catch(
           (e): DeployStatus => ({ status: "ERROR", commit: sha.slice(0, 8), approved: false, note: e instanceof Error ? e.message : "ошибка статуса Vercel" }),
         );
+      }
+      // Гонка доставок: пока ждали/апрувили деплой, более поздняя доставка обогнала нашу. Если задеплоенный
+      // коммит СОДЕРЖИТ наш (наш = предок) — контент уже в проде, это не «не той коміт», а нормальная обгонка.
+      if (deploy && deploy.matched === false && deploy.commit && sha && (await commitReachable(p.client, sha, deploy.commit))) {
+        deploy = { ...deploy, matched: true, note: [deploy.note, "новіша доставка обігнала — наш коміт уже в проді"].filter(Boolean).join("; ") };
       }
     }
     out.push({ ...res, deploy });

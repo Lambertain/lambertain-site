@@ -6,7 +6,7 @@
  *
  * Вызывать в фоне через after() — не блокировать ответ/экшен.
  */
-import { autoDeliverIfConfigured } from "./deliver";
+import { autoDeliverIfConfigured, isDeployPublished } from "./deliver";
 import { deliverGitflow } from "./sync-client";
 import { publishProjectToProd } from "./deploy-stage";
 import { setTaskPr } from "./db";
@@ -49,13 +49,13 @@ export async function autoDeliverAndNotify(projectKey: string, meta: ProjectMeta
     // toDefault только в прямом режиме (squash в main) → публикация в прод. В PR-режиме — ждём мержа дева клиента.
     if (ds.some((d) => d.toDefault)) await publishProjectToProd(projectKey).catch(() => {});
     // Деплой «живой» = SUCCESS и задеплоен именно наш коммит. Иначе — явное предупреждение (не глотаем).
-    const live = (d: (typeof ds)[number]) => !d.deploy || (d.deploy.status === "SUCCESS" && d.deploy.matched !== false);
+    const live = (d: (typeof ds)[number]) => !d.deploy || (isDeployPublished(d.deploy.status) && d.deploy.matched !== false);
     const lines = ds
       .map((d) => {
         const dep = d.deploy;
         const depTxt = !dep
           ? ""
-          : dep.status === "SUCCESS" && dep.matched !== false
+          : isDeployPublished(dep.status) && dep.matched !== false
             ? " · деплой: ✓ опубліковано"
             : ` · ⚠️ деплой: ${dep.status}${dep.matched === false ? " (НЕ той коміт!)" : ""}${dep.note ? " — " + dep.note : ""}`;
         return `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${depTxt}`;
