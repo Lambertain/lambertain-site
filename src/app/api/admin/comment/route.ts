@@ -48,6 +48,13 @@ export async function POST(req: Request) {
   if (task.reporter?.login && task.reporter.role !== "client") {
     await notifyLogins([task.reporter.login], `💬 <b>Відповідь по задачі</b> · ${await taskTag(readableId)}: ${task.summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), link).catch(() => {});
   }
+  // Уведомить исполнителя-разработчика о новом комменте по его задаче. Раньше внутренний коммент (visibleToClient:false)
+  // не слал НИКОМУ, кроме reporter-не-клиента → если постановщик клиент (обычный кейс), разработчик узнавал о комменте,
+  // только зайдя в задачу вручную. Теперь ассайни всегда получает пуш (кроме случая, когда он же автор/постановщик).
+  if (task.assignee?.login && task.assignee.login !== task.reporter?.login) {
+    const kind = visible ? "коментар" : "внутрішній коментар";
+    await notifyLogins([task.assignee.login], `💬 <b>Новий ${kind}</b> · ${await taskTag(readableId)}: ${task.summary}\n${body.slice(0, 400)}`, attachmentIdsIn(body), link).catch(() => {});
+  }
   if (b.review === true) {
     await be.updateStatus(readableId, "Review");
     if (task.reporter?.login) await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(readableId)}: ${task.summary}`, [], link).catch(() => {});
