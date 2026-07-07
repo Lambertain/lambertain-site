@@ -11,7 +11,7 @@ import { NextResponse, after } from "next/server";
 import { getProjectKeyByToken, getProjectFull, setDeployStage } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { getBackend } from "@/lib/tasks";
-import { notifyAdmin, notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
 import { autoDeliverAndNotify, deliverGitflowAndNotify } from "@/lib/auto-deliver";
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
         await be.updateStatus(taskId, "Done", { actorRole: "system", trigger: task.autoDone ? "автоздача за спекою (autoDone)" : "gitflow: авто-приймання (autoApprove)" });
         after(() => syncTaskToTrello(taskId, "Done")); // Trello: карточку → «Виконано»
         await advanceStage(taskId, "dev", "розробник здав на ревʼю").catch(() => {}); // готово и на дев-мейн → «На тестовому»; авто-доставка ниже переведёт в «Опубліковано»
-        await notifyAdmin(`✅ <b>Авто-готово</b> · ${await taskTag(taskId)}: ${task.summary}`, { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
+        // «Авто-готово» адміну НЕ пушимо — це шум, який ще й треба вручну закривати. Стан видно на дошці; далі йде авто-доставка.
         // Клиенту «Виконано» сообщаем ТОЛЬКО ПОСЛЕ доставки (иначе клиент идёт проверять до публикации и «не бачить змін»).
         const notifyClientDone = async () => {
           if (!summary) return;

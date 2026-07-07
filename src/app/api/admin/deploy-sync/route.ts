@@ -15,7 +15,6 @@ import { syncPrReview } from "@/lib/pr-review-sync";
 import { computeProjectRepoSync, invalidateSyncCache } from "@/lib/repo-sync";
 import { autoDeliverIfConfigured } from "@/lib/deliver";
 import { notifyAdmin } from "@/lib/notify";
-import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { ghFetchRetry, GitHubError, githubCoreRemaining } from "@/lib/github";
 
 function bearer(req: Request): string | null {
@@ -137,14 +136,12 @@ export async function POST(req: Request) {
       // чтобы не держать ответ поллера и не ловить gateway-timeout. Доезжает в фоне; self-limiting (ahead=0 после).
       after(async () => {
         try {
-          const res = await autoDeliverIfConfigured(p.meta);
+          await autoDeliverIfConfigured(p.meta); // сама доставка (side-effect); результат для пуша більше не потрібен
           invalidateSyncCache(p.key); // бейдж должен сразу показать «синхронізовано»
           await clearFailStreak(streakKey);
           await setState(`autosync:retryafter:${p.key}`, "0").catch(() => {});
-          if (res && res.length) {
-            const lines = res.map((r) => `• ${r.clientRepo}: ${r.files} файлів${r.deploy ? `, деплой ${r.deploy.status ?? "—"}` : ""}${r.prUrl ? `, PR ${r.prUrl}` : ""}`).join("\n");
-            await notifyAdmin(`🚀 <b>Авто-синк dev→client</b> · ${p.key} (dev було попереду на ${s.ahead})\n${lines}`, { text: "Відкрити проєкти", url: `${PORTAL_BASE}/admin` }).catch(() => {});
-          }
+          // Успішний авто-синк адміну НЕ пушимо — це шум, який ще й треба вручну закривати. Бейдж проєкту
+          // й так показує «синхронізовано». Пушимо лише невдачу (нижче) — вона потребує втручання.
         } catch (e) {
           const streak = await bumpFailStreak(streakKey).catch(() => 1);
           // Rate-limit/транзитный сбой — КОРОТКИЙ бэкофф (10 мин): общий гейт по квоте уже держит паузу при

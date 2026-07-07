@@ -31,8 +31,13 @@ export async function deliverGitflowAndNotify(projectKey: string, meta: ProjectM
       for (const d of delivered) {
         await setTaskPr(taskId, d.prUrl!).catch((e) => reportTaskError(taskId, `прив'язка PR до задачі (${d.clientRepo || "?"})`, e));
       }
-      const lines = delivered.map((r) => `• ${r.clientRepo}: PR ${r.created ? "відкрито" : "оновлено"}${r.upToDate === false ? " ⚠️ develop пішов вперед — потрібен ребейз" : ""}`).join("\n");
-      await notifyAdmin(`🚀 <b>Gitflow-доставка</b> · ${await taskTag(taskId)} · гілка <code>${branch}</code>\n${lines}`, { text: "Pull Request", url: delivered[0].prUrl! }).catch(() => {});
+      // Чистый успех (PR открыт/обновлён, ребейз не нужен) НЕ пушим админу — это шум, который ещё и надо
+      // вручную закрывать. PR привязан, поллер ведёт стадию дальше сам. Пушим ТОЛЬКО при предупреждении.
+      const needsRebase = delivered.some((r) => r.upToDate === false);
+      if (needsRebase) {
+        const lines = delivered.map((r) => `• ${r.clientRepo}: PR ${r.created ? "відкрито" : "оновлено"}${r.upToDate === false ? " ⚠️ develop пішов вперед — потрібен ребейз" : ""}`).join("\n");
+        await notifyAdmin(`⚠️ <b>Gitflow-доставка — потрібен ребейз</b> · ${await taskTag(taskId)} · гілка <code>${branch}</code>\n${lines}`, { text: "Pull Request", url: delivered[0].prUrl! }).catch(() => {});
+      }
     } else {
       const err = results.map((r) => r.error || r.prError).filter(Boolean).join("; ") || "гілку не знайдено в жодному форку";
       await reportTaskError(taskId, `gitflow-доставка гілки ${branch}`, err);
@@ -61,10 +66,13 @@ export async function autoDeliverAndNotify(projectKey: string, meta: ProjectMeta
         return `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${depTxt}`;
       })
       .join("\n");
-    const first = ds[0];
-    const btn = first.prUrl ? { text: "Pull Request", url: first.prUrl } : { text: "Коммит", url: first.commitUrl };
-    const header = ds.every(live) ? "🚀 <b>Авто-доставка</b>" : "⚠️ <b>Авто-доставка — деплой НЕ опубліковано, перевір</b>";
-    await notifyAdmin(`${header} · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
+    // Чистый успех (всё опубликовано) НЕ пушим админу — это шум, который ещё и надо вручную закрывать.
+    // Пушим ТОЛЬКО когда деплой НЕ опубликован / не тот коммит — это требует вмешательства.
+    if (!ds.every(live)) {
+      const first = ds[0];
+      const btn = first.prUrl ? { text: "Pull Request", url: first.prUrl } : { text: "Коммит", url: first.commitUrl };
+      await notifyAdmin(`⚠️ <b>Авто-доставка — деплой НЕ опубліковано, перевір</b> · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
+    }
   } catch (e) {
     await reportTaskError(taskId, "авто-доставка", e);
   }
