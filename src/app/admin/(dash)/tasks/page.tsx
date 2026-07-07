@@ -5,7 +5,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
-import { getReads, getProjectReads, getDepsFor } from "@/lib/db";
+import { getReads, getProjectReads, getDepsFor, getStatusHistoryFor } from "@/lib/db";
+import { statusDotRows } from "@/lib/status-timer";
 import { mergeFeedback } from "@/lib/feedback";
 import { visibleProjects } from "@/lib/scope";
 import { statusBucket, BUCKET_ORDER, type Bucket } from "@/lib/statuses";
@@ -58,7 +59,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     // В режиме «Мои задачи» показываем только проекты, где есть мои АКТИВНЫЕ (не выполненные) задачи; на «Все» — все проекты.
     const activeKeys = new Set(tasks.filter((tk) => statusBucket(tk.state) !== "done").map((tk) => tk.projectKey));
     const projects = (mine ? projectsList.filter((p) => activeKeys.has(p.key)) : projectsList).map((p) => ({ key: p.key, name: p.name }));
-    const depMap = await getDepsFor(tasks.map((tk) => tk.id));
+    const [depMap, histMap] = await Promise.all([getDepsFor(tasks.map((tk) => tk.id)), getStatusHistoryFor(tasks.map((tk) => tk.id))]);
+    const now = nowMs();
     const board: BoardTask[] = tasks.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
       const lastRead = reads.get(tk.id) ?? 0;
@@ -80,6 +82,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         clientAction: tk.clientAction,
         deployStage: tk.deployStage,
         addressee: taskAddressee(tk),
+        statusRows: statusDotRows({ createdMs: tk.created ?? now, resolvedMs: tk.resolved, currentStatus: tk.state || "Open", events: histMap.get(tk.id) ?? [], nowMs: now }),
       };
     });
     const fbSet = new Set(projectsList.filter((p) => p.meta.feedback).map((p) => p.key));
@@ -147,7 +150,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     const merged0 = await mergeFeedback(me, all, raw);
     // Разработчик/сотрудник видит internal только адресованные деву (admin/super), но НЕ личные само-задачи супер-админа.
     const merged = me.realRole === "admin" ? merged0 : merged0.filter((tk) => !tk.internal || tk.createdByRole === "admin" || tk.createdByRole === "super");
-    const depMap = await getDepsFor(merged.map((tk) => tk.id));
+    const [depMap, histMap] = await Promise.all([getDepsFor(merged.map((tk) => tk.id)), getStatusHistoryFor(merged.map((tk) => tk.id))]);
+    const now = nowMs();
     const board: BoardTask[] = merged.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
       const lastRead = reads.get(tk.id) ?? 0;
@@ -159,6 +163,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         blocked: blockers.length > 0, blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
         ownerAction: tk.ownerAction, clientAction: tk.clientAction, deployStage: tk.deployStage,
         addressee: taskAddressee(tk),
+        statusRows: statusDotRows({ createdMs: tk.created ?? now, resolvedMs: tk.resolved, currentStatus: tk.state || "Open", events: histMap.get(tk.id) ?? [], nowMs: now }),
       };
     });
     const projectsWithNew = visible

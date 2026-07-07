@@ -6,6 +6,7 @@
 import { Pool } from "pg";
 import { randomBytes } from "node:crypto";
 import type { Role } from "./tasks/types";
+import type { StatusEvent } from "./status-timer";
 
 declare global {
   var _pmPool: Pool | undefined;
@@ -923,6 +924,29 @@ export async function getTaskEvents(taskId: string): Promise<TaskEvent[]> {
     details: r.details,
   }));
 }
+/**
+ * Пакетно — история переходов статусов (status_change) по списку задач, для «кружков» на карточке.
+ * Один запрос на весь список (как getDepsFor), чтобы не дёргать журнал по каждой задаче.
+ * Возвращает Map<readableId, StatusEvent[]> в хронологическом порядке.
+ */
+export async function getStatusHistoryFor(taskIds: string[]): Promise<Map<string, StatusEvent[]>> {
+  const out = new Map<string, StatusEvent[]>();
+  if (!taskIds.length) return out;
+  const rows = await q<{ readable_id: string; from_val: string | null; to_val: string | null; created_at: string }>(
+    `SELECT t.readable_id, te.from_val, te.to_val, te.created_at
+       FROM task_events te JOIN tasks t ON t.id = te.task_id
+      WHERE te.type = 'status_change' AND t.readable_id = ANY($1::text[])
+      ORDER BY te.created_at, te.id`,
+    [taskIds],
+  );
+  for (const r of rows) {
+    const arr = out.get(r.readable_id) ?? [];
+    arr.push({ ts: new Date(r.created_at).getTime(), from: r.from_val, to: r.to_val });
+    out.set(r.readable_id, arr);
+  }
+  return out;
+}
+
 /** Задачи проекта в стадии 'dev' (на тестовом) — для публикации в прод при доставке. */
 export async function listProjectDevStageTasks(projectKey: string): Promise<string[]> {
   const r = await q<{ readable_id: string }>(

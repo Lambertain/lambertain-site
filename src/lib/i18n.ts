@@ -727,6 +727,8 @@ export const DICT: Record<string, Entry> = {
   "card.from": { uk: "від {name}", ru: "от {name}", en: "from {name}" },
   "card.clientTag": { uk: " (клієнт)", ru: " (клиент)", en: " (client)" },
   "card.updated": { uk: "оновл. {date}", ru: "обновл. {date}", en: "upd. {date}" },
+  "card.created": { uk: "поставл. {date}", ru: "поставл. {date}", en: "set {date}" },
+  "card.daysN": { uk: "{n} дн.", ru: "{n} дн.", en: "{n}d" },
 };
 
 export function t(locale: Locale, key: string, params?: Record<string, string | number>): string {

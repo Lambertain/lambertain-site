@@ -8,6 +8,7 @@ import { AddresseeBadge } from "./addressee-badge";
 import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import type { AddresseeKey } from "@/lib/task-addressee";
 import { t, type Locale } from "@/lib/i18n";
+import { dayColor, type StatusDot } from "@/lib/status-timer";
 import { ui } from "../ui-styles";
 
 export type BoardTask = {
@@ -29,7 +30,47 @@ export type BoardTask = {
   clientAction?: string | null; // ждёт действия клиента
   deployStage?: string | null; // pr → dev → prod (деплой-стадия, простыми словами для клиента)
   addressee?: AddresseeKey | null; // кому адресована (бейдж для команды; null — не показывать)
+  statusRows?: StatusDot[][]; // кружки «дней в статусе» по строкам (внутренний вид); undefined — не показывать
 };
+
+const DOT_COLOR: Record<"green" | "amber" | "red", string> = { green: "#3fb950", amber: "#e8b339", red: "#ff5b5b" };
+const DATE_LOC: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
+
+/** Ряды кружков-счётчиков «дней в статусе». Цвет по числу дней; при наведении — бабл со статусом. */
+function StatusDots({ rows, locale }: { rows: StatusDot[][]; locale: Locale }) {
+  const [hover, setHover] = useState<string | null>(null);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {rows.map((row, ri) => (
+        <div key={ri} style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {row.map((d, ci) => {
+            const key = `${ri}-${ci}`;
+            return (
+              <span
+                key={key}
+                style={{ position: "relative", display: "inline-flex" }}
+                onMouseEnter={() => setHover(key)}
+                onMouseLeave={() => setHover((h) => (h === key ? null : h))}
+              >
+                <span
+                  aria-label={`${d.status}: ${d.days}`}
+                  style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, padding: "0 5px", borderRadius: 999, background: DOT_COLOR[dayColor(d.days)], color: "#000", fontSize: 12, fontWeight: 700 }}
+                >
+                  {d.days}
+                </span>
+                {hover === key && (
+                  <span style={{ position: "absolute", bottom: "calc(100% + 6px)", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "var(--surface-2)", border: "1px solid var(--border-2)", padding: "4px 8px", borderRadius: 4, fontSize: 12, color: "var(--text)", zIndex: 30, pointerEvents: "none", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
+                    {d.status} · {t(locale, "card.daysN", { n: d.days })}
+                  </span>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type Proj = { key: string; name: string; hasNew?: boolean };
 
@@ -143,7 +184,18 @@ function Row({
       <div style={{ display: "flex", gap: 14, ...ui.monoLabel, textTransform: "none", marginTop: 8, flexWrap: "wrap" }}>
         {task.assignee && <span>→ {task.assignee}</span>}
         <span>{t(locale, "task.comments")}: {task.commentCount ?? 0}</span>
+        {task.created && (
+          <span>{t(locale, "card.created", { date: new Date(task.created).toLocaleString(DATE_LOC[locale], { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) })}</span>
+        )}
       </div>
+
+      {/* Кружки «днів у статусі» (по 24 год): зелений 1 / жовтий 2 / червоний ≥3. Зміна статусу — новий кружок,
+          повернення в статус — новий рядок. Бабл при наведенні. Тільки внутрішній вид (statusRows задано на сервері). */}
+      {task.statusRows && task.statusRows.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <StatusDots rows={task.statusRows} locale={locale} />
+        </div>
+      )}
 
       {task.blocked && task.blockers && task.blockers.length > 0 && (
         <div style={{ ...ui.monoLabel, textTransform: "none", color: "#ff5b5b", marginTop: 8 }}>
