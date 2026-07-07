@@ -88,7 +88,11 @@ export function ChatModal({ projects, locale, isContributor, isAdmin, feedbackKe
               )}
             </div>
           ) : (
-            <ChatIntake projects={projects} locale={locale} fill isContributor={isContributor} isAdmin={isAdmin} feedbackKey={feedbackKey} lockedProject={formProject ?? undefined} onCreated={handleCreated} />
+            // DEV-45: всё под верхней панелькой (с крестиком) — единый скролл-контейнер, чтобы форму можно
+            // было прокрутить до кнопки «створити» (в т.ч. когда клавиатура сжимает экран на мобильном).
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+              <ChatIntake projects={projects} locale={locale} fill isContributor={isContributor} isAdmin={isAdmin} feedbackKey={feedbackKey} lockedProject={formProject ?? undefined} onCreated={handleCreated} />
+            </div>
           )}
         </div>
       )}

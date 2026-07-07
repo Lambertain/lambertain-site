@@ -118,7 +118,7 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: fill ? "100%" : "calc(100dvh - 200px)", minHeight: 0, flex: fill ? 1 : undefined, marginTop: fill ? 0 : 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: fill ? "auto" : "calc(100dvh - 200px)", minHeight: fill ? undefined : 0, marginTop: fill ? 0 : 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
       {/* проект */}
       <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={ui.monoLabel}>{t(locale, "field.project")}:</span>

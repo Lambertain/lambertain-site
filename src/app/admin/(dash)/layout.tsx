@@ -13,6 +13,17 @@ import { NotificationBell } from "./notification-bell";
 import { AutoRefresh } from "./auto-refresh";
 import { listUnreadNotifications, listProjectsWithMeta } from "@/lib/db";
 import { ui } from "../ui-styles";
+import type { Viewport } from "next";
+
+// DEV-45: на мобільному (TMA-webview) клавіатура за замовчуванням НАКРИВАЄ низ екрана, тож нижня панель
+// форми створення задачі з кнопкою «створити» ховається за клавіатурою — клієнту доводилось закривати
+// клавіатуру, щоб її натиснути. interactive-widget=resizes-content змушує клавіатуру СТИСКАТИ контент
+// (layout viewport зменшується), тож модалка й кнопка лишаються над клавіатурою й видимі.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
+};
 
 const NAV: Record<Role, { href: string; key: string }[]> = {
   admin: [
