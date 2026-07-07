@@ -1,5 +1,6 @@
 import type { Task } from "@/lib/tasks/types";
 import { t, type Locale } from "@/lib/i18n";
+import { CopySlug } from "./copy-slug";
 import { ui } from "../ui-styles";
 
 const DATE_LOC: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-US" };
@@ -26,7 +27,7 @@ export function TaskCard({ task, locale, unread, hideWorkers }: { task: Task; lo
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
         {unread && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />}
-        <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>
+        <CopySlug id={task.id} locale={locale} />
         {task.state && <span style={ui.monoLabel}>{task.state}</span>}
         {task.priority && <span style={ui.monoLabel}>· {task.priority}</span>}
         {isStale && (

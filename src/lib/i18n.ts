@@ -729,6 +729,8 @@ export const DICT: Record<string, Entry> = {
   "card.updated": { uk: "оновл. {date}", ru: "обновл. {date}", en: "upd. {date}" },
   "card.created": { uk: "поставл. {date}", ru: "поставл. {date}", en: "set {date}" },
   "card.daysN": { uk: "{n} дн.", ru: "{n} дн.", en: "{n}d" },
+  "slug.copy": { uk: "Скопіювати слаг", ru: "Скопировать слаг", en: "Copy slug" },
+  "slug.copied": { uk: "скопійовано", ru: "скопировано", en: "copied" },
 };
 
 export function t(locale: Locale, key: string, params?: Record<string, string | number>): string {

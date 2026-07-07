@@ -20,6 +20,7 @@ import { TaskEdit } from "./task-edit";
 import { MoveTask } from "./move-task";
 import { CreateProjectFromTask } from "./create-project-from-task";
 import { StatusPicker } from "./status-picker";
+import { CopySlug } from "../../copy-slug";
 import { BackButton } from "./back-button";
 import { ScrollTop } from "./scroll-top";
 import { ReporterHover } from "./reporter-hover";
@@ -150,13 +151,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <span>›</span>
           <Link href={projectBoardHref} style={{ color: "var(--accent)", textDecoration: "none" }}>{projectName}</Link>
           <span>›</span>
-          <span style={{ color: "var(--text)" }}>{task.id}</span>
+          <CopySlug id={task.id} locale={locale} color="var(--text)" />
         </div>
       )}
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
         {/* Слаг: команде он уже в хлебных крошках выше (не дублируем); клиенту крошек нет — показываем здесь. */}
-        {me.role === "client" && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{task.id}</span>}
+        {me.role === "client" && <CopySlug id={task.id} locale={locale} />}
         {/* Смена статуса прямо тут — админ/разработчик (не клиент); иначе просто текст статуса. */}
         {task.state && canEditStatus ? (
           <StatusPicker taskId={task.id} status={task.state} locale={locale} />

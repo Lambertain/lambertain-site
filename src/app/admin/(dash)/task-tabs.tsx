@@ -9,6 +9,7 @@ import { STATUSES, statusColor, statusBucket, BUCKET_ORDER, BUCKET_LABEL, type B
 import type { AddresseeKey } from "@/lib/task-addressee";
 import { t, type Locale } from "@/lib/i18n";
 import { dayColor, type StatusDot } from "@/lib/status-timer";
+import { CopySlug } from "./copy-slug";
 import { ui } from "../ui-styles";
 
 export type BoardTask = {
@@ -140,14 +141,11 @@ function Row({
             </div>
           )}
         </div>
-        {/* слаг задачи (HH-62) — виден во всех табах, не только при открытии */}
-        <span style={{ ...ui.monoLabel, color: "var(--accent)", flexShrink: 0, alignSelf: "center" }}>{task.id}</span>
+        {/* слаг задачи (HH-62) — виден во всех табах; клик копирует слаг в буфер */}
+        <CopySlug id={task.id} locale={locale} style={{ flexShrink: 0, alignSelf: "center" }} />
         <AddresseeBadge addressee={task.addressee} locale={locale} />
         <DeployBadge stage={task.deployStage} locale={locale} />
-        {/* DEV-11: название ВСЕГДА открывает задачу (без авто-смены статуса). Статус разраб ставит вручную, Клод — через API. */}
-        <a href={`/admin/tasks/${task.id}`} title={mode === "start" ? t(locale, "tab.openHint") : undefined} style={{ flex: 1, color: "var(--text)", fontSize: 15, fontWeight: 600, textDecoration: "none" }}>
-          {task.summary}
-        </a>
+        <span style={{ flex: 1 }} />
         <TaskBadge newComments={task.newComments} isNew={task.isNew} />
         {canDelete && (
           <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }}>
@@ -155,6 +153,13 @@ function Row({
           </button>
         )}
       </div>
+
+      {/* DEV-11: название ВСЕГДА открывает задачу. Заголовок — отдельной строкой на всю ширину карточки
+          (не в flex-шапке): раньше при малом числе бейджей он делил строку з ними й сжимался в узкую колонку,
+          а при большом — переносился на всю ширину. Теперь всегда полная ширина. */}
+      <a href={`/admin/tasks/${task.id}`} title={mode === "start" ? t(locale, "tab.openHint") : undefined} style={{ display: "block", marginTop: 8, color: "var(--text)", fontSize: 15, fontWeight: 600, textDecoration: "none" }}>
+        {task.summary}
+      </a>
 
       {reviewRef !== null && (
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
