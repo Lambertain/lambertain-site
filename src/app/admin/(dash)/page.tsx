@@ -166,12 +166,19 @@ export default async function HomePage() {
   // Счётчики задач по корзинам + новые для проекта (из доски).
   const projCounts = (k: string) => {
     const c: Record<string, number> = { inProgress: 0, review: 0, rework: 0, done: 0, notStarted: 0, blocked: 0 };
-    let nw = 0;
     for (const b of board) {
       if (b.projectKey !== k) continue;
       c[b.blocked ? "blocked" : statusBucket(b.status)]++;
-      // NEW на проекте — кол-во НОВЫХ задач (ещё не открытых), среди активных (Done не считаем).
-      if (b.isNew && statusBucket(b.status) !== "done") nw++;
+    }
+    // DEV-49: NEW на проекте — активность (нова задача АБО новий коментар) позже последнего ОТКРИТТЯ ПРОЕКТУ,
+    // серед активних (Done не рахуємо). Раніше рахувалось по per-task reads (created > lastRead), тож плашка
+    // «N NEW» не знімалась при відкритті проекту — лише коли відкриєш КОЖНУ задачу окремо (звідси «все переглянуто,
+    // а плашка висить»). Тепер консистентно з hasNew: скидається відкриттям проекту (markProjectOpened → projectSeen).
+    const seen = projectSeen.get(k) ?? 0;
+    let nw = 0;
+    for (const tk of filtered) {
+      if (tk.projectKey !== k || statusBucket(tk.state) === "done") continue;
+      if (Math.max(tk.created ?? 0, tk.lastCommentAt ?? 0) > seen) nw++;
     }
     return { counts: c as Record<Bucket, number>, newCount: nw };
   };
