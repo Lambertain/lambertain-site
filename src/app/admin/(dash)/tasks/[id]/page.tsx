@@ -96,9 +96,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   // client_nodev — комменты супер-админа клиенту МИМО разработчика: контрибьютору (разработчику) их не показываем (server-side).
   const visibleComments = me.role === "contributor" ? comments.filter((c) => c.visibility !== "client_nodev") : comments;
   const lastOtherCreated = visibleComments.reduce((max, c) => (myLogin && c.author.login !== myLogin ? Math.max(max, c.created) : max), 0);
-  // Итог разраба ещё на модерации (клиент-facing коммент approved=false): результат клиенту НЕ показан.
-  // Пока так — клиент-постановщик НЕ должен видеть блок приёмки (разраб ставит Review сразу, но итог ждёт апрува).
-  const pendingClientResult = comments.some((c) => c.visibility === "client" && c.approved === false);
+  // Итог разраба ещё на модерации (клиент-facing коммент approved=false): результат клиенту НЕ показан,
+  // клиент-постановщик НЕ должен видеть блок приёмки (разраб ставит Review сразу, но итог ждёт апрува).
+  // НО прячем только если неодобренный итог — ПОСЛЕДНЕЕ слово агентства: если после него уже вышел
+  // одобренный client-коммент (новый итог/публикация), результат клиенту показан — старый застрявший
+  // на модерации коммент не должен вечно блокировать приёмку (иначе кнопок «Готово/На доработку» нет навсегда).
+  const lastApprovedClientAt = comments.reduce((max, c) => (c.visibility === "client" && c.approved !== false ? Math.max(max, c.created) : max), 0);
+  const pendingClientResult = comments.some((c) => c.visibility === "client" && c.approved === false && c.created > lastApprovedClientAt);
   const viewComments: ViewComment[] = visibleComments.map((c) => ({
     id: c.id,
     text: c.text,
