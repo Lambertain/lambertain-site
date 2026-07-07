@@ -62,17 +62,22 @@ export async function POST(req: Request) {
         // клиентского деплоя). Фоном (after) — не блокируем ответ дев-Клоду; «Виконано» клиенту — ПОСЛЕ доставки.
         // gitflow-режим (meta.gitflowDelivery): доставляем feature-ветку разработчика как PR в develop клиента.
         // Иначе — legacy squash-доставка (meta.autoDeliver). Режимы взаимоисключающие.
+        // DEV-46: summary клиенту — в finally, чтобы уходил ГАРАНТИРОВАННО даже если доставка бросила/зависла
+        // (иначе summary молча терялся, а клиент не получал итог). Доставка не блокирует итог необратимо.
+        const autoDeliverPath = !!((proj?.meta?.gitflowDelivery && branch) || proj?.meta?.autoDeliver);
         if (proj?.meta?.gitflowDelivery && branch) {
           const meta = proj.meta;
-          after(async () => { await deliverGitflowAndNotify(projectKey, meta, branch, taskId); await notifyClientDone(); });
+          after(async () => { try { await deliverGitflowAndNotify(projectKey, meta, branch, taskId); } finally { await notifyClientDone(); } });
         } else if (proj?.meta?.autoDeliver) {
           const meta = proj.meta;
-          after(async () => { await autoDeliverAndNotify(projectKey, meta, taskId); await notifyClientDone(); });
+          after(async () => { try { await autoDeliverAndNotify(projectKey, meta, taskId); } finally { await notifyClientDone(); } });
         } else {
           // Нет авто-доставки (доставка вручную) — сообщаем клиенту сразу, как раньше.
           await notifyClientDone();
         }
-        return NextResponse.json({ ok: true, status: "Done", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : (proj?.meta?.autoDeliver ? "squash" : "none") });
+        // summaryDelivery — явный сигнал разработчику (DEV-46 п.4): summary уходит клиенту ПОСЛЕ доставки
+        // (async, до пары минут на апрув деплоя) либо уже отправлен синхронно; "none" — summary не передан.
+        return NextResponse.json({ ok: true, status: "Done", delivery: proj?.meta?.gitflowDelivery && branch ? "gitflow" : (proj?.meta?.autoDeliver ? "squash" : "none"), summaryDelivery: !summary ? "none" : autoDeliverPath ? "after-delivery" : "sent" });
       }
       // Иначе — Ревью + информируем постановщика/клиента, что нужно принять или вернуть.
       await be.updateStatus(taskId, "Review", { actorRole: "contributor", trigger: "розробник здав на ревʼю" });
@@ -91,7 +96,8 @@ export async function POST(req: Request) {
         await submitForModeration(taskId, `✅ <b>Готово до перевірки:</b>\n\n${summary}\n\n— — —\nℹ️ Перевірте результат і прийміть («Готово») або поверніть на доопрацювання у задачі на порталі.`, { taskSummary: task.summary, devAuthored: true });
       };
       if (clientAutoPublish && meta) {
-        after(async () => { await autoDeliverAndNotify(projectKey, meta, taskId); await postReviewSummary(); });
+        // DEV-46: summary — в finally, чтобы уходил ГАРАНТИРОВАННО даже если доставка бросила/зависла.
+        after(async () => { try { await autoDeliverAndNotify(projectKey, meta, taskId); } finally { await postReviewSummary(); } });
       } else {
         await postReviewSummary();
         // gitflow-доставка и на ручной приёмке (проект без autoApprove): открываем PR в develop из ветки разработчика.
@@ -101,7 +107,9 @@ export async function POST(req: Request) {
       if (task.reporter?.login && task.reporter.role !== "client" && task.reporter.role !== "employee") {
         await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(taskId)}: ${task.summary}${summary ? `\n\n${summary.slice(0, 400)}` : ""}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }).catch(() => {});
       }
-      return NextResponse.json({ ok: true, status: "Review", delivery: clientAutoPublish ? "squash" : (meta?.gitflowDelivery && branch ? "gitflow" : "none") });
+      // summaryDelivery (DEV-46 п.4): "after-delivery" — summary опубликуется клиенту после автопубликации
+      // (async, до пары хвилин); "sent" — уже опубликован синхронно; "none" — summary не передан.
+      return NextResponse.json({ ok: true, status: "Review", delivery: clientAutoPublish ? "squash" : (meta?.gitflowDelivery && branch ? "gitflow" : "none"), summaryDelivery: !summary ? "none" : clientAutoPublish ? "after-delivery" : "sent" });
     }
     await be.updateStatus(taskId, status, { actorRole: "contributor", trigger: status === "In Progress" ? "розробник взяв у роботу" : undefined });
     after(() => syncTaskToTrello(taskId, status)); // Trello: карточку под новый статус (напр. «В процесі»)
