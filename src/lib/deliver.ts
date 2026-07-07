@@ -66,7 +66,11 @@ function clientSkip(path: string): boolean {
     p === "esc.json" ||
     /(^|\/)\.lambertain(\/|$)/.test(p) ||
     /(^|\/)claude\.local\.md$/.test(p) ||
-    /(^|\/)\.env(\.|$)/.test(p)
+    /(^|\/)\.env(\.|$)/.test(p) ||
+    // GitHub API-токен без scope `workflow` НЕ може створювати/змінювати файли в .github/workflows/ —
+    // на git/trees це віддає 404 Not Found (а не 403), і вся доставка стабільно падає, якщо dev-репо має
+    // CI-workflow. Dev-CI Lambertain клієнту не потрібен (у нього свій деплой) → не доставляємо ці файли.
+    /(^|\/)\.github\/workflows\//.test(p)
   );
 }
 /** Файл санируем (вырезаем протокол-блок Lambertain), прежде чем отдать клиенту. */
