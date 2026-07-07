@@ -5,7 +5,7 @@ import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny, makeCommentClientVisible } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue, reopenDeployStage } from "@/lib/db";
+import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, setReporterAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue, reopenDeployStage } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
@@ -108,6 +108,11 @@ export async function addTaskComment(
         // DEV-39: возврат опубликованной (prod) задачи в работу → сброс стадии, чтобы повторная доставка снова
         // уведомила клиента «Опубліковано». Self-guarded (сработает только при стадии prod). Только на реальном возврате.
         if (clientSide) await reopenDeployStage(id, { actorRole: "system", trigger: "клієнт написав нові правки по опублікованій задачі" }).catch(() => {});
+      }
+      // DEV-48: постановщик ответил на вопрос разработчика → снимаем маркер «ждёт ответа постановщика»
+      // (плашку + мини-секцию). Статус не трогаем здесь (он и не менялся при escalate admin).
+      if (meIsReporter && t.reporterAction && visibility !== "client_nodev") {
+        await setReporterAction(id, null).catch(() => {});
       }
     } catch { /* best-effort */ }
     // Уведомления (best-effort): адресно по ролям + картинки задачи.

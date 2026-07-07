@@ -28,6 +28,8 @@ export type BoardTask = {
   blocked?: boolean;
   blockers?: { id: string; summary: string }[];
   ownerAction?: string | null; // ждёт ops-шага агентства (владельца)
+  reporterAction?: string | null; // DEV-48: ждёт ответа постановщика (вопрос разработчика)
+  awaitingMyAnswer?: boolean; // reporterAction И смотрящий = постановщик → показать в мини-секции «ждут вашего ответа»
   clientAction?: string | null; // ждёт действия клиента
   deployStage?: string | null; // pr → dev → prod (деплой-стадия, простыми словами для клиента)
   addressee?: AddresseeKey | null; // кому адресована (бейдж для команды; null — не показывать)
@@ -218,6 +220,13 @@ function Row({
           ⏳ {t(locale, "block.client")}: {String(task.clientAction).slice(0, 80)}
         </div>
       )}
+      {/* DEV-48: вопрос разработчика ПОСТАНОВЩИКУ. Яркая плашка — постановщику особенно (awaitingMyAnswer),
+          остальным — просто индикатор «ждёт ответа постановщика». */}
+      {task.reporterAction && (
+        <div style={{ ...ui.monoLabel, textTransform: "none", marginTop: 8, color: task.awaitingMyAnswer ? "#000" : "#e8b339", background: task.awaitingMyAnswer ? "var(--accent)" : "transparent", padding: task.awaitingMyAnswer ? "3px 8px" : 0, borderRadius: 3, fontWeight: task.awaitingMyAnswer ? 700 : 400, display: "inline-block" }}>
+          ❓ {t(locale, task.awaitingMyAnswer ? "reporter.forYou" : "reporter.wait")}: {String(task.reporterAction).slice(0, 80)}
+        </div>
+      )}
     </div>
   );
 }
@@ -367,6 +376,9 @@ export function TaskTabs({
   const [bucket, setBucket] = useState<Bucket | null>(initialBucket ?? null);
   const activeBucket = bucket ?? defaultBucket;
   const rows = byBucket[activeBucket];
+  // DEV-48: задачи, где разработчик задал вопрос ИМЕННО СМОТРЯЩЕМУ-постановщику — в мини-секцию вверху доски
+  // (persistent, не зависит от активного таба), чтобы постановщик точно увидел и не искал в табе Blocked.
+  const awaitingMine = projTasks.filter((tk) => tk.awaitingMyAnswer);
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -416,6 +428,19 @@ export function TaskTabs({
       {feedbackKey && activeProject === feedbackKey && (
         <div style={{ ...ui.card, padding: 14, marginBottom: 12, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)" }}>
           <p style={{ fontSize: 14, lineHeight: 1.6 }}>{t(locale, "feedback.intro")}</p>
+        </div>
+      )}
+
+      {/* DEV-48: мини-секция «Очікують вашої відповіді» — вверху, над табами. Постановщик видит вопросы
+          разработчика сразу, независимо от активного таба (не прячутся в Blocked). */}
+      {awaitingMine.length > 0 && (
+        <div style={{ ...ui.card, padding: 12, marginBottom: 12, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)" }}>
+          <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 8 }}>❓ {t(locale, "reporter.section")} · {awaitingMine.length}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {awaitingMine.map((tk) => (
+              <Row key={`aw-${tk.id}`} task={tk} locale={locale} canEditStatus={canEditStatus} canDelete={canDelete} mode="open" />
+            ))}
+          </div>
         </div>
       )}
 

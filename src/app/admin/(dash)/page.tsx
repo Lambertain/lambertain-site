@@ -138,6 +138,8 @@ export default async function HomePage() {
       blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
       // Клиенту ops-шаг агентства (ownerAction) не показываем; его собственное действие (clientAction) — показываем.
       ownerAction: me.role === "client" ? null : tk.ownerAction,
+      reporterAction: tk.reporterAction,
+      awaitingMyAnswer: !!tk.reporterAction && !!me.youtrackLogin && tk.reporter?.login === me.youtrackLogin,
       clientAction: tk.clientAction,
       deployStage: tk.deployStage,
     };

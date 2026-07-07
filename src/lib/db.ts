@@ -1024,6 +1024,11 @@ export async function claimTaskForTriage(readableId: string): Promise<boolean> {
 export async function setOwnerAction(readableId: string, action: string | null): Promise<void> {
   await q("UPDATE tasks SET owner_action = $2, updated_at = now() WHERE readable_id = $1", [readableId, action]);
 }
+/** DEV-48: «ждёт ответа постановщика» — вопрос разработчика (escalate admin). Статус не меняем; это маркер
+ *  на первом табе + мини-секция постановщику. null = снять (постановщик ответил). */
+export async function setReporterAction(readableId: string, action: string | null): Promise<void> {
+  await q("UPDATE tasks SET reporter_action = $2, updated_at = now() WHERE readable_id = $1", [readableId, action]);
+}
 /** «Нужно действие клиента» (зарегистрировать сервис/дать доступ) + id гайда-инструкции. null = снять. */
 export async function setClientAction(readableId: string, action: string | null, guideId: number | null = null, field: string | null = null): Promise<void> {
   await q("UPDATE tasks SET client_action = $2, client_action_guide = $3, client_action_field = $4, updated_at = now() WHERE readable_id = $1", [readableId, action, guideId, field]);

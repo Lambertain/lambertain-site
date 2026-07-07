@@ -83,6 +83,10 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS auto_done BOOLEAN NOT NULL DEFAULT fa
 -- Действие владельца: задача требует ручного ops-шага только владельца (деплой/регистрация/токен) — передаётся
 -- супер-админу «на доработку». Клиент видит «в работе» (status не меняется); это внутренний флаг.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS owner_action TEXT;
+-- DEV-48: вопрос разработчика ПОСТАНОВЩИКУ (escalate admin). Задача НЕ уходит в Blocked (иначе постановщик
+-- не заглянет в тот таб) — статус не меняется, остаётся на первом табе; это маркер-плашка + мини-секция
+-- «Очікують вашої відповіді» вверху доски. Снимается ответом постановщика (коммент).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reporter_action TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_action_guide INT;
 -- Целевое поле каталога (project-fields) для client_action, формат "fieldKey.subKey" (напр. "aiKeys.anthropic"):

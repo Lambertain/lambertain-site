@@ -6,7 +6,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse } from "next/server";
-import { getProjectKeyByToken, logTaskEvent } from "@/lib/db";
+import { getProjectKeyByToken, logTaskEvent, setReporterAction } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
@@ -47,6 +47,10 @@ export async function POST(req: Request) {
       // Постановщик-член (напр. админ Настя) получает уведомление; иначе — супер-админ (Никита).
       const body = `🔧 Вопрос разработчика (нужно решение):\n\n${question}`;
       await be.addComment(taskId, body, "internal", undefined, true, true);
+      // DEV-48: маркер «ждёт ответа постановщика» — НЕ меняем статус (иначе уходит в Blocked, куда постановщик
+      // не заглянет). Задача остаётся на первом табе; на доске — плашка + мини-секция постановщику. Снимется
+      // ответом постановщика (коммент). Снимаем плашку через 80 симв., полный вопрос — в комменте выше.
+      await setReporterAction(taskId, question).catch(() => {});
       await logTaskEvent(taskId, { type: "escalation", actorRole: "contributor", trigger: "escalate(admin)", details: { kind: "admin", question: question.slice(0, 300) } });
       const msg = `🔧 <b>Вопрос разработчика</b> · ${await taskTag(taskId)}: ${task.summary}\n${question.slice(0, 400)}`;
       if (task.reporter?.login) await notifyLogins([task.reporter.login], msg, [], openBtn);

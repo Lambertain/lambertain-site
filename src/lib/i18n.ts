@@ -612,6 +612,9 @@ export const DICT: Record<string, Entry> = {
   "deploy.hint.prod": { uk: "Зміни вже на робочому (живому) сайті.", ru: "Изменения уже на рабочем (живом) сайте.", en: "Changes are live on the production site." },
   "block.owner": { uk: "Чекає на агентство", ru: "Ждёт агентство", en: "Waiting on agency" },
   "block.client": { uk: "Чекає на клієнта", ru: "Ждёт клиента", en: "Waiting on client" },
+  "reporter.wait": { uk: "Чекає відповіді постановника", ru: "Ждёт ответа постановщика", en: "Waiting on reporter" },
+  "reporter.forYou": { uk: "Питання вам", ru: "Вопрос вам", en: "Question for you" },
+  "reporter.section": { uk: "Очікують вашої відповіді", ru: "Ждут вашего ответа", en: "Awaiting your answer" },
 
   // — дашборд загрузки разработчиков —
   "dash.kicker": { uk: "Завантаженість команди", ru: "Загрузка команды", en: "Team workload" },
