@@ -12,8 +12,9 @@
  * HEAD → 200 (Trello проверяет доступность callbackURL при создании).
  */
 import { NextResponse } from "next/server";
-import { q, getProjectFull, projectReporterLogin } from "@/lib/db";
+import { q, getProjectFull, projectReporterLogin, reopenDeployStage } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
+import { statusBucket } from "@/lib/statuses";
 import { trelloCfg, trelloMemberId } from "@/lib/trello";
 import { notifyLogins, notifyAdmin, taskTag } from "@/lib/notify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
@@ -75,6 +76,19 @@ export async function POST(req: Request) {
 
   const be = getBackend();
   await be.addComment(task.readable_id, text, "client", clientLogin || undefined, true, false).catch(() => {});
+
+  // DEV-44: симетрія з порталом. Коментар клієнта по задачі в Review/Blocked повертає її в роботу
+  // (у Review коментар = потрібні правки; приймання «все ок» — кнопкою «Готово»). Done не чіпаємо —
+  // прийнята задача закрита остаточно (коментар-подяка/питання її не воскрешає). Раніше цей поворот
+  // працював лише через портал/TMA, а той самий коментар у Trello статус не міняв — усунено.
+  try {
+    const full = await be.getTask(task.readable_id);
+    const bucket = statusBucket(full.state);
+    if (bucket === "review" || bucket === "blocked") {
+      await be.updateStatus(task.readable_id, "In Progress", { actorRole: "client", trigger: "клієнт написав коментар у Trello — повернуто в роботу" });
+      await reopenDeployStage(task.readable_id, { actorRole: "system", trigger: "клієнт написав нові правки (Trello) по опублікованій задачі" }).catch(() => {});
+    }
+  } catch { /* best-effort — коментар уже додано */ }
 
   // Клиент написал (в Trello) → ответственному разработчику проекта. Админа (Никиту) НЕ шумим, если разработчик
   // есть — коммент клиента ведёт разраб. Админу пушим ТОЛЬКО когда разработчика в проекте нет.
