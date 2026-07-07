@@ -76,12 +76,14 @@ export async function POST(req: Request) {
   const be = getBackend();
   await be.addComment(task.readable_id, text, "client", clientLogin || undefined, true, false).catch(() => {});
 
-  // Уведомляем ответственного разработчика + супер-админа: клиент написал (в Trello).
+  // Клиент написал (в Trello) → ответственному разработчику проекта. Админа (Никиту) НЕ шумим, если разработчик
+  // есть — коммент клиента ведёт разраб. Админу пушим ТОЛЬКО когда разработчика в проекте нет.
   const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${task.readable_id}` };
   const who = action.memberCreator?.fullName || action.memberCreator?.username || "клієнт";
   const tag = await taskTag(task.readable_id).catch(() => task.readable_id);
-  if (task.assignee_login) await notifyLogins([task.assignee_login], `💬 <b>Клієнт (Trello)</b> · ${tag}\n${text.slice(0, 400)}`, [], link).catch(() => {});
-  await notifyAdmin(`💬 <b>Коммент клієнта в Trello</b> · ${tag} (${who})\n${text.slice(0, 400)}`, link).catch(() => {});
+  const dev = task.assignee_login || proj?.meta.defaultAssignee || null;
+  if (dev) await notifyLogins([dev], `💬 <b>Клієнт (Trello)</b> · ${tag}\n${text.slice(0, 400)}`, [], link).catch(() => {});
+  else await notifyAdmin(`💬 <b>Коммент клієнта в Trello</b> · ${tag} (${who})\n${text.slice(0, 400)}`, link).catch(() => {});
 
   return NextResponse.json({ ok: true, taskId: task.readable_id });
 }

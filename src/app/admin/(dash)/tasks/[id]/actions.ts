@@ -114,14 +114,21 @@ export async function addTaskComment(
     try {
       const task = await getBackend().getTask(id);
       const imgs = attachmentIdsIn(body, task.description);
-      const projName = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey)?.name || task.projectKey;
+      const project = (await getBackend().listProjects().catch(() => [])).find((p) => p.key === task.projectKey);
+      const projName = project?.name || task.projectKey;
       const openBtn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${id}` };
       // me.tgId — автор: ему не шлём пуш о СВОЁМ комменте (ни одним из каналов).
       const authorTg = me.tgId;
       if (clientSide) {
-        // Клиент (или сотрудник-как-клиент) написал → ответственному разработчику + админу.
-        await notifyLogins(task.assignee?.login ? [task.assignee.login] : [], `💬 <b>Клиент</b> · ${projName} · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn, authorTg);
-        await notifyAdmin(`💬 <b>Вопрос клиента</b> · ${projName} · ${id}: ${task.summary}`, openBtn, authorTg);
+        // Клиент (или сотрудник-как-клиент) написал → ответственному разработчику проекта.
+        // Админа (Никиту) НЕ шумим, если разработчик есть — коммент клиента ведёт разраб. Админу пушим ТОЛЬКО
+        // когда разработчика в проекте нет (assignee и defaultAssignee пусты) — иначе коммент клиента никто не увидит.
+        const dev = task.assignee?.login || project?.meta.defaultAssignee || null;
+        if (dev) {
+          await notifyLogins([dev], `💬 <b>Клиент</b> · ${projName} · ${id}: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn, authorTg);
+        } else {
+          await notifyAdmin(`💬 <b>Вопрос клиента</b> · ${projName} · ${id}: ${task.summary}`, openBtn, authorTg);
+        }
       } else if (visibility === "client" || visibility === "client_nodev") {
         // Команда/супер-админ ответили клиенту → клиенту/сотруднику проекта (client_nodev — тоже клиенту, но разработчику НЕ шлём).
         await notifyProjectClients(task.projectKey, `💬 <b>${projName} · ${id}</b>: ${task.summary}\n${body.slice(0, 400)}`, imgs, openBtn, authorTg);
