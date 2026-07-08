@@ -141,6 +141,9 @@ export default async function HomePage() {
       reporterAction: tk.reporterAction,
       awaitingMyAnswer: !!tk.reporterAction && !!me.youtrackLogin && tk.reporter?.login === me.youtrackLogin,
       clientAction: tk.clientAction,
+      // DEV-42: клиенту нужно действие — задача готова к приёмке (review), либо ждёт его ответа/регистрации
+      // (clientAction) либо вопрос-эскалация (blocked). Для мини-секции «Потребує вашої дії» вверху доски.
+      clientAttention: me.role === "client" && (statusBucket(tk.state) === "review" || !!tk.clientAction || statusBucket(tk.state) === "blocked"),
       deployStage: tk.deployStage,
     };
   });

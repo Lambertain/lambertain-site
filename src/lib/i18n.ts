@@ -615,6 +615,7 @@ export const DICT: Record<string, Entry> = {
   "reporter.wait": { uk: "Чекає відповіді постановника", ru: "Ждёт ответа постановщика", en: "Waiting on reporter" },
   "reporter.forYou": { uk: "Питання вам", ru: "Вопрос вам", en: "Question for you" },
   "reporter.section": { uk: "Очікують вашої відповіді", ru: "Ждут вашего ответа", en: "Awaiting your answer" },
+  "attention.section": { uk: "Потребує вашої дії", ru: "Требует вашего действия", en: "Needs your action" },
 
   // — дашборд загрузки разработчиков —
   "dash.kicker": { uk: "Завантаженість команди", ru: "Загрузка команды", en: "Team workload" },

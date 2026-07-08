@@ -30,6 +30,7 @@ export type BoardTask = {
   ownerAction?: string | null; // ждёт ops-шага агентства (владельца)
   reporterAction?: string | null; // DEV-48: ждёт ответа постановщика (вопрос разработчика)
   awaitingMyAnswer?: boolean; // reporterAction И смотрящий = постановщик → показать в мини-секции «ждут вашего ответа»
+  clientAttention?: boolean; // DEV-42: клиенту нужно действие — готово к приёмке (review) ИЛИ вопрос/регистрация (clientAction/blocked)
   clientAction?: string | null; // ждёт действия клиента
   deployStage?: string | null; // pr → dev → prod (деплой-стадия, простыми словами для клиента)
   addressee?: AddresseeKey | null; // кому адресована (бейдж для команды; null — не показывать)
@@ -381,9 +382,11 @@ export function TaskTabs({
   const [bucket, setBucket] = useState<Bucket | null>(initialBucket ?? null);
   const activeBucket = bucket ?? defaultBucket;
   const rows = byBucket[activeBucket];
-  // DEV-48: задачи, где разработчик задал вопрос ИМЕННО СМОТРЯЩЕМУ-постановщику — в мини-секцию вверху доски
-  // (persistent, не зависит от активного таба), чтобы постановщик точно увидел и не искал в табе Blocked.
-  const awaitingMine = projTasks.filter((tk) => tk.awaitingMyAnswer);
+  // Мини-секция «Потребує вашої дії» вверху доски (persistent, не зависит от активного таба):
+  // DEV-48 — вопрос разработчика постановщику (awaitingMyAnswer); DEV-42 — клиенту нужно действие
+  // (готово к приёмке / вопрос / регистрация, clientAttention). Так постановщик/клиент сразу видят,
+  // что от них ждут, не теряя при этом полный обзор задач в табах ниже.
+  const attentionItems = projTasks.filter((tk) => tk.awaitingMyAnswer || tk.clientAttention);
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -436,14 +439,14 @@ export function TaskTabs({
         </div>
       )}
 
-      {/* DEV-48: мини-секция «Очікують вашої відповіді» — вверху, над табами. Постановщик видит вопросы
-          разработчика сразу, независимо от активного таба (не прячутся в Blocked). */}
-      {awaitingMine.length > 0 && (
+      {/* Мини-секция «Потребує вашої дії» — вверху, над табами (DEV-48 постановщику + DEV-42 клиенту).
+          Требующие внимания задачи всегда на виду, но полный список задач в табах ниже сохраняется. */}
+      {attentionItems.length > 0 && (
         <div style={{ ...ui.card, padding: 12, marginBottom: 12, borderColor: "var(--accent-line)", background: "rgba(185,255,75,0.06)" }}>
-          <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 8 }}>❓ {t(locale, "reporter.section")} · {awaitingMine.length}</div>
+          <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 8 }}>❗ {t(locale, "attention.section")} · {attentionItems.length}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {awaitingMine.map((tk) => (
-              <Row key={`aw-${tk.id}`} task={tk} locale={locale} canEditStatus={canEditStatus} canDelete={canDelete} mode="open" />
+            {attentionItems.map((tk) => (
+              <Row key={`att-${tk.id}`} task={tk} locale={locale} canEditStatus={canEditStatus} canDelete={canDelete} mode="open" />
             ))}
           </div>
         </div>
