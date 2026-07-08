@@ -10,6 +10,7 @@ import { getProjectRepoSync } from "@/lib/repo-sync";
 import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
 import { ProjectInfoCard } from "./project-info-card";
+import { addMonth } from "./project-timeline";
 import { nowMs } from "@/lib/now";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
@@ -83,7 +84,13 @@ export default async function HomePage() {
   // иначе клиент по невнимательности создаёт задачи своего проекта в Lamb.dev.
   const fbSet = new Set(all.filter((p) => p.meta.feedback).map((p) => p.key));
   const byFeedbackLast = (a: { key: string }, b: { key: string }) => (fbSet.has(a.key) ? 1 : 0) - (fbSet.has(b.key) ? 1 : 0);
-  const projects = visible.map((p) => ({ key: p.key, name: p.name })).sort(byFeedbackLast);
+  // DEV-41: гарантийный период внесения правок = сдача (deadline) + 1 месяц. Если истёк — клиенту в форме
+  // создания задачи покажем предупреждение с контактом. Флаг считаем для всех, показываем только клиенту.
+  const nowW = nowMs();
+  const projects = visible.map((p) => {
+    const dl = p.meta.deadline ? new Date(p.meta.deadline).getTime() : null;
+    return { key: p.key, name: p.name, warrantyExpired: dl != null && nowW > addMonth(dl) };
+  }).sort(byFeedbackLast);
   const visibleKeys = new Set(visible.map((p) => p.key));
 
   let tasks, reads, projectSeen;

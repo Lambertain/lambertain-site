@@ -6,7 +6,7 @@ import { t, type Locale } from "@/lib/i18n";
 import { RichComposer, type RichComposerHandle } from "./rich-composer";
 import { ui } from "../ui-styles";
 
-type Proj = { key: string; name: string };
+type Proj = { key: string; name: string; warrantyExpired?: boolean };
 type Created = { id: string; url: string };
 
 // Черновик задачи в localStorage — чтобы введённый текст не пропал при случайном обновлении страницы.
@@ -119,6 +119,14 @@ export function ChatIntake({ projects, locale, fill, isContributor, isAdmin, fee
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: fill ? "auto" : "calc(100dvh - 200px)", minHeight: fill ? undefined : 0, marginTop: fill ? 0 : 12, border: "1px solid var(--border)", background: "var(--surface)" }}>
+      {/* DEV-41: гарантийный период внесения правок истёк — клиенту предупреждение с контактом (только клиенту:
+          не разработчику/админу). Нажатие на @soloveynik открывает чат в Telegram. */}
+      {!isContributor && !isAdmin && projects.find((p) => p.key === projectKey)?.warrantyExpired && (
+        <div style={{ padding: "12px 14px", borderBottom: "1px solid var(--border)", background: "rgba(232,179,57,0.10)", color: "#e8b339", fontSize: 14, lineHeight: 1.5 }}>
+          ⚠️ {t(locale, "warranty.expired")}{" "}
+          <a href="https://t.me/soloveynik" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>@soloveynik</a>
+        </div>
+      )}
       {/* проект */}
       <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
         <span style={ui.monoLabel}>{t(locale, "field.project")}:</span>

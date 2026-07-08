@@ -635,6 +635,11 @@ export const DICT: Record<string, Entry> = {
   "dash.warrantyPending": { uk: "стартує зі здачею, діє до {date}", ru: "стартует со сдачей, действует до {date}", en: "starts at delivery, until {date}" },
   "dash.warrantyActive": { uk: "діє до {date} · лишилось {n} дн.", ru: "действует до {date} · осталось {n} дн.", en: "until {date} · {n}d left" },
   "dash.warrantyEnded": { uk: "завершено {date}", ru: "завершён {date}", en: "ended {date}" },
+  "warranty.expired": {
+    uk: "Гарантійний період внесення правок завершено. Щодо нових задач зверніться:",
+    ru: "Гарантийный период внесения правок завершён. По новым задачам обратитесь:",
+    en: "The warranty period for edits has ended. For new tasks, please contact:",
+  },
   "dash.tasks": { uk: "задачі", ru: "задачи", en: "tasks" },
   "dash.noDeadline": { uk: "без дедлайну", ru: "без дедлайна", en: "no deadline" },
   "dash.unassigned": { uk: "Без відповідального", ru: "Без ответственного", en: "Unassigned" },

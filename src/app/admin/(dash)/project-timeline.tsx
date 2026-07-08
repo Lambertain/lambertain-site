@@ -9,7 +9,8 @@ import { ui } from "../ui-styles";
 const DAY = 86400000;
 const DATE_LOCALE: Record<Locale, string> = { uk: "uk-UA", ru: "ru-RU", en: "en-GB" };
 
-function addMonth(ms: number): number {
+/** Гарантійний період внесення правок = сдача (deadline) + 1 місяць. */
+export function addMonth(ms: number): number {
   const d = new Date(ms);
   d.setMonth(d.getMonth() + 1);
   return d.getTime();

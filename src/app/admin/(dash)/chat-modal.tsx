@@ -6,7 +6,7 @@ import { ChatIntake } from "./chat-intake";
 import { t, type Locale } from "@/lib/i18n";
 import { ui } from "../ui-styles";
 
-type Proj = { key: string; name: string };
+type Proj = { key: string; name: string; warrantyExpired?: boolean };
 
 export function ChatModal({ projects, locale, isContributor, isAdmin, feedbackKey, role }: {
   projects: Proj[]; locale: Locale; isContributor?: boolean; isAdmin?: boolean; feedbackKey?: string; role?: string;
