@@ -367,7 +367,12 @@ export function TaskTabs({
 
   const byBucket = useMemo(() => {
     const m: Record<Bucket, BoardTask[]> = { inProgress: [], review: [], rework: [], done: [], notStarted: [], blocked: [] };
-    for (const tk of projTasks) m[tk.blocked ? "blocked" : statusBucket(tk.status)].push(tk);
+    // DEV-43: без отдельного таба «Заблоковано» — заблокированные (по зависимостям или статусу Blocked)
+    // кладём в «Не начато»; причина видна текстовой плашкой (blockedBy / ownerAction / clientAction).
+    for (const tk of projTasks) {
+      const b = tk.blocked ? "blocked" : statusBucket(tk.status);
+      m[b === "blocked" ? "notStarted" : b].push(tk);
+    }
     return m;
   }, [projTasks]);
 

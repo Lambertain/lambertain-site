@@ -170,7 +170,9 @@ export default async function HomePage() {
     const c: Record<string, number> = { inProgress: 0, review: 0, rework: 0, done: 0, notStarted: 0, blocked: 0 };
     for (const b of board) {
       if (b.projectKey !== k) continue;
-      c[b.blocked ? "blocked" : statusBucket(b.status)]++;
+      // DEV-43: нет отдельного таба «Заблоковано» — заблокированные считаем в «Не начато».
+      const bk = b.blocked ? "blocked" : statusBucket(b.status);
+      c[bk === "blocked" ? "notStarted" : bk]++;
     }
     // DEV-49: NEW на проекте — активность (нова задача АБО новий коментар) позже последнего ОТКРИТТЯ ПРОЕКТУ,
     // серед активних (Done не рахуємо). Раніше рахувалось по per-task reads (created > lastRead), тож плашка

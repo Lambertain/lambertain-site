@@ -25,8 +25,11 @@ export const BUCKET_STATUS: Record<Bucket, (typeof STATUSES)[number]> = {
   blocked: "Blocked",
 };
 
-/** Порядок табов в UI: в работе → ревью → доработка → готово → не начатые → заблок. */
-export const BUCKET_ORDER: Bucket[] = ["inProgress", "review", "rework", "done", "notStarted", "blocked"];
+/** Порядок табов в UI: в работе → ревью → доработка → готово → не начатые.
+ *  DEV-43: отдельного таба «Заблоковано» нет — заблокированные задачи показываются в «Не начато»
+ *  с текстовой плашкой блокера (blockedBy / ownerAction / clientAction). Bucket "blocked" остаётся в
+ *  МОДЕЛИ (statusBucket → detection «не бери в работу» в dev-API/actions), но не выводится вкладкой. */
+export const BUCKET_ORDER: Bucket[] = ["inProgress", "review", "rework", "done", "notStarted"];
 
 /** i18n-ключ подписи таба корзины. */
 export const BUCKET_LABEL: Record<Bucket, string> = {
