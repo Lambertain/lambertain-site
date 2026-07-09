@@ -52,6 +52,6 @@
 - `POST /api/admin/comment` `{ readableId, body, visibleToClient?, review? }` → коммент от агентства (зеркалится в Trello при `visibleToClient`).
 
 **Заведение/привязка проекта по API** (тоже `ADMIN_API_TOKEN`, не БД):
-- `POST /api/admin/project/link` `{ projectKey, devGit?, clientGit?, defaultAssignee? }` → проставляет meta, возвращает **токен проекта**, раскладывает bootstrap CLAUDE.md в `Lambertain/*` дев-репо (layProtocol).
+- `POST /api/admin/project/link` `{ projectKey, name?, devGit?, clientGit?, defaultAssignee? }` → проставляет meta, возвращает **токен проекта**, раскладывает bootstrap CLAUDE.md в `Lambertain/*` дев-репо (layProtocol). Если проекта ещё нет — **создаёт его** (нужен `name`); ручной шаг «завести проект в UI» не требуется.
 - `POST /api/admin/project/spec` `{ projectKey, spec }` / `GET ?projectKey=` → записать/прочитать `meta.spec` (спеку пишет Claude Code).
 НЕ ходить в БД напрямую для этих операций.

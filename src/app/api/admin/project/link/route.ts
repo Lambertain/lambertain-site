@@ -7,7 +7,7 @@
  */
 import { NextResponse, after } from "next/server";
 import { randomBytes } from "node:crypto";
-import { getProjectFull, setProjectMeta, getProjectTokens, setProjectToken } from "@/lib/db";
+import { getProjectFull, setProjectMeta, getProjectTokens, setProjectToken, createProject } from "@/lib/db";
 import { layProtocol } from "@/lib/protocol-deploy";
 import { readJsonSmart } from "@/lib/req-body";
 
@@ -21,13 +21,19 @@ export async function POST(req: Request) {
   if (!expected) return NextResponse.json({ error: "ADMIN_API_TOKEN not configured" }, { status: 503 });
   if (bearer(req) !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
-  let body: { projectKey?: string; devGit?: string; clientGit?: string; defaultAssignee?: string };
+  let body: { projectKey?: string; name?: string; devGit?: string; clientGit?: string; defaultAssignee?: string };
   try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   if (!projectKey) return NextResponse.json({ error: "projectKey required" }, { status: 400 });
+  const name = String(body.name || "").trim();
 
-  const proj = await getProjectFull(projectKey);
-  if (!proj) return NextResponse.json({ error: `project ${projectKey} not found` }, { status: 404 });
+  // Создаём проект, если его ещё нет и передано name (заводной воркфлоу целиком по API, без ручного шага в UI).
+  let proj = await getProjectFull(projectKey);
+  if (!proj) {
+    if (!name) return NextResponse.json({ error: `project ${projectKey} not found (pass "name" to create it)` }, { status: 404 });
+    await createProject(projectKey, name);
+    proj = { name, meta: {} };
+  }
 
   const meta = { ...proj.meta };
   if (body.devGit) meta.devGit = String(body.devGit).trim();
