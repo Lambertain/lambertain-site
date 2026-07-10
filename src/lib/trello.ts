@@ -32,6 +32,22 @@ const BUCKET_KEYWORDS: Partial<Record<Bucket, string[]>> = {
   notStarted: ["беклог", "backlog", "to do", "todo", "тиждень"],
 };
 
+/**
+ * Обратное сопоставление: имя колонки клиентской Trello-доски → корзина статуса портала.
+ * Нужно вебхуку, чтобы ручное перетаскивание карточки клиентом/их разработчиком отражалось в статусе
+ * портальной задачи (Trello → портал). Порядок проверок важен (done/blocked/review раньше inProgress).
+ * «В процесі» → inProgress (а не rework): отдельной колонки доработки на доске нет, «назад в работу» = In Progress.
+ * Возвращает null для неузнанных/плановых колонок (Беклог, Поточний тиждень, Архів) — их вебхук не синкает.
+ */
+export function bucketFromListName(name: string): Bucket | null {
+  const s = String(name || "").toLowerCase();
+  if (/(викона|выполн|\bdone\b|complete|готов)/.test(s)) return "done";
+  if (/(блокер|заблок|block|hold)/.test(s)) return "blocked";
+  if (/(тестуван|тестиров|review|ревью|\bqa\b|test)/.test(s)) return "review";
+  if (/(в процес|в процессе|in progress|doing|wip|доопрац|rework|доработ)/.test(s)) return "inProgress";
+  return null;
+}
+
 async function trello(cfg: TrelloCfg, method: string, path: string, params: Record<string, string> = {}): Promise<unknown> {
   const u = new URL("https://api.trello.com/1" + path);
   u.searchParams.set("key", cfg.key);
