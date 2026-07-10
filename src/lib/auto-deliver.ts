@@ -53,25 +53,33 @@ export async function autoDeliverAndNotify(projectKey: string, meta: ProjectMeta
     if (!ds || !ds.length) return;
     // toDefault только в прямом режиме (squash в main) → публикация в прод. В PR-режиме — ждём мержа дева клиента.
     if (ds.some((d) => d.toDefault)) await publishProjectToProd(projectKey).catch(() => {});
-    // Деплой «живой» = SUCCESS и задеплоен именно наш коммит. Иначе — явное предупреждение (не глотаем).
-    const live = (d: (typeof ds)[number]) => !d.deploy || (isDeployPublished(d.deploy.status) && d.deploy.matched !== false);
-    const lines = ds
-      .map((d) => {
-        const dep = d.deploy;
-        const depTxt = !dep
-          ? ""
-          : isDeployPublished(dep.status) && dep.matched !== false
-            ? " · деплой: ✓ опубліковано"
-            : ` · ⚠️ деплой: ${dep.status}${dep.matched === false ? " (НЕ той коміт!)" : ""}${dep.note ? " — " + dep.note : ""}`;
-        return `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${depTxt}`;
-      })
-      .join("\n");
-    // Чистый успех (всё опубликовано) НЕ пушим админу — это шум, который ещё и надо вручную закрывать.
-    // Пушим ТОЛЬКО когда деплой НЕ опубликован / не тот коммит — это требует вмешательства.
-    if (!ds.every(live)) {
-      const first = ds[0];
+    // Проблемный деплой = ТЕРМИНАЛЬНО-плохой: провал сборки или в проде задеплоен НЕ наш коммит.
+    // Промежуточные статусы (DEPLOYING/BUILDING/PENDING…) — деплой ещё ИДЁТ, это не ошибка: approveClientDeploy
+    // ждёт финал лишь ~150с, а сборка Railway (build+preDeploy-миграция) бывает дольше → раньше на «ещё идёт»
+    // слался ложный «деплой НЕ опубліковано, перевір» (шум админу), хотя доставка прошла и деплой докатывался сам.
+    // matched:false на НЕтерминальном статусе тоже ложный — наш коммит просто ещё не стал активным.
+    const TERMINAL_BAD = new Set(["FAILED", "CRASHED", "ERROR", "REMOVED", "SKIPPED"]);
+    const isProblem = (d: (typeof ds)[number]): boolean => {
+      const dep = d.deploy;
+      if (!dep) return false; // деплой не настроен — доставка кода и так прошла
+      if (isDeployPublished(dep.status) && dep.matched !== false) return false; // опубликован именно наш коммит — ок
+      if (TERMINAL_BAD.has(dep.status)) return true; // провал сборки/деплоя
+      if (dep.matched === false && isDeployPublished(dep.status)) return true; // в проде реально чужой коммит
+      return false; // DEPLOYING/BUILDING/PENDING — ещё идёт, не тревожим
+    };
+    // Пушим ТОЛЬКО реальную проблему деплоя (успех и «ещё идёт» — не шумим админу).
+    const problems = ds.filter(isProblem);
+    if (problems.length) {
+      const lines = problems
+        .map((d) => {
+          const dep = d.deploy!;
+          const depTxt = ` · ⚠️ деплой: ${dep.status}${dep.matched === false ? " (НЕ той коміт!)" : ""}${dep.note ? " — " + dep.note : ""}`;
+          return `• ${d.clientRepo} (${d.branch})${d.prUrl ? " — PR" : ""}, файлів: ${d.files}${depTxt}`;
+        })
+        .join("\n");
+      const first = problems[0];
       const btn = first.prUrl ? { text: "Pull Request", url: first.prUrl } : { text: "Коммит", url: first.commitUrl };
-      await notifyAdmin(`⚠️ <b>Авто-доставка — деплой НЕ опубліковано, перевір</b> · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
+      await notifyAdmin(`⚠️ <b>Авто-доставка — деплой не вдався, перевір</b> · ${await taskTag(taskId)}\n${lines}`, btn).catch(() => {});
     }
   } catch (e) {
     await reportTaskError(taskId, "авто-доставка", e);
