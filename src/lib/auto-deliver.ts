@@ -31,13 +31,9 @@ export async function deliverGitflowAndNotify(projectKey: string, meta: ProjectM
       for (const d of delivered) {
         await setTaskPr(taskId, d.prUrl!).catch((e) => reportTaskError(taskId, `прив'язка PR до задачі (${d.clientRepo || "?"})`, e));
       }
-      // Чистый успех (PR открыт/обновлён, ребейз не нужен) НЕ пушим админу — это шум, который ещё и надо
-      // вручную закрывать. PR привязан, поллер ведёт стадию дальше сам. Пушим ТОЛЬКО при предупреждении.
-      const needsRebase = delivered.some((r) => r.upToDate === false);
-      if (needsRebase) {
-        const lines = delivered.map((r) => `• ${r.clientRepo}: PR ${r.created ? "відкрито" : "оновлено"}${r.upToDate === false ? " ⚠️ develop пішов вперед — потрібен ребейз" : ""}`).join("\n");
-        await notifyAdmin(`⚠️ <b>Gitflow-доставка — потрібен ребейз</b> · ${await taskTag(taskId)} · гілка <code>${branch}</code>\n${lines}`, { text: "Pull Request", url: delivered[0].prUrl! }).catch(() => {});
-      }
+      // Админу НИЧЕГО не пушим: PR привязан, поллер ведёт стадию pr→dev→prod сам. Отставание ветки от develop
+      // без конфликтов мержится автоматически, а реальный конфликт просто застопорит PR в стадии pr→dev —
+      // это видно на портале. Пуш «потрібен ребейз» на любое отставание был чистым шумом.
     } else {
       const err = results.map((r) => r.error || r.prError).filter(Boolean).join("; ") || "гілку не знайдено в жодному форку";
       await reportTaskError(taskId, `gitflow-доставка гілки ${branch}`, err);
