@@ -92,6 +92,11 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
     { key: "globalKey", label: { uk: "Global API Key", ru: "Global API Key", en: "Global API Key" }, kind: "secret" },
     { key: "email", label: { uk: "Акаунт (email)", ru: "Аккаунт (email)", en: "Account (email)" }, kind: "text" },
   ] },
+  // PlayFab — бекенд гри (каталог, промокоди/купони, інвентар підписок). Потрібен розробнику для монетизації.
+  { key: "playfab", group: "other", label: { uk: "PlayFab", ru: "PlayFab", en: "PlayFab" }, subs: [
+    { key: "titleId", label: { uk: "Title ID", ru: "Title ID", en: "Title ID" }, kind: "text" },
+    { key: "secretKey", label: { uk: "Secret Key (Admin/Server)", ru: "Secret Key (Admin/Server)", en: "Secret Key (Admin/Server)" }, kind: "secret" },
+  ] },
 ];
 
 export function getFieldDef(key: string): ProjectFieldDef | undefined {
