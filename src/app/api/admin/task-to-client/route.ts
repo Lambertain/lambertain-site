@@ -11,6 +11,7 @@ import { getProjectFull, projectHasClient, setClientAction, setOwnerAction } fro
 import { notifyProjectClients, taskTag } from "@/lib/notify";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
+import { projectSpecText } from "@/lib/specs";
 import { revalidatePath } from "next/cache";
 
 function bearer(req: Request): string | null {
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
   if (!(await projectHasClient(task.projectKey))) return NextResponse.json({ error: "в проекте нет клиента" }, { status: 400 });
 
   const proj = await getProjectFull(task.projectKey).catch(() => null);
-  const { short, text, guideId } = await clientStepFromAction(source, { summary: task.summary, projectSpec: proj?.meta.spec });
+  const { short, text, guideId } = await clientStepFromAction(source, { summary: task.summary, projectSpec: projectSpecText(proj?.meta) });
   const gid = guideId ?? (await generateGuide(short).catch(() => null));
   await setClientAction(readableId, text, gid);
   await setOwnerAction(readableId, null);

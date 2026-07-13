@@ -11,6 +11,7 @@ import { getProjectFull, setTaskTags, projectReporterLogin } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins, notifyProjectClients } from "@/lib/notify";
+import { getSpec, projectSpecText } from "@/lib/specs";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -22,18 +23,23 @@ export async function POST(req: Request) {
   if (!expected) return NextResponse.json({ error: "ADMIN_API_TOKEN not configured" }, { status: 503 });
   if (bearer(req) !== expected) return NextResponse.json({ error: "invalid token" }, { status: 401 });
 
-  let body: { projectKey?: string };
+  let body: { projectKey?: string; specKey?: string };
   try { body = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   const projectKey = String(body.projectKey || "").trim();
   if (!projectKey) return NextResponse.json({ error: "projectKey required" }, { status: 400 });
+  const specKey = String(body.specKey || "").trim();
 
   const p = await getProjectFull(projectKey);
   if (!p) return NextResponse.json({ error: "Проект не найден" }, { status: 404 });
-  const spec = (p.meta.spec || "").trim();
-  if (!spec) return NextResponse.json({ error: "У проекта нет сохранённой meta.spec" }, { status: 400 });
+  // specKey — разбить ОДНУ спеку (модуль/фазу); иначе — всю спеку проекта (все specs[] или легаси).
+  const one = specKey ? getSpec(p.meta, specKey) : null;
+  if (specKey && !one) return NextResponse.json({ error: `спека ${specKey} не найдена` }, { status: 404 });
+  const spec = (one ? `# ${one.title}\n\n${one.body}` : projectSpecText(p.meta)).trim();
+  if (!spec) return NextResponse.json({ error: "У проекта нет сохранённой спеки" }, { status: 400 });
+  const decompName = one ? `${p.name} — ${one.title}` : p.name;
 
   try {
-    const tasks: KickoffTask[] = await decomposeSpec(spec, p.name);
+    const tasks: KickoffTask[] = await decomposeSpec(spec, decompName);
     if (!tasks.length) return NextResponse.json({ error: "Не удалось разбить спеку на задачи" }, { status: 422 });
     const be = getBackend();
     const assignee = p.meta.defaultAssignee || null;

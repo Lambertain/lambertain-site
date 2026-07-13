@@ -14,6 +14,7 @@ import { readJsonSmart } from "@/lib/req-body";
 import { classifyHandoff, generateGuide } from "@/lib/handoff-classify";
 import { submitForModeration } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
+import { projectSpecText } from "@/lib/specs";
 
 function bearer(req: Request): string | null {
   const h = req.headers.get("authorization") || "";
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     const task = await be.getTask(taskId);
     const proj = await getProjectFull(projectKey);
     const hasClient = await projectHasClient(projectKey).catch(() => false);
-    const cls = await classifyHandoff(action, { summary: task.summary, projectSpec: proj?.meta.spec, hasClient });
+    const cls = await classifyHandoff(action, { summary: task.summary, projectSpec: projectSpecText(proj?.meta), hasClient });
     const taskBtn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
 
     if (cls.kind === "self") {

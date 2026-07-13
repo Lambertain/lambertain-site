@@ -429,12 +429,15 @@ export function MetaForm({
 
       {/* Railway/Vercel перенесены в реестр «Додаткові поля» ниже (значения по-прежнему в clientDeploy/clientVercel). */}
 
+      {/* Легаси-одиночная спека: только если у проекта ещё нет мультиспек (specs[]). Иначе спеками управляет панель «Спеки» ниже. */}
+      {!m.specs?.length && (
       <div style={{ marginTop: 18 }}>
         <label style={ui.fieldLabel}>{t(locale, "projects.spec")}</label>
         <div style={{ ...ui.monoLabel, textTransform: "none", marginBottom: 6 }}>{t(locale, "projects.specHint")}</div>
         <textarea value={spec} onChange={(e) => setSpec(e.target.value)} rows={10} style={{ ...ui.input, resize: "vertical", fontSize: 13, lineHeight: 1.5 }} />
         <VisToggles field="spec" vis={vis} setVis={setVis} locale={locale} />
       </div>
+      )}
 
       <div style={{ marginTop: 18 }}>
         <label style={ui.fieldLabel}>{t(locale, "projects.devInfo")}</label>

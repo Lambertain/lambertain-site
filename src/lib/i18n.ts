@@ -602,6 +602,17 @@ export const DICT: Record<string, Entry> = {
   "kickoff.deps": { uk: "після", ru: "после", en: "after" },
   "kickoff.create": { uk: "Створити {n} задач", ru: "Создать {n} задач", en: "Create {n} tasks" },
   "kickoff.created": { uk: "Створено задач: {n}. Розробник отримав сповіщення.", ru: "Создано задач: {n}. Разработчик получил уведомление.", en: "Created {n} tasks. The developer was notified." },
+  // — Спеки проєкту (кілька окремих спек по модулях/фазах) —
+  "specs.title": { uk: "Спеки проєкту", ru: "Спеки проекта", en: "Project specs" },
+  "specs.hint": { uk: "Кілька окремих спек (по модулях/фазах). Кожна — окремий документ: додавання нової не дописується в існуючу. «Розбити на задачі» кікає ОДНУ спеку — задачі нарізаються дрібніше й точніше, ніж з однієї великої.", ru: "Несколько отдельных спек (по модулям/фазам). Каждая — отдельный документ: добавление новой не дописывается в существующую. «Разбить на задачи» кикает ОДНУ спеку — задачи нарезаются мельче и точнее, чем из одной большой.", en: "Several separate specs (per module/phase). Each is its own document: adding one does not append to another. «Split into tasks» kicks a SINGLE spec — tasks come out finer and more precise than from one big spec." },
+  "specs.empty": { uk: "Спек ще немає. Додайте першу.", ru: "Спек ещё нет. Добавьте первую.", en: "No specs yet. Add the first one." },
+  "specs.add": { uk: "Додати спеку", ru: "Добавить спеку", en: "Add spec" },
+  "specs.titlePh": { uk: "Заголовок (напр. «Модуль 3. Замовлення»)", ru: "Заголовок (напр. «Модуль 3. Заказы»)", en: "Title (e.g. «Module 3. Orders»)" },
+  "specs.bodyPh": { uk: "Тіло спеки (Markdown)", ru: "Тело спеки (Markdown)", en: "Spec body (Markdown)" },
+  "specs.edit": { uk: "Редагувати", ru: "Редактировать", en: "Edit" },
+  "specs.kickoff": { uk: "Розбити на задачі", ru: "Разбить на задачи", en: "Split into tasks" },
+  "specs.removeConfirm": { uk: "Видалити цю спеку?", ru: "Удалить эту спеку?", en: "Delete this spec?" },
+  "specs.removeYes": { uk: "Так, видалити", ru: "Да, удалить", en: "Yes, delete" },
   "gender.warn": { uk: "Жіночий рід: {words}. Клієнт спілкується нібито напряму з агентством — пишіть у чоловічому роді.", ru: "Женский род: {words}. Клиент общается как будто напрямую с агентством — пишите в мужском роде.", en: "Feminine gender: {words}. The client thinks they talk to the agency directly — write in masculine." },
 
   // — ревью кода (ИИ, on-demand) —

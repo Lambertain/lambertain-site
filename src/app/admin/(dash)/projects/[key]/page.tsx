@@ -10,7 +10,8 @@ import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
 import { MetaForm } from "./meta-form";
 import { ProjectTypeToggle } from "./project-type-toggle";
-import { KickoffPanel } from "./kickoff-panel";
+import { SpecsPanel } from "./specs-panel";
+import { listSpecs } from "@/lib/specs";
 import { DeliverPanel } from "./deliver-panel";
 import { autoDeliverReadiness } from "@/lib/deliver";
 import { TokenRow } from "../token-row";
@@ -97,7 +98,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
 
       <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title }))} enabled={enabledGuides} />
 
-      <KickoffPanel projectKey={key} locale={locale} hasSpec={!!proj.meta.spec?.trim()} />
+      <SpecsPanel projectKey={key} locale={locale} initialSpecs={listSpecs(proj.meta)} />
 
       <div style={{ marginTop: 24 }}>
         <div style={ui.monoLabel}>{t(locale, "projects.kicker")}</div>

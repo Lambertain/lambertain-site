@@ -5,6 +5,7 @@ import { getProjectFull, setProjectMeta, setTaskTags, setProjectGuides, upsertSe
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
 import { notifyLogins, notifyProjectClients } from "@/lib/notify";
+import { getSpec, projectSpecText, upsertSpec, removeSpec } from "@/lib/specs";
 import { revalidatePath } from "next/cache";
 
 type Cred = { role?: string; env?: string; login?: string; pass?: string };
@@ -54,15 +55,19 @@ export async function saveProjectGuides(projectKey: string, guideIds: number[]):
  * Старт проекта одной кнопкой: берём СОХРАНЁННУЮ спеку проекта (`meta.spec`), разбиваем на задачи и СРАЗУ создаём
  * (с зависимостями, тегами, assign на ответственного). Без превью/апрува и без второго поля спеки. Admin.
  */
-export async function kickoffFromSpec(projectKey: string): Promise<{ created?: number; error?: string }> {
+export async function kickoffFromSpec(projectKey: string, specKey?: string): Promise<{ created?: number; error?: string }> {
   const me = await getPrincipal();
   if (!me || me.realRole !== "admin") return { error: "Нет прав" };
   const p = await getProjectFull(projectKey);
   if (!p) return { error: "Проект не найден" };
-  const spec = (p.meta.spec || "").trim();
-  if (!spec) return { error: "Сначала заполните и сохраните «Спека проекта» выше." };
+  // specKey — разбить ОДНУ спеку (модуль/фазу); иначе — всю спеку проекта.
+  const one = specKey ? getSpec(p.meta, specKey) : null;
+  if (specKey && !one) return { error: "Спека не найдена" };
+  const spec = (one ? `# ${one.title}\n\n${one.body}` : projectSpecText(p.meta)).trim();
+  if (!spec) return { error: "Сначала добавьте и сохраните спеку." };
+  const decompName = one ? `${p.name} — ${one.title}` : p.name;
   try {
-    const tasks: KickoffTask[] = await decomposeSpec(spec, p.name);
+    const tasks: KickoffTask[] = await decomposeSpec(spec, decompName);
     if (!tasks.length) return { error: "Не удалось разбить спеку на задачи" };
     const be = getBackend();
     const assignee = p.meta.defaultAssignee || null;
@@ -90,6 +95,40 @@ export async function kickoffFromSpec(projectKey: string): Promise<{ created?: n
     return { created: ids.length };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка декомпозиции/создания" };
+  }
+}
+
+/** Сохранить (upsert) одну спеку проекта (модуль/фаза) — не дописывается в существующие. Admin. */
+export async function saveSpec(projectKey: string, spec: { key?: string; title: string; body: string }): Promise<{ ok?: boolean; key?: string; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  const p = await getProjectFull(projectKey);
+  if (!p) return { error: "Проект не найден" };
+  const title = spec.title.trim();
+  if (!title) return { error: "Укажите заголовок спеки" };
+  try {
+    const meta = upsertSpec(p.meta, { key: spec.key, title, body: spec.body }, new Date().toISOString());
+    await setProjectMeta(projectKey, p.name, meta);
+    const saved = (meta.specs ?? []).find((s) => s.title === title && s.body === spec.body);
+    revalidatePath(`/admin/projects/${projectKey}`);
+    return { ok: true, key: saved?.key };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Удалить одну спеку проекта по ключу. Admin. */
+export async function deleteProjectSpec(projectKey: string, key: string): Promise<{ ok?: boolean; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  const p = await getProjectFull(projectKey);
+  if (!p) return { error: "Проект не найден" };
+  try {
+    await setProjectMeta(projectKey, p.name, removeSpec(p.meta, key));
+    revalidatePath(`/admin/projects/${projectKey}`);
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
   }
 }
 

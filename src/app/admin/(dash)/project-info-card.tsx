@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ProjectMeta } from "@/lib/tasks/types";
+import { listSpecs } from "@/lib/specs";
 import { fieldVisible } from "@/lib/field-visibility";
 import { getFieldDef } from "@/lib/project-fields";
 import { BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
@@ -18,6 +19,20 @@ function ExtLink({ href, label }: { href: string; label: string }) {
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
       {label}
     </a>
+  );
+}
+
+/** Одна спека проекта — раскрывающийся блок (у каждой своё состояние). */
+function SpecItem({ title, body }: { title: string; body: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ border: "1px solid var(--border-2)", borderRadius: 6 }}>
+      <button onClick={() => setOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
+        <span style={ui.monoLabel}>{title}</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}><polyline points="6 9 12 15 18 9" /></svg>
+      </button>
+      {open && <div style={{ padding: "0 12px 12px", maxHeight: 420, overflowY: "auto" }}><Markdown>{body}</Markdown></div>}
+    </div>
   );
 }
 
@@ -75,7 +90,6 @@ export function ProjectInfoCard({
 }) {
   const m = project.meta;
   const [open, setOpen] = useState(false);
-  const [specOpen, setSpecOpen] = useState(false);
 
   const startedMs = m.startedAt ? new Date(m.startedAt).getTime() : null;
   const deadlineMs = m.deadline ? new Date(m.deadline).getTime() : null;
@@ -155,15 +169,9 @@ export function ProjectInfoCard({
               <Markdown>{m.devInfo}</Markdown>
             </div>
           )}
-          {see("spec") && m.spec && (
-            <div style={{ border: "1px solid var(--border-2)", borderRadius: 6 }}>
-              <button onClick={() => setSpecOpen((v) => !v)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", textAlign: "left" }}>
-                <span style={ui.monoLabel}>{t(locale, "proj.fullSpec")}</span>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="2" style={{ transform: specOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }}><polyline points="6 9 12 15 18 9" /></svg>
-              </button>
-              {specOpen && <div style={{ padding: "0 12px 12px", maxHeight: 420, overflowY: "auto" }}><Markdown>{m.spec}</Markdown></div>}
-            </div>
-          )}
+          {see("spec") && listSpecs(m).map((s) => (
+            <SpecItem key={s.key} title={s.key === "main" ? t(locale, "proj.fullSpec") : s.title} body={s.body} />
+          ))}
 
         </div>
       )}

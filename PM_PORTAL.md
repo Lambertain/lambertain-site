@@ -116,6 +116,25 @@ Event-driven из server actions (`notify.ts`): tg_id резолвится из 
   но значения по-прежнему хранятся в `meta.clientDeploy`/`meta.clientVercel` (форма проецирует их туда на save,
   карточка читает оттуда) — **логика деплоя/мониторинга не затронута**.
 
+## Спеки проекта (мультиспек по модулям/фазам)
+
+Проект может иметь **несколько спек** (`meta.specs[]`: `{key,title,body,order,updatedAt}`) — по модулям/фазам, чтобы
+добавление новой не дописывалось в существующую и не раздувало её. Легаси-одиночная спека — `meta.spec` (приоритет
+у `specs[]`; при первом мультиспек-апдейте `meta.spec` переносится в `specs[]` как `main`). Доступ — чистые функции
+`src/lib/specs.ts`: `listSpecs` (нормализация specs[]/легаси), `projectSpecText` (склейка ВСЕХ спек — общий контекст
+разработчику), `getSpec`, `upsertSpec`, `removeSpec`.
+
+- **UI:** панель «Спеки» на странице проекта (`specs-panel.tsx`) — список с add/edit/delete и кнопкой **«Розбити на
+  задачі»** на КАЖДОЙ спеке (per-spec kickoff). В `meta-form` легаси-textarea спеки показывается только пока нет `specs[]`.
+  Карточка проекта (`project-info-card`) показывает все спеки списком (видимость поля `spec`).
+- **API:** `POST /api/admin/project/spec {projectKey, spec, specKey?, title?, order?}` — upsert конкретной спеки;
+  `{specKey, delete:true}` — удалить; `{projectKey, spec}` без ключа — легаси. `GET ?projectKey=&specKey=` — список/одна.
+- **Kickoff по одной спеке:** `POST /api/admin/project/kickoff {projectKey, specKey?}` и `kickoffFromSpec(projectKey, specKey?)`.
+  Причина мельчить: `decomposeSpec` режет вход по 60k симв., ответ ≤8k токенов и целится в «5–15 задач на проект» —
+  одна большая спека → грубо/обрезанно; per-spec kickoff даёт каждому модулю свой бюджет глубины.
+- **Контекст разработчику** (`dev/tasks` `projectSpec`, классификаторы handoff/task-to-client) — всегда `projectSpecText`
+  (все спеки вместе), чтобы при нарезке одного модуля не терялась связь с остальными.
+
 ## Доставка dev → client (на странице проекта)
 
 `deliver.ts` + панель (только при заданных dev/client git): squash-пуш состояния dev-репо одним коммитом

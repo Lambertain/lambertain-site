@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { getProjectKeyByToken, getTaskTags, getProjectFull, getTaskEvents, getTaskDeps, getDepsFor } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { statusBucket } from "@/lib/statuses";
+import { projectSpecText } from "@/lib/specs";
 
 // DEV-33: зависимость считается «незакрытой» (блокирующей), пока её статус не в корзине done.
 const depUnfinished = (status: string | null) => statusBucket(status) !== "done";
@@ -64,7 +65,7 @@ export async function GET(req: Request) {
     // ХТО і ЧОМУ змінив стан («X змінив статус через Y»), без розпитувань. Хронологічно; зливай із comments за ts.
     // dependsOn/blockedBy/effectiveBlocked (DEV-33): якщо effectiveBlocked=true — задача де-факто заблокована
     // незавершеними залежностями (blockedBy), НЕ бери в роботу, поки вони не закриті.
-    return NextResponse.json({ task: taskOut, tags, projectSpec: devFiles(proj?.meta.spec || null), projectInfo: devFiles(proj?.meta.devInfo || null), comments: commentsOut, events, dependsOn, blockedBy, effectiveBlocked, awaitingClient, lastClientAnswer, answerImageIds });
+    return NextResponse.json({ task: taskOut, tags, projectSpec: devFiles(projectSpecText(proj?.meta) || null), projectInfo: devFiles(proj?.meta.devInfo || null), comments: commentsOut, events, dependsOn, blockedBy, effectiveBlocked, awaitingClient, lastClientAnswer, answerImageIds });
   }
 
   // Список задач проекта.

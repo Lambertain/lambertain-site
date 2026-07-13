@@ -11,6 +11,7 @@ import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
 import { autoDeliverAndNotify } from "@/lib/auto-deliver";
 import { syncTaskToTrello, mirrorCommentToTrello } from "@/lib/trello";
+import { projectSpecText } from "@/lib/specs";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
@@ -29,7 +30,7 @@ export async function handStepToClient(taskId: string): Promise<{ ok?: boolean; 
     if (!source) return { error: "Нет шага для передачи клиенту" };
     if (!(await projectHasClient(task.projectKey))) return { error: "В проекте нет клиента" };
     const proj = await getProjectFull(task.projectKey).catch(() => null);
-    const { short, text, guideId } = await clientStepFromAction(source, { summary: task.summary, projectSpec: proj?.meta.spec });
+    const { short, text, guideId } = await clientStepFromAction(source, { summary: task.summary, projectSpec: projectSpecText(proj?.meta) });
     const gid = guideId ?? (await generateGuide(short).catch(() => null));
     await setClientAction(taskId, text, gid);
     await setOwnerAction(taskId, null); // снять owner-флаг — теперь это действие клиента
