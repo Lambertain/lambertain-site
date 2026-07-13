@@ -82,6 +82,12 @@ function htmlToTrello(html: string): string {
     .trim();
 }
 
+/** Короткий номер карточки (Trello #N) по её id/shortLink — для префикса заголовка PR. null, если не удалось. */
+export async function trelloCardShort(cfg: TrelloCfg, cardId: string): Promise<number | null> {
+  const c = (await trello(cfg, "GET", `/cards/${cardId}`, { fields: "idShort" })) as { idShort?: number } | null;
+  return typeof c?.idShort === "number" ? c.idShort : null;
+}
+
 /** Добавить коммент на карточку. */
 export async function trelloComment(cfg: TrelloCfg, cardId: string, text: string): Promise<void> {
   if (!text.trim()) return;

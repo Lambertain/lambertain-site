@@ -21,7 +21,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * ("fetch failed"/ECONNRESET) или вторичный rate-limit (429/403 при remaining=0) не должен ронять всю доставку.
  * Ретраим сетевые ошибки, 429, 5xx и 403-rate-limit с экспоненциальным бэкоффом; финальную ошибку — с контекстом.
  */
-async function gh(path: string, init?: RequestInit): Promise<Response> {
+export async function gh(path: string, init?: RequestInit): Promise<Response> {
   const headers = {
     Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`,
     Accept: "application/vnd.github+json",
@@ -48,7 +48,7 @@ async function gh(path: string, init?: RequestInit): Promise<Response> {
   const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
   throw new Error(`GitHub мережевий збій (${init?.method || "GET"} ${path}) після ${MAX} спроб: ${msg}`);
 }
-async function ghJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+export async function ghJson<T = unknown>(path: string, init?: RequestInit): Promise<T> {
   const r = await gh(path, init);
   if (!r.ok) throw new Error(`GitHub ${r.status} ${init?.method || "GET"} ${path}: ${(await r.text()).slice(0, 300)}`);
   return r.json() as Promise<T>;

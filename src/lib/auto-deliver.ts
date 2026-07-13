@@ -8,6 +8,7 @@
  */
 import { autoDeliverIfConfigured, isDeployPublished } from "./deliver";
 import { deliverGitflow } from "./sync-client";
+import { enrichDeliveredPRs } from "./pr-enrich";
 import { publishProjectToProd } from "./deploy-stage";
 import { setTaskPr } from "./db";
 import { notifyAdmin, taskTag } from "./notify";
@@ -31,6 +32,9 @@ export async function deliverGitflowAndNotify(projectKey: string, meta: ProjectM
       for (const d of delivered) {
         await setTaskPr(taskId, d.prUrl!).catch((e) => reportTaskError(taskId, `прив'язка PR до задачі (${d.clientRepo || "?"})`, e));
       }
+      // Обогащение PR: номер Trello в заголовок + метка «бек+фронт»/pair-link для мультирепо-задач
+      // (то, что раньше проставлялось руками; просьба разработчика клиента). Best-effort, сбой не валит доставку.
+      await enrichDeliveredPRs(taskId, meta, delivered).catch((e) => reportTaskError(taskId, `оформлення PR (Trello#/мітка)`, e));
       // Админу НИЧЕГО не пушим: PR привязан, поллер ведёт стадию pr→dev→prod сам. Отставание ветки от develop
       // без конфликтов мержится автоматически, а реальный конфликт просто застопорит PR в стадии pr→dev —
       // это видно на портале. Пуш «потрібен ребейз» на любое отставание был чистым шумом.
