@@ -42,6 +42,9 @@ export async function POST(req: Request) {
     const tasks: KickoffTask[] = await decomposeSpec(spec, decompName);
     if (!tasks.length) return NextResponse.json({ error: "Не удалось разбить спеку на задачи" }, { status: 422 });
     const be = getBackend();
+    // Первый ли это kickoff проекта: если задачи уже есть (напр. разбиваем следующий модуль спеки),
+    // повторное «проєкт розбито» НЕ шлём — уведомление о заведении задач одно на проект.
+    const hadTasks = (await be.listTasks({ projectKey, limit: 1 })).length > 0;
     const assignee = p.meta.defaultAssignee || null;
     // Постановщик задач проекта — КЛИЕНТ (его проект, он принимает результат). Нет клиента → null.
     const clientLogin = await projectReporterLogin(projectKey);
@@ -61,9 +64,10 @@ export async function POST(req: Request) {
     }
     // Блокеры НЕ ставим: задачи созданы в порядке выполнения (по номерам). Разработчик делает их ПОДРЯД,
     // не дожидаясь приёмки предыдущей (см. dev-protocol). Порядок = очередь номеров задач.
-    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай ПО ПОРЯДКУ (по номерам), не жди приёмки предыдущей.`).catch(() => {});
-    // Клиент-постановщик — пуш, что по проекту начали работу (вовлечённость + видно прогресс).
-    if (clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: по проєкту створено ${ids.length} задач — роботу розпочато. Стежте за прогресом у порталі.`).catch(() => {});
+    // Уведомление о заведении задач — ОДНО на проект (только при первом kickoff). Дальше — по каждой
+    // задаче отдельно, когда её берут в работу (см. dev/status и admin/task-status).
+    if (!hadTasks && assignee) await notifyLogins([assignee], `🆕 <b>${p.name}</b>: проєкт розбито на задачі. Бери ПО ПОРЯДКУ (за номерами), не чекай приймання попередньої.`).catch(() => {});
+    if (!hadTasks && clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: узялися за ваш проєкт — розклали його на задачі. Повідомлятимемо окремо, щойно братимемо кожну задачу в роботу.`).catch(() => {});
     return NextResponse.json({ ok: true, created: ids.length, ids });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Ошибка декомпозиции/создания" }, { status: 500 });

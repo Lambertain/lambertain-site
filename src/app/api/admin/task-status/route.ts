@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { readJsonSmart } from "@/lib/req-body";
 import { getBackend } from "@/lib/tasks";
+import { getTaskEvents } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { syncTaskToTrello } from "@/lib/trello";
@@ -50,6 +51,12 @@ export async function POST(req: Request) {
     if (task.reporter?.login) await notifyLogins([task.reporter.login], `🔍 <b>На перевірку</b> · ${await taskTag(readableId)}: ${task.summary}${summary ? `\n\n${summary}` : ""}`, [], link).catch(() => {});
   } else if (statusBucket(status) === "done") {
     await notifyProjectClients(task.projectKey, `✅ <b>Готово</b> · ${await taskTag(readableId)}: ${task.summary}`).catch(() => {});
+  } else if (statusBucket(status) === "inProgress") {
+    // Клиенту — «взяли в роботу» по задаче, ОДИН раз (только при первом переходе в работу).
+    const evs = await getTaskEvents(readableId);
+    if (evs.filter((e) => e.type === "status_change" && e.to === "In Progress").length === 1) {
+      await notifyProjectClients(task.projectKey, `▶️ <b>${await taskTag(readableId)}</b>: ${task.summary}\n\nВзяли в роботу.`).catch(() => {});
+    }
   }
   revalidatePath("/admin");
   revalidatePath("/admin/tasks");

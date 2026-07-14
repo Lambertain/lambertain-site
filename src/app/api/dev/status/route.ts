@@ -8,7 +8,7 @@
  * Авторизация: Authorization: Bearer <project_token>
  */
 import { NextResponse, after } from "next/server";
-import { getProjectKeyByToken, getProjectFull, setDeployStage } from "@/lib/db";
+import { getProjectKeyByToken, getProjectFull, setDeployStage, getTaskEvents } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { getBackend } from "@/lib/tasks";
 import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
@@ -113,7 +113,19 @@ export async function POST(req: Request) {
     }
     await be.updateStatus(taskId, status, { actorRole: "contributor", trigger: status === "In Progress" ? "розробник взяв у роботу" : undefined });
     after(() => syncTaskToTrello(taskId, status)); // Trello: карточку под новый статус (напр. «В процесі»)
-    if (status === "In Progress") await setDeployStage(taskId, "pr", { actorRole: "contributor", trigger: "розробник взяв у роботу" }).catch(() => {}); // взял в работу → «Готується»
+    if (status === "In Progress") {
+      await setDeployStage(taskId, "pr", { actorRole: "contributor", trigger: "розробник взяв у роботу" }).catch(() => {}); // взял в работу → «Готується»
+      // Клиенту — «взяли в роботу» по этой задаче, ОДИН раз (только при первом переходе в работу). Фоном.
+      after(async () => {
+        try {
+          const evs = await getTaskEvents(taskId);
+          if (evs.filter((e) => e.type === "status_change" && e.to === "In Progress").length === 1) {
+            const t = await be.getTask(taskId);
+            await notifyProjectClients(t.projectKey, `▶️ <b>${await taskTag(taskId)}</b>: ${t.summary}\n\nВзяли в роботу.`);
+          }
+        } catch { /* уведомления вторичны, не роняем ответ */ }
+      });
+    }
     return NextResponse.json({ ok: true, status });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "error" }, { status: 500 });

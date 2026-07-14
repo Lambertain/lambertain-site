@@ -4,7 +4,7 @@ import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { getBackend } from "@/lib/tasks";
 import { visibleProjects } from "@/lib/scope";
 import type { BoardTask } from "./task-tabs";
-import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage, getProjectFull, createProject, generateProjectKey } from "@/lib/db";
+import { markRead, markProjectSeen, setReviewRef, setTaskApproval, moveTaskToProject, markTaskNotificationsRead, setDeployStage, getProjectFull, createProject, generateProjectKey, getTaskEvents } from "@/lib/db";
 import { advanceStage } from "@/lib/deploy-stage";
 import { autoDeliverAndNotify } from "@/lib/auto-deliver";
 import { assignProjectDevAndNotify } from "@/lib/task-intake";
@@ -36,6 +36,16 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
     const bucket = bucketTarget;
     if (bucket === "inProgress") await setDeployStage(id, "pr", evt).catch(() => {});
     else if (bucket === "review") await advanceStage(id, "dev", "здав на ревʼю у порталі").catch(() => {}); // + коммент клиенту «на тестовому»
+    // Клиенту — «взяли в роботу» по задаче, ОДИН раз (только при первом переходе в работу).
+    if (bucket === "inProgress") {
+      try {
+        const evs = await getTaskEvents(id);
+        if (evs.filter((e) => e.type === "status_change" && e.to === "In Progress").length === 1) {
+          const t = await getBackend().getTask(id);
+          await notifyProjectClients(t.projectKey, `▶️ <b>${await taskTag(id)}</b>: ${t.summary}\n\nВзяли в роботу.`);
+        }
+      } catch { /* уведомления вторичны */ }
+    }
     revalidatePath("/admin");
     revalidatePath("/admin/tasks");
     // Задача готова.

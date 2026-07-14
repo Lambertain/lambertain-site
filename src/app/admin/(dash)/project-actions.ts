@@ -70,6 +70,8 @@ export async function kickoffFromSpec(projectKey: string, specKey?: string): Pro
     const tasks: KickoffTask[] = await decomposeSpec(spec, decompName);
     if (!tasks.length) return { error: "Не удалось разбить спеку на задачи" };
     const be = getBackend();
+    // Первый ли это kickoff проекта: задачи уже есть (следующий модуль) → повторное «проєкт розбито» не шлём.
+    const hadTasks = (await be.listTasks({ projectKey, limit: 1 })).length > 0;
     const assignee = p.meta.defaultAssignee || null;
     // Постановщик задач проекта — КЛИЕНТ (его проект, он принимает результат). Нет клиента → null.
     const clientLogin = await projectReporterLogin(projectKey);
@@ -88,8 +90,10 @@ export async function kickoffFromSpec(projectKey: string, specKey?: string): Pro
       ids.push(task.id);
     }
     // Блокеры НЕ ставим: задачи созданы в порядке выполнения (по номерам) — разработчик делает их подряд.
-    if (assignee) await notifyLogins([assignee], `🆕 <b>Проект разбит на задачи</b> · ${p.name}: ${ids.length} задач(и). Делай ПО ПОРЯДКУ (по номерам), не жди приёмки предыдущей.`).catch(() => {});
-    if (clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: по проєкту створено ${ids.length} задач — роботу розпочато. Стежте за прогресом у порталі.`).catch(() => {});
+    // Уведомление о заведении задач — ОДНО на проект (только при первом kickoff). Дальше — по каждой
+    // задаче отдельно, когда её берут в работу (см. dev/status и admin/task-status).
+    if (!hadTasks && assignee) await notifyLogins([assignee], `🆕 <b>${p.name}</b>: проєкт розбито на задачі. Бери ПО ПОРЯДКУ (за номерами), не чекай приймання попередньої.`).catch(() => {});
+    if (!hadTasks && clientLogin) await notifyProjectClients(projectKey, `🚀 <b>${p.name}</b>: узялися за ваш проєкт — розклали його на задачі. Повідомлятимемо окремо, щойно братимемо кожну задачу в роботу.`).catch(() => {});
     revalidatePath("/admin");
     revalidatePath(`/admin/projects/${projectKey}`);
     return { created: ids.length };
