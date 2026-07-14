@@ -66,12 +66,13 @@ export async function kickoffFromSpec(projectKey: string, specKey?: string): Pro
   const spec = (one ? `# ${one.title}\n\n${one.body}` : projectSpecText(p.meta)).trim();
   if (!spec) return { error: "Сначала добавьте и сохраните спеку." };
   const decompName = one ? `${p.name} — ${one.title}` : p.name;
+  const be = getBackend();
+  // Первый ли это kickoff проекта: задачи уже есть (следующий модуль) → дизайн-систему заново не создаём
+  // (одна на продукт) и повторное «проєкт розбито» не шлём.
+  const hadTasks = (await be.listTasks({ projectKey, limit: 1 })).length > 0;
   try {
-    const tasks: KickoffTask[] = await decomposeSpec(spec, decompName);
+    const tasks: KickoffTask[] = await decomposeSpec(spec, decompName, { includeDesignSystem: !hadTasks });
     if (!tasks.length) return { error: "Не удалось разбить спеку на задачи" };
-    const be = getBackend();
-    // Первый ли это kickoff проекта: задачи уже есть (следующий модуль) → повторное «проєкт розбито» не шлём.
-    const hadTasks = (await be.listTasks({ projectKey, limit: 1 })).length > 0;
     const assignee = p.meta.defaultAssignee || null;
     // Постановщик задач проекта — КЛИЕНТ (его проект, он принимает результат). Нет клиента → null.
     const clientLogin = await projectReporterLogin(projectKey);

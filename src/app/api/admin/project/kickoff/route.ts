@@ -38,13 +38,13 @@ export async function POST(req: Request) {
   if (!spec) return NextResponse.json({ error: "У проекта нет сохранённой спеки" }, { status: 400 });
   const decompName = one ? `${p.name} — ${one.title}` : p.name;
 
+  const be = getBackend();
+  // Первый ли это kickoff проекта: если задачи уже есть (разбиваем следующий модуль спеки), то и дизайн-систему
+  // заново НЕ создаём (она одна на продукт), и «проєкт розбито» повторно не шлём — уведомление одно на проект.
+  const hadTasks = (await be.listTasks({ projectKey, limit: 1 })).length > 0;
   try {
-    const tasks: KickoffTask[] = await decomposeSpec(spec, decompName);
+    const tasks: KickoffTask[] = await decomposeSpec(spec, decompName, { includeDesignSystem: !hadTasks });
     if (!tasks.length) return NextResponse.json({ error: "Не удалось разбить спеку на задачи" }, { status: 422 });
-    const be = getBackend();
-    // Первый ли это kickoff проекта: если задачи уже есть (напр. разбиваем следующий модуль спеки),
-    // повторное «проєкт розбито» НЕ шлём — уведомление о заведении задач одно на проект.
-    const hadTasks = (await be.listTasks({ projectKey, limit: 1 })).length > 0;
     const assignee = p.meta.defaultAssignee || null;
     // Постановщик задач проекта — КЛИЕНТ (его проект, он принимает результат). Нет клиента → null.
     const clientLogin = await projectReporterLogin(projectKey);
