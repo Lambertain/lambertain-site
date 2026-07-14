@@ -645,6 +645,47 @@ export async function moveTaskToProject(
 }
 
 /**
+ * Перенумеровать задачи проекта БЕЗ пропусков: сортируем по num и присваиваем 1..N (readable_id = KEY-N).
+ * Пропуски возникают после удаления задач. Комменты/события/PR/зависимости висят на tasks.id (int) — переживают.
+ * Слаг-хранящие таблицы (notifications «колокольчик», notifications_log) переписываем old→new; read-state
+ * (task_reads) по проекту сбрасываем — безвредно и снимает риск коллизии PK(login,task_id) при сдвиге слагов.
+ * Присваиваем ПО ВОЗРАСТАНИЮ: сдвиг только «вниз» в освободившиеся дыры → слаг-цели уже свободны, коллизий нет.
+ * Транзакция + advisory-лок на № проекта (как при создании). dryRun — только вернуть маппинг, без изменений.
+ * Откат отдельным вызовом не нужен: повторный прогон идемпотентен (уже без дыр → changes пуст).
+ */
+export async function renumberProjectTasks(
+  projectKey: string,
+  opts?: { dryRun?: boolean },
+): Promise<{ changes: { from: string; to: string }[] } | { error: string }> {
+  return withTransaction(async (query) => {
+    const proj = await query<{ id: number; key: string }>("SELECT id, key FROM projects WHERE key = $1", [projectKey]);
+    if (!proj[0]) return { error: `проект ${projectKey} не найден` };
+    await query("SELECT pg_advisory_xact_lock(hashtext('tasknum'), $1::int)", [proj[0].id]);
+    const rows = await query<{ id: number; num: number; readable_id: string }>(
+      "SELECT id, num, readable_id FROM tasks WHERE project_id = $1 ORDER BY num ASC",
+      [proj[0].id],
+    );
+    const changes: { from: string; to: string }[] = [];
+    rows.forEach((r, i) => {
+      const newNum = i + 1;
+      if (r.num !== newNum) changes.push({ from: r.readable_id, to: `${proj[0].key}-${newNum}` });
+    });
+    if (opts?.dryRun || !changes.length) return { changes };
+    await query("DELETE FROM task_reads WHERE task_id LIKE $1", [`${proj[0].key}-%`]); // read-state сбрасываем (безвредно)
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const newNum = i + 1;
+      if (r.num === newNum) continue;
+      const newRid = `${proj[0].key}-${newNum}`;
+      await query("UPDATE tasks SET num = $2, readable_id = $3, updated_at = now() WHERE id = $1", [r.id, newNum, newRid]);
+      await query("UPDATE notifications SET task_id = $2 WHERE task_id = $1", [r.readable_id, newRid]);
+      await query("UPDATE notifications_log SET task_id = $2 WHERE task_id = $1", [r.readable_id, newRid]);
+    }
+    return { changes };
+  });
+}
+
+/**
  * Переименовать ключ (слаг) проекта: oldKey → newKey. Меняет readable_id всех задач (LAM-21 → BUK-21),
  * task_reads (хранит слаг строкой) и project_key во всех связанных таблицах. Транзакция. Токен проекта
  * НЕ меняется (тот же), дев продолжает работать. Откат — обратный вызов renameProjectKey(newKey, oldKey).
