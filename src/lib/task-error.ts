@@ -51,13 +51,15 @@ export async function reportTaskError(
 const TRANSIENT_ESCALATE_AT = 3;
 
 /**
- * Репорт ошибки из ПОЛЛЕРА (deploy-sync и т.п.), терпимый к транзитным сбоям GitHub.
- * Транзитный блип (5xx/429/сеть) самоисправляется следующим проходом — курсоры не двигаются, потерь нет,
+ * Репорт ошибки из ПОЛЛЕРА (deploy-sync: проверка мержа/публикации, зеркалирование ревью), терпимый к
+ * транзитным сбоям GitHub. DEV-51: ошибки синка (rate-limit тощо) в ТРЕД ЗАДАЧИ НЕ пишем — только админу/в лог,
+ * иначе сотни одинаковых «⚠️ Помилка … rate limit» забивают тред и топят реальный фидбек ревьюера.
+ * Транзитный блип (5xx/429/сеть) самоисправляется следующим проходом — курсоры/маппинг не двигаются, потерь нет,
  * поэтому админа сразу не дёргаем: копим счётчик per-ключ и эскалируем, только если сбой держится
  * TRANSIENT_ESCALATE_AT проходов подряд (устойчивая деградация). Неретрайные/логические ошибки
  * (404/422/бэд-URL) — эскалируем сразу. На успешном проходе вызвать clearPollError(streakKey).
  * @param streakKey стабильный ключ единицы работы, напр. "ghfail:review:SAD-21:<prUrl>".
- * @returns true, если ошибку эскалировали.
+ * @returns true, если ошибку эскалировали (уведомили админа).
  */
 export async function reportPollError(streakKey: string, taskId: string, where: string, err: unknown): Promise<boolean> {
   if (isTransientGhError(err)) {
@@ -68,7 +70,13 @@ export async function reportPollError(streakKey: string, taskId: string, where: 
     // заваливает уведомлениями по каждому PR × каждый проход (был флуд ~200 повідомлень).
     if (streak > TRANSIENT_ESCALATE_AT && (streak - TRANSIENT_ESCALATE_AT) % 12 !== 0) return false;
   }
-  await reportTaskError(taskId, where, err);
+  // ТОЛЬКО админу (throttled выше) + в лог сервера — НЕ комментом в задачу.
+  const msg = (err instanceof Error ? err.message : String(err ?? "невідома помилка")).slice(0, 500);
+  console.error(`[poll-error] ${taskId} · ${where}: ${msg}`);
+  await notifyAdmin(
+    `⚠️ <b>${await taskTag(taskId).catch(() => taskId)}</b> · ${where}\n${msg}`,
+    { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` },
+  ).catch(() => {});
   return true;
 }
 

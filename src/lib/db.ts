@@ -880,6 +880,76 @@ export async function setPrReviewSynced(taskId: string, prUrl: string, ts?: stri
   if (ts) await q("UPDATE task_prs SET review_synced_at=$3 WHERE task_id=$1 AND pr_url=$2", [id[0].id, prUrl, ts]);
   else await q("UPDATE task_prs SET review_synced_at=now() WHERE task_id=$1 AND pr_url=$2 AND review_synced_at IS NULL", [id[0].id, prUrl]);
 }
+
+// ---- DEV-51: идемпотентный маппинг зазеркаленных GitHub-элементов (dedup по стабильному id) ----
+/** int id задачи по читаемому id (или null). */
+export async function taskDbId(readableId: string): Promise<number | null> {
+  const r = await q<{ id: number }>("SELECT id FROM tasks WHERE readable_id=$1", [readableId]);
+  return r[0]?.id ?? null;
+}
+/** Уже зазеркаленные элементы PR: ключ `${gh_type}:${gh_id}` → { commentId, sig }. */
+export async function getMirroredForPr(prUrl: string): Promise<Map<string, { commentId: number | null; sig: string | null }>> {
+  const rows = await q<{ gh_type: string; gh_id: string; comment_id: number | null; sig: string | null }>(
+    "SELECT gh_type, gh_id, comment_id, sig FROM mirrored_pr_items WHERE pr_url=$1",
+    [prUrl],
+  );
+  const m = new Map<string, { commentId: number | null; sig: string | null }>();
+  for (const r of rows) m.set(`${r.gh_type}:${r.gh_id}`, { commentId: r.comment_id, sig: r.sig });
+  return m;
+}
+/** Записать элемент как зазеркаленный (идемпотентно по (gh_type, gh_id)). commentId=null — базлайн/история (не постился). */
+export async function markMirroredItem(taskDbId: number, prUrl: string, ghType: string, ghId: number | string, commentId: number | null, sig: string): Promise<void> {
+  await q(
+    `INSERT INTO mirrored_pr_items (task_id, pr_url, gh_type, gh_id, comment_id, sig) VALUES ($1,$2,$3,$4,$5,$6)
+     ON CONFLICT (gh_type, gh_id) DO NOTHING`,
+    [taskDbId, prUrl, ghType, String(ghId), commentId, sig],
+  );
+}
+/** Обновить подпись элемента (после правки оригинала на GitHub → обновили зеркальный коммент). */
+export async function updateMirroredSig(ghType: string, ghId: number | string, sig: string): Promise<void> {
+  await q("UPDATE mirrored_pr_items SET sig=$3 WHERE gh_type=$1 AND gh_id=$2", [ghType, String(ghId), sig]);
+}
+/** Заменить тело коммента (для зеркалирования правок оригинального GitHub-коммента). */
+export async function updateCommentBody(commentId: number, body: string): Promise<void> {
+  await q("UPDATE comments SET body=$2 WHERE id=$1", [commentId, body]);
+}
+
+/**
+ * DEV-51 разовая чистка накопленного шума зеркалирования по ВСЕМ проектам:
+ *  - дубли зеркальных коментов (🔎 код-рев'ю / 💬 коментар у PR) — оставляем по одной канонической копии
+ *    (самой ранней) на каждый distinct (task_id, body), остальные удаляем;
+ *  - все авто-комменты об ошибках синка (⚠️ Помилка…) удаляем (теперь ошибки идут только админу/в лог).
+ * Цель только авто-комментов портала: internal + author_id IS NULL + dev_authored=false. dryRun — только счётчики.
+ */
+export async function cleanupMirrorNoise(dryRun: boolean): Promise<{ dupDeleted: number; errDeleted: number; canonicalKept: number }> {
+  const AUTO = "c.author_id IS NULL AND c.visibility='internal' AND c.dev_authored=false";
+  const MIRROR = "(c.body LIKE '🔎%' OR c.body LIKE '💬 <b>Коментар у PR%')";
+  const ERR = "c.body LIKE '⚠️ <b>Помилка%'";
+  if (dryRun) {
+    const dup = await q<{ n: number; groups: number }>(
+      `SELECT COALESCE(SUM(cnt-1),0)::int n, COUNT(*)::int groups FROM (
+         SELECT count(*) cnt FROM comments c WHERE ${AUTO} AND ${MIRROR}
+         GROUP BY c.task_id, c.body HAVING count(*) > 1) g`,
+    );
+    const err = await q<{ n: number }>(`SELECT count(*)::int n FROM comments c WHERE ${AUTO} AND ${ERR}`);
+    return { dupDeleted: dup[0]?.n ?? 0, errDeleted: err[0]?.n ?? 0, canonicalKept: dup[0]?.groups ?? 0 };
+  }
+  // Дубли: удаляем всё, кроме минимального id в группе (task_id, body).
+  const dupRes = await q<{ id: number }>(
+    `DELETE FROM comments c USING (
+        SELECT task_id, body, MIN(id) AS keep_id FROM comments c2
+        WHERE c2.author_id IS NULL AND c2.visibility='internal' AND c2.dev_authored=false
+          AND (c2.body LIKE '🔎%' OR c2.body LIKE '💬 <b>Коментар у PR%')
+        GROUP BY task_id, body HAVING count(*) > 1
+     ) d
+     WHERE c.task_id=d.task_id AND c.body=d.body AND c.id <> d.keep_id
+     RETURNING c.id`,
+  );
+  const errRes = await q<{ id: number }>(
+    `DELETE FROM comments c WHERE ${AUTO} AND ${ERR} RETURNING c.id`,
+  );
+  return { dupDeleted: dupRes.length, errDeleted: errRes.length, canonicalKept: 0 };
+}
 /** Установить деплой-стадию задачи. Возвращает true, если стадия реально изменилась (для анти-дубля комментов).
  *  evt — контекст для журнала (DEV-32): кто/почему сменил стадию (по умолчанию актор = система-автоматика). */
 export async function setDeployStage(taskId: string, stage: "pr" | "dev" | "prod", evt?: TaskEventActor, opts?: { forwardOnly?: boolean }): Promise<boolean> {

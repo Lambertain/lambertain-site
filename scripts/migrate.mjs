@@ -115,6 +115,22 @@ CREATE TABLE IF NOT EXISTS task_prs (
 INSERT INTO task_prs (task_id, pr_url, review_synced_at)
   SELECT id, pr_url, pr_review_synced_at FROM tasks WHERE pr_url IS NOT NULL
   ON CONFLICT (task_id, pr_url) DO NOTHING;
+-- DEV-51: идемпотентное зеркалирование код-ревью. Каждый GitHub-элемент (review/inline-comment/issue-comment)
+-- мирорим РОВНО ОДИН РАЗ, ключ — стабильный GitHub id (gh_type, gh_id), а не временной курсор (который давал
+-- бесконечные дубли из-за расхождения формата времени). Маппинг переживает рестарты (состояние в БД).
+-- comment_id — зеркальный коммент в задаче (для правки при редактировании оригинала на GitHub); sig — подпись
+-- содержимого (updated_at#len) для детекта правок. review_synced_at в task_prs остаётся как окно fetch/базлайн.
+CREATE TABLE IF NOT EXISTS mirrored_pr_items (
+  id         SERIAL PRIMARY KEY,
+  task_id    INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  pr_url     TEXT NOT NULL,
+  gh_type    TEXT NOT NULL,                                   -- 'review' | 'inline' | 'issue'
+  gh_id      BIGINT NOT NULL,                                 -- стабильный GitHub id элемента
+  comment_id INT REFERENCES comments(id) ON DELETE SET NULL,  -- зеркальный коммент задачи (NULL — базлайн/история, не постился)
+  sig        TEXT,                                            -- подпись содержимого (детект правок)
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (gh_type, gh_id));
+CREATE INDEX IF NOT EXISTS idx_mirrored_pr_items_pr ON mirrored_pr_items(pr_url);
 CREATE TABLE IF NOT EXISTS task_deps (
   task_id       INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   depends_on_id INT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
