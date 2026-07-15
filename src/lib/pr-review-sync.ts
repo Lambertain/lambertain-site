@@ -108,6 +108,10 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
   items.sort((a, b) => a.tsMs - b.tsMs); // хронологически
 
   const mirrored = await getMirroredForPr(prUrl);
+  // Базлайн: первый проход под id-системой для этого PR (маппинга ещё нет). Засеваем ВСЕ текущие элементы
+  // молча, без коментов — чтобы не завалить задачу историей фидбека (и не перепостить то, что старый
+  // временной курсор мог продублировать). Посты идут только с последующих циклов — на реально НОВЫЕ элементы.
+  const baseline = mirrored.size === 0;
   const be = getBackend();
   let posted = 0;
   for (const it of items) {
@@ -121,14 +125,12 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
       }
       continue;
     }
-    // Новый для нас элемент. Постим ТОЛЬКО то, что появилось после базлайна-курсора; историю (<=курсор) и всё
-    // на первом проходе — просто помечаем зазеркаленным (seed), без коммента: не заваливаем задачу старым фидбеком.
-    if (!firstPass && cursorMs != null && it.tsMs > cursorMs) {
+    if (baseline) {
+      await markMirroredItem(tid, prUrl, it.type, it.ghId, null, it.sig); // seed без коммента
+    } else {
       const c = await be.addComment(taskId, it.text, "internal", undefined, true, false);
       await markMirroredItem(tid, prUrl, it.type, it.ghId, Number(c.id), it.sig);
       posted++;
-    } else {
-      await markMirroredItem(tid, prUrl, it.type, it.ghId, null, it.sig);
     }
   }
 
