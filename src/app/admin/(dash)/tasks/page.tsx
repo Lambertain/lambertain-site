@@ -20,6 +20,31 @@ export const dynamic = "force-dynamic";
 
 const STALE_DAYS = 5;
 
+/**
+ * «Голова очереди» по каждому проекту — задача, у которой показываем тикающий Open-кружок (сигнал разработчику
+ * «эту бери в работу»). Это первая (по номеру KEY-N) незакрытая незаблокированная Open-задача проекта, и только
+ * когда по проекту НЕТ активной работы (нет задач в In Progress/Rework): пока разработчик кодит одну задачу,
+ * остальной бэклог не должен «просрочиваться». У всех прочих Open-задач отсчёт стартует лишь при взятии в работу.
+ */
+function queueHeadIds(
+  tasks: Array<{ id: string; projectKey: string; state?: string | null; ownerAction?: string | null; clientAction?: string | null }>,
+  blockedIds: Set<string>,
+): Set<string> {
+  const num = (id: string) => { const m = id.match(/(\d+)\s*$/); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; };
+  const byProj = new Map<string, typeof tasks>();
+  for (const tk of tasks) { const a = byProj.get(tk.projectKey); if (a) a.push(tk); else byProj.set(tk.projectKey, [tk]); }
+  const heads = new Set<string>();
+  for (const list of byProj.values()) {
+    const busy = list.some((tk) => { const b = statusBucket(tk.state); return b === "inProgress" || b === "rework"; });
+    if (busy) continue;
+    const head = list
+      .filter((tk) => statusBucket(tk.state) === "notStarted" && !blockedIds.has(tk.id) && !tk.ownerAction && !tk.clientAction)
+      .sort((a, b) => num(a.id) - num(b.id))[0];
+    if (head) heads.add(head.id);
+  }
+  return heads;
+}
+
 export default async function TasksPage({ searchParams }: { searchParams: Promise<{ project?: string; tab?: string; mine?: string }> }) {
   const me = await getPrincipal();
   if (!me) redirect("/admin/login");
@@ -61,6 +86,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     const projects = (mine ? projectsList.filter((p) => activeKeys.has(p.key)) : projectsList).map((p) => ({ key: p.key, name: p.name }));
     const [depMap, histMap] = await Promise.all([getDepsFor(tasks.map((tk) => tk.id)), getStatusHistoryFor(tasks.map((tk) => tk.id))]);
     const now = nowMs();
+    const blockedIds = new Set(tasks.filter((tk) => (depMap.get(tk.id) ?? []).some((d) => statusBucket(d.status) !== "done")).map((tk) => tk.id));
+    const heads = queueHeadIds(tasks, blockedIds);
     const board: BoardTask[] = tasks.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
       const lastRead = reads.get(tk.id) ?? 0;
@@ -84,7 +111,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         clientAction: tk.clientAction,
         deployStage: tk.deployStage,
         addressee: taskAddressee(tk),
-        statusRows: statusDotRows({ createdMs: tk.created ?? now, resolvedMs: tk.resolved, currentStatus: tk.state || "Open", events: histMap.get(tk.id) ?? [], nowMs: now }),
+        statusRows: statusDotRows({ createdMs: tk.created ?? now, resolvedMs: tk.resolved, currentStatus: tk.state || "Open", events: histMap.get(tk.id) ?? [], nowMs: now, suppressCurrentOpen: statusBucket(tk.state) === "notStarted" && !heads.has(tk.id) }),
       };
     });
     const fbSet = new Set(projectsList.filter((p) => p.meta.feedback).map((p) => p.key));
@@ -154,6 +181,8 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     const merged = me.realRole === "admin" ? merged0 : merged0.filter((tk) => !tk.internal || tk.createdByRole === "admin" || tk.createdByRole === "super");
     const [depMap, histMap] = await Promise.all([getDepsFor(merged.map((tk) => tk.id)), getStatusHistoryFor(merged.map((tk) => tk.id))]);
     const now = nowMs();
+    const blockedIds = new Set(merged.filter((tk) => (depMap.get(tk.id) ?? []).some((d) => statusBucket(d.status) !== "done")).map((tk) => tk.id));
+    const heads = queueHeadIds(merged, blockedIds);
     const board: BoardTask[] = merged.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
       const lastRead = reads.get(tk.id) ?? 0;
@@ -167,7 +196,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         awaitingMyAnswer: !!tk.reporterAction && !!me.youtrackLogin && tk.reporter?.login === me.youtrackLogin,
         clientAction: tk.clientAction, deployStage: tk.deployStage,
         addressee: taskAddressee(tk),
-        statusRows: statusDotRows({ createdMs: tk.created ?? now, resolvedMs: tk.resolved, currentStatus: tk.state || "Open", events: histMap.get(tk.id) ?? [], nowMs: now }),
+        statusRows: statusDotRows({ createdMs: tk.created ?? now, resolvedMs: tk.resolved, currentStatus: tk.state || "Open", events: histMap.get(tk.id) ?? [], nowMs: now, suppressCurrentOpen: statusBucket(tk.state) === "notStarted" && !heads.has(tk.id) }),
       };
     });
     const projectsWithNew = visible

@@ -5,7 +5,13 @@
  * Цвет: 1 — зелёный, 2 — жёлтый, ≥3 — красный (дальше цифра растёт, цвет остаётся красным).
  * Смена статуса начинает новый отрезок. Возврат в статус, где задача уже была в текущей строке,
  * переносит отрезок на новую строку (строка = один «проход» по статусам → видно циклы доработок).
+ *
+ * Очередь бэклога: у задачи, которая просто ЖДЁТ своей очереди (не «голова» очереди проекта), «тикающий»
+ * кружок текущего Open-статуса НЕ показываем (suppressCurrentOpen) — иначе весь бэклог из 100+ задач начинает
+ * «просрочиваться» с момента создания, пока разработчик физически берёт задачи по одной. Отсчёт у такой задачи
+ * начинается только когда её взяли в работу (In Progress). «Голова» очереди (первая, которую надо брать) — тикает.
  */
+import { statusBucket } from "./statuses";
 
 const DAY_MS = 86400000;
 
@@ -87,9 +93,17 @@ export function statusDotRows(opts: {
   currentStatus: string;
   events: StatusEvent[];
   nowMs: number;
+  suppressCurrentOpen?: boolean; // задача ждёт очереди (не «голова») → не показывать тикающий Open-кружок
 }): StatusDot[][] {
   const segs = buildStatusSegments(opts);
-  return segmentsToRows(segs).map((row) =>
+  // Задача ждёт очереди: убираем ещё «тикающий» (endMs===now) кружок текущего Open/notStarted-статуса,
+  // чтобы бэклог не «просрочивался» до взятия в работу. Историю (если задачу уже брали) не трогаем.
+  let effective = segs;
+  if (opts.suppressCurrentOpen && segs.length) {
+    const last = segs[segs.length - 1];
+    if (last.endMs === opts.nowMs && statusBucket(last.status) === "notStarted") effective = segs.slice(0, -1);
+  }
+  return segmentsToRows(effective).map((row) =>
     row.map((s) => ({ status: s.status, days: segmentDayNumber(s.startMs, s.endMs) })),
   );
 }
