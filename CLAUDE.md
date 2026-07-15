@@ -50,6 +50,8 @@
 - `POST /api/admin/task-status` `{ readableId, status, summary? }` → смена статуса (+синк Trello-карточки).
 - `POST /api/admin/task-deps` `{ readableId, dependsOn: ["1A-1", ...] }` → **полностью заменяет** набор блокеров (только из того же проекта).
 - `POST /api/admin/comment` `{ readableId, body, visibleToClient?, review? }` → коммент от агентства (зеркалится в Trello при `visibleToClient`).
+- `POST /api/admin/set-client-action` `{ readableId, action, guideId?, field? }` → задать/переписать инструкцию ожидания клиента (текст-баннер под задачей + гайд + поле каталога). Уведомлений НЕ шлёт — пуш/коммент клиенту слать отдельно `comment`ом. Снять ожидание — `clear-action`.
+- `POST /api/admin/guide-regenerate` `{ guideId, topic? }` → перегенерировать гайд-инструкцию; с `topic` — под ДРУГОЙ сервис (напр. SendGrid → Resend), тело/заголовок = `topic`.
 
 **Заведение/привязка проекта по API** (тоже `ADMIN_API_TOKEN`, не БД):
 - `POST /api/admin/project/link` `{ projectKey, name?, devGit?, clientGit?, defaultAssignee? }` → проставляет meta, возвращает **токен проекта**, раскладывает bootstrap CLAUDE.md в `Lambertain/*` дев-репо (layProtocol). Если проекта ещё нет — **создаёт его** (нужен `name`); ручной шаг «завести проект в UI» не требуется.

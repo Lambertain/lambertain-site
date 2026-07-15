@@ -2,6 +2,8 @@
  * Гайды-инструкции: инспекция и регенерация локалей.
  * GET  /api/admin/guide-regenerate           — список гайдов (id, title по локалям) для проверки языка.
  * POST /api/admin/guide-regenerate { guideId } — перегенерировать ОДИН гайд в правильных uk/ru/en (тема = текущий title).
+ * POST /api/admin/guide-regenerate { guideId, topic } — перегенерировать гайд под ДРУГУЮ тему (напр. сменили сервис
+ *                                                       SendGrid → Resend): тело и заголовок = переданный topic.
  * POST /api/admin/guide-regenerate { all:true } — перегенерировать ВСЕ гайды.
  * Авторизация: Authorization: Bearer <ADMIN_API_TOKEN>.
  */
@@ -25,10 +27,10 @@ export async function GET(req: Request) {
   return NextResponse.json({ count: guides.length, guides: guides.map((g) => ({ id: g.id, title: g.title, title_ru: g.title_ru, title_en: g.title_en })) });
 }
 
-async function regen(id: number): Promise<{ id: number; ok: boolean; title?: string }> {
+async function regen(id: number, topicOverride?: string): Promise<{ id: number; ok: boolean; title?: string }> {
   const g = await getGuide(id);
   if (!g) return { id, ok: false };
-  const topic = g.title || g.title_ru || g.title_en || "інструкція";
+  const topic = (topicOverride && topicOverride.trim()) || g.title || g.title_ru || g.title_en || "інструкція";
   const c = await genGuideContent(topic);
   if (!c) return { id, ok: false };
   await updateGuide(id, c.title_uk, c.body_uk, g.ord); // тільки українською (ru/en обнуляються)
@@ -37,7 +39,7 @@ async function regen(id: number): Promise<{ id: number; ok: boolean; title?: str
 
 export async function POST(req: Request) {
   if (!ok(req)) return NextResponse.json({ error: "invalid token" }, { status: 401 });
-  let b: { guideId?: number; all?: boolean; stripAll?: boolean };
+  let b: { guideId?: number; all?: boolean; stripAll?: boolean; topic?: string };
   try { b = await readJsonSmart(req); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }
   // stripAll — оставить уже корректный uk, обнулить ru/en у ВСЕХ гайдов (без LLM): все видят украинский.
   if (b.stripAll) {
@@ -53,5 +55,5 @@ export async function POST(req: Request) {
   }
   const id = Number(b.guideId);
   if (!Number.isFinite(id)) return NextResponse.json({ error: "guideId or all required" }, { status: 400 });
-  return NextResponse.json(await regen(id));
+  return NextResponse.json(await regen(id, b.topic));
 }
