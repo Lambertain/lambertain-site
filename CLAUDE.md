@@ -28,7 +28,8 @@
   - Web service `lambertain-site`: `e085dd1f-af3f-4d1f-b2b5-88e75cd6f08c` (build `npm run build`, start `npm start`, preDeploy `node scripts/migrate.mjs`)
   - Poller service `poller`: `8d8d1b53-2036-4c92-9352-38e80aaec4ae` (start `npm run poller`, cron `*/5 * * * *`, POLL_ONCE=1)
   - Postgres service `64ddd9a1-62ed-4b60-90e8-a684b8810a05` (image postgres:16, internal `postgres.railway.internal:5432`, db `railway`)
-- Внешнего TCP-прокси к Postgres нет — миграции через preDeployCommand (`scripts/migrate.mjs`).
+- Прод-БД доступна снаружи через публичный TCP-proxy `centerbeam.proxy.rlwy.net:33919` → 5432. Строка — в `.env.local` как `DATABASE_PUBLIC_URL` (взять/обновить можно по Railway GraphQL: `variables` Postgres-сервиса → `RAILWAY_TCP_PROXY_DOMAIN/PORT`, `POSTGRES_USER/PASSWORD/DB`). Миграции на деплое — через preDeployCommand (`scripts/migrate.mjs`).
+- **Прямой доступ к прод-БД — только для схемы/разовых read-миграций.** Контент (задачи, комменты, clientAction, гайды и т.п.) менять **через API портала**; если нужного эндпоинта нет — создать его (и добавить в каталог API ниже), а не править данные сырым SQL.
 - Домены: `lambertain-site-production.up.railway.app`, `www.lambertain.site`.
 
 ## Telegram-бот
@@ -36,7 +37,7 @@
 - Menu button → `https://lambertain-site-production.up.railway.app/tma`.
 
 ## Доступы
-Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL`, `GITHUB_TOKEN`, `ADMIN_API_TOKEN`. Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
+Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL` (локальная дев-БD `localhost:5434`), `DATABASE_PUBLIC_URL` (прод-БД портала через TCP-proxy), `GITHUB_TOKEN`, `ADMIN_API_TOKEN`. Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
 
 ## Создание задач по API (для Claude/скриптов — без доступа к БД)
 `POST /api/admin/create-task`, заголовок `Authorization: Bearer $ADMIN_API_TOKEN` (значение — в `.env.local`).
