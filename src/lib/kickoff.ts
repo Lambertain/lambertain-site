@@ -15,6 +15,8 @@ export interface KickoffTask {
   type?: string;
   complexity?: "small" | "feature";
   skills?: string[];
+  /** Может ли НЕтехнический клиент сам проверить результат (открыть/кликнуть/увидеть). false — внутренняя/техническая. */
+  clientVerifiable?: boolean;
 }
 
 const TOOL: Anthropic.Tool = {
@@ -34,8 +36,9 @@ const TOOL: Anthropic.Tool = {
             type: { type: "string", description: "bug | feature | improvement | infra | content | design | other" },
             complexity: { type: "string", enum: ["small", "feature"], description: "small — мелочь/правка; feature — существенное (спека)." },
             skills: { type: "array", items: { type: "string" }, description: "slug'и релевантных скилов из списка." },
+            client_verifiable: { type: "boolean", description: "Может ли НЕтехнический клиент САМ проверить результат — открыть экран/страницу/приложение и увидеть или покликать (страница, экран, кнопка, поведение, документ/файл, письмо, ответ бота). true — есть наблюдаемый клиентом результат. false — чисто внутренняя/техническая работа без видимого клиенту результата (миграция БД, схема данных, бэкап, CI/деплой-настройка, серверная интеграция без UI, рефакторинг). Если сомневаешься — true." },
           },
-          required: ["summary", "description"],
+          required: ["summary", "description", "client_verifiable"],
         },
       },
     },
@@ -72,7 +75,7 @@ export async function decomposeSpec(spec: string, projectName: string, opts?: { 
     "- ПОРЯДОК ВМЕСТО БЛОКЕРОВ: верни задачи СТРОГО В ПОРЯДКЕ ВЫПОЛНЕНИЯ (первая в массиве — которую делать первой). БЛОКЕРЫ/ЗАВИСИМОСТИ НЕ ПРОСТАВЛЯЙ — разработчик выполняет задачи ПОДРЯД по их номерам, ему не нужно ждать приёмки предыдущей. Просто расположи так, чтобы предшественник шёл РАНЬШЕ зависимой (фундаментальную обвязку — внутрь первой фичи, что ею пользуется). Это порядок-подсказка, а не жёсткая блокировка.\n" +
     designRule +
     "- ОРИЕНТИР ПО КОЛИЧЕСТВУ: обычно 5–15 задач на проект, а НЕ десятки. Лучше крупнее и цельнее, чем мельче. Если получается >20 — ты дробишь слишком мелко, укрупни.\n" +
-    "- Теги: type; complexity (для таких фич — обычно feature; small лишь для реально мелких правок); skills (slug'и из списка ниже).\n" +
+    "- Теги: type; complexity (для таких фич — обычно feature; small лишь для реально мелких правок); skills (slug'и из списка ниже); client_verifiable (может ли клиент САМ проверить результат — см. описание поля; для внутренних/технических задач без видимого клиенту результата ставь false, чтобы они не шли клиенту на приёмку впустую).\n" +
     "- ЕСЛИ в спеке указано, что уже сделано / текущее состояние (проект частично готов) — НЕ создавай задачи на готовое, только на ОСТАВШЕЕСЯ; зависимости считай относительно остатка.\n" +
     "- В репозиторий НЕ ходишь — код и детальную разбивку каждой фичи делает Claude разработчика (у него весь код как контекст).\n\n" +
     "Доступные скилы:\n" + (skillList || "(нет)");
@@ -91,7 +94,10 @@ export async function decomposeSpec(spec: string, projectName: string, opts?: { 
     outTok += resp.usage.output_tokens;
     for (const block of resp.content) {
       if (block.type === "tool_use" && block.name === "propose_tasks") {
-        return ((block.input as { tasks?: KickoffTask[] }).tasks || []).filter((t) => t.summary?.trim());
+        type RawTask = KickoffTask & { client_verifiable?: boolean };
+        return ((block.input as { tasks?: RawTask[] }).tasks || [])
+          .filter((t) => t.summary?.trim())
+          .map((t) => ({ ...t, clientVerifiable: t.client_verifiable !== false })); // по умолчанию true (на ревью), false только если модель явно сказала
       }
     }
     throw new Error("ИИ не вернул задачи");

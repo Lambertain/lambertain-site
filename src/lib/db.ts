@@ -378,6 +378,11 @@ export async function setTaskApproval(taskId: string, status: "approved" | "pend
   await q("UPDATE tasks SET approval_status = $2 WHERE readable_id = $1", [taskId, status]);
 }
 
+/** Классификация «клиент может проверить сам» (client_verifiable). true → на ревью клиенту; false → сразу Done; null — снять. */
+export async function setTaskClientVerifiable(taskId: string, val: boolean | null): Promise<void> {
+  await q("UPDATE tasks SET client_verifiable = $2 WHERE readable_id = $1", [taskId, val]);
+}
+
 /** Создать/обновить участника (member) — для людей, добавленных через Telegram. */
 export async function upsertMember(
   login: string,

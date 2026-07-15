@@ -45,10 +45,17 @@ export async function POST(req: Request) {
     if (status === "Review") {
       const task = await be.getTask(taskId);
       const proj = await getProjectFull(projectKey).catch(() => null);
-      // autoDone (спека супер-админа) ИЛИ autoApprove (доверенный разраб) — на готовности сразу Done, без ручной приёмки.
-      // DEV-29: НО задачи ОТ КЛИЕНТА (reporter=client) авто-закрывать нельзя — их принимает сам клиент (идут в Review).
-      if ((task.autoDone || proj?.meta.autoApprove) && task.reporter?.role !== "client") {
-        await be.updateStatus(taskId, "Done", { actorRole: "system", trigger: task.autoDone ? "автоздача за спекою (autoDone)" : "gitflow: авто-приймання (autoApprove)" });
+      // Кто закрывает задачу на готовности:
+      //  • autoDone (спека супер-админа) / autoApprove (доверенный разраб) + постановщик НЕ клиент → сразу Done.
+      //  • НЕ верифицируема клиентом (client_verifiable=false — внутренняя/техническая: миграция, схема, бэкап,
+      //    деплой, серверная интеграция без UI) → сразу Done ДАЖЕ для клиента-постановщика: клиент физически не
+      //    может это «покликати», поэтому не выносим ему на приёмку (иначе он в недоумении принимает то, чего не видит).
+      //  • Иначе (клиент может проверить глазами/руками) → Review с кнопками «Готово/На доработку».
+      // DEV-29: обычные задачи ОТ КЛИЕНТА (reporter=client), которые клиент МОЖЕТ проверить, авто-закрывать нельзя.
+      const clientCantVerify = task.clientVerifiable === false;
+      const autoAccept = (task.autoDone || proj?.meta.autoApprove) && task.reporter?.role !== "client";
+      if (clientCantVerify || autoAccept) {
+        await be.updateStatus(taskId, "Done", { actorRole: "system", trigger: clientCantVerify ? "авто-готово: внутрішня/технічна задача (клієнт не перевіряє)" : task.autoDone ? "автоздача за спекою (autoDone)" : "gitflow: авто-приймання (autoApprove)" });
         after(() => syncTaskToTrello(taskId, "Done")); // Trello: карточку → «Виконано»
         await advanceStage(taskId, "dev", "розробник здав на ревʼю").catch(() => {}); // готово и на дев-мейн → «На тестовому»; авто-доставка ниже переведёт в «Опубліковано»
         // «Авто-готово» адміну НЕ пушимо — це шум, який ще й треба вручну закривати. Стан видно на дошці; далі йде авто-доставка.

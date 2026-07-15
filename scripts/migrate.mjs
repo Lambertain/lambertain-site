@@ -80,6 +80,11 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS tags JSONB;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS internal BOOLEAN NOT NULL DEFAULT false;
 -- Авто-готово: задачи по спеке от супер-админа на готовности идут сразу в Done (без ручной приёмки).
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS auto_done BOOLEAN NOT NULL DEFAULT false;
+-- Верифицируема ли задача КЛИЕНТОМ (может проверить глазами/руками — открыть экран, кликнуть, увидеть результат):
+-- true → на ревью клиенту с кнопками «Готово/На доработку»; false → внутренняя/техническая (миграция, схема,
+-- бэкап, деплой-настройка, серверная интеграция без UI) → на готовности идёт сразу в Done, минуя клиентское
+-- ревью (клиент всё равно не может это проверить); NULL → ещё не классифицировано (ведёт себя как true — на ревью).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_verifiable BOOLEAN;
 -- Действие владельца: задача требует ручного ops-шага только владельца (деплой/регистрация/токен) — передаётся
 -- супер-админу «на доработку». Клиент видит «в работе» (status не меняется); это внутренний флаг.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS owner_action TEXT;

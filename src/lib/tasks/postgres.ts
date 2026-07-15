@@ -31,6 +31,7 @@ interface TaskRow {
   approval_status: string | null;
   internal: boolean | null;
   auto_done: boolean | null;
+  client_verifiable: boolean | null;
   owner_action: string | null;
   reporter_action: string | null;
   created_by_role: string | null;
@@ -43,7 +44,7 @@ interface TaskRow {
 
 const TASK_SELECT = `
   SELECT t.readable_id, p.key AS project_key, t.title, t.description, t.status, t.priority,
-         t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal, t.auto_done, t.owner_action, t.reporter_action, t.created_by_role,
+         t.created_at, t.updated_at, t.resolved_at, t.approval_status, t.internal, t.auto_done, t.client_verifiable, t.owner_action, t.reporter_action, t.created_by_role,
          t.client_action, t.client_action_guide, t.client_action_field, t.deploy_stage, t.pr_url,
          a.login AS assignee_login, a.full_name AS assignee_name,
          r.login AS reporter_login, r.full_name AS reporter_name, r.role AS reporter_role,
@@ -76,6 +77,7 @@ function rowToTask(t: TaskRow): Task {
     approvalStatus: t.approval_status ?? "approved",
     internal: !!t.internal,
     autoDone: !!t.auto_done,
+    clientVerifiable: t.client_verifiable ?? null,
     ownerAction: t.owner_action ?? null,
     reporterAction: t.reporter_action ?? null,
     createdByRole: t.created_by_role ?? null,
@@ -172,9 +174,9 @@ export const postgresBackend: TasksBackend = {
       const num = (maxNum[0]?.n ?? 0) + 1;
       const rid = `${proj[0].key}-${num}`;
       await query(
-        `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, reporter_id, created_at, updated_at, source, approval_status, created_by_role, internal, auto_done)
-         VALUES ($1,$2,$3,$4,$5,'Open',$6,$7,$8, now(), now(), 'portal', $9, $10, $11, $12)`,
-        [proj[0].id, num, rid, input.summary, description, input.priority || null, assigneeId, reporterId, input.approvalStatus || "approved", input.createdByRole || null, input.internal || false, input.autoDone || false],
+        `INSERT INTO tasks (project_id, num, readable_id, title, description, status, priority, assignee_id, reporter_id, created_at, updated_at, source, approval_status, created_by_role, internal, auto_done, client_verifiable)
+         VALUES ($1,$2,$3,$4,$5,'Open',$6,$7,$8, now(), now(), 'portal', $9, $10, $11, $12, $13)`,
+        [proj[0].id, num, rid, input.summary, description, input.priority || null, assigneeId, reporterId, input.approvalStatus || "approved", input.createdByRole || null, input.internal || false, input.autoDone || false, input.clientVerifiable ?? null],
       );
       return rid;
     });

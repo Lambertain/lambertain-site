@@ -158,6 +158,9 @@ export interface Task {
   createdByRole?: string | null;
   /** Авто-готово: на ревью-завершении дева задача идёт сразу в Done (без ручной приёмки). */
   autoDone?: boolean;
+  /** Может ли КЛИЕНТ проверить результат сам (глазами/руками): true → на ревью с кнопками «Готово/Доработать»;
+   *  false → внутренняя/техническая → на готовности сразу Done, минуя клиентское ревью; null → не классифицировано (как true). */
+  clientVerifiable?: boolean | null;
   /** Задача ждёт ручного ops-шага владельца (деплой/регистрация/токен): что нужно сделать. Клиент не видит. */
   ownerAction?: string | null;
   /** DEV-48: задача ждёт ответа ПОСТАНОВЩИКА — вопрос разработчика (escalate admin). Статус не меняется. */
@@ -233,6 +236,7 @@ export interface TasksBackend {
     createdByRole?: Role;
     internal?: boolean;
     autoDone?: boolean;
+    clientVerifiable?: boolean | null;
   }): Promise<Task>;
   getComments(id: string): Promise<Comment[]>;
   addComment(id: string, text: string, visibility?: "client" | "internal" | "client_nodev", authorLogin?: string, approved?: boolean, devAuthored?: boolean): Promise<Comment>;

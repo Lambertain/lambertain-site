@@ -58,6 +58,7 @@ export async function POST(req: Request) {
         reporterLogin: clientLogin,
         approvalStatus: "approved",
         autoDone: false, // клиент-постановщик принимает результат сам (а не авто-Готово)
+        clientVerifiable: tk.clientVerifiable !== false, // false — внутренняя/техническая → сразу Done минуя клиентское ревью
       });
       await setTaskTags(task.id, { type: tk.type, complexity: tk.complexity, skills: (Array.isArray(tk.skills) ? tk.skills : []).filter(Boolean) });
       ids.push(task.id);
