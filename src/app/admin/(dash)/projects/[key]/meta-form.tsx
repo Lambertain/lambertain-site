@@ -30,6 +30,25 @@ function AccountsEditor({ rows, onChange, locale }: { rows: Account[]; onChange:
   );
 }
 
+/** Редактор оплат клиента: строки «сумма + дата» (по умолчанию сегодня), добавляется сколько нужно. */
+function PaymentsEditor({ rows, onChange, currency, locale }: { rows: { amount: string; date: string }[]; onChange: (r: { amount: string; date: string }[]) => void; currency: string; locale: Locale }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const set = (i: number, k: "amount" | "date", v: string) => onChange(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <input value={r.amount} onChange={(e) => set(i, "amount", e.target.value)} inputMode="numeric" placeholder={t(locale, "field.paymentAmount")} style={{ ...ui.input, width: 130, padding: "6px 8px" }} />
+          <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>{currency}</span>
+          <div style={{ minWidth: 150 }}><DateField value={r.date} onChange={(v) => set(i, "date", v)} locale={locale} /></div>
+          <button onClick={() => onChange(rows.filter((_, j) => j !== i))} title="×" style={{ background: "transparent", border: "none", color: "#ff5b5b", cursor: "pointer", fontSize: 16 }}>×</button>
+        </div>
+      ))}
+      <button onClick={() => onChange([...rows, { amount: "", date: today }])} style={{ ...ui.monoLabel, color: "var(--muted)", background: "transparent", border: "1px dashed var(--border-2)", padding: "6px 12px", cursor: "pointer", borderRadius: 2, alignSelf: "flex-start" }}>+ {t(locale, "field.addPayment")}</button>
+    </div>
+  );
+}
+
 /** Вложения, вставленные в markdown-текст: `[name](/api/files/12)` или `![name](/api/files/12)`. */
 type MdAtt = { full: string; label: string; href: string; isImage: boolean };
 function parseAttachments(md: string): MdAtt[] {
@@ -133,8 +152,8 @@ export function MetaForm({
   const [defaultAssignee, setDefaultAssignee] = useState(m.defaultAssignee ?? "");
   const [cost, setCost] = useState(m.cost != null ? String(m.cost) : "");
   const [currency, setCurrency] = useState(m.currency ?? "₴");
-  const [parts, setParts] = useState(m.parts != null ? String(m.parts) : "1");
-  const [paidParts, setPaidParts] = useState(m.paidParts != null ? String(m.paidParts) : "0");
+  const [payments, setPayments] = useState<{ amount: string; date: string }[]>((m.payments ?? []).map((p) => ({ amount: String(p.amount ?? ""), date: p.date || "" })));
+  const [showFinanceToDev, setShowFinanceToDev] = useState(!!m.showFinanceToDev);
   const [startedAt, setStartedAt] = useState(m.startedAt ?? "");
   const [deadline, setDeadline] = useState(m.deadline ?? "");
   const [clientGit, setClientGit] = useState(m.clientGit ?? "");
@@ -229,8 +248,13 @@ export function MetaForm({
       defaultAssignee: defaultAssignee || undefined,
       cost: cost.trim() !== "" && Number.isFinite(Number(cost)) ? Number(cost) : undefined,
       currency: currency || undefined,
-      parts: Number(parts) >= 1 ? Math.floor(Number(parts)) : undefined,
-      paidParts: Number(paidParts) >= 0 ? Math.floor(Number(paidParts)) : undefined,
+      // Оплаты клиента (сумма+дата); суммы сверх cost поднимают итоговую стоимость (см. lib/finance).
+      payments: (() => {
+        const rows = payments.map((p) => ({ amount: Number(p.amount), date: p.date })).filter((p) => Number.isFinite(p.amount) && p.amount > 0);
+        return rows.length ? rows : undefined;
+      })(),
+      showFinanceToDev: showFinanceToDev || undefined,
+      // parts/paidParts (legacy) не трогаем — сохраняются из ...m; calc их игнорирует, если есть payments.
       startedAt: startedAt || undefined,
       deadline: deadline || undefined,
       // Railway/Vercel — проекция реестр-полей обратно в clientDeploy/clientVercel (логика деплоя читает их).
@@ -322,14 +346,6 @@ export function MetaForm({
           </select>
         </div>
         <div>
-          <label style={ui.fieldLabel}>{t(locale, "field.parts")}</label>
-          <input value={parts} onChange={(e) => setParts(e.target.value)} inputMode="numeric" style={ui.input} />
-        </div>
-        <div>
-          <label style={ui.fieldLabel}>{t(locale, "field.paidParts")}</label>
-          <input value={paidParts} onChange={(e) => setPaidParts(e.target.value)} inputMode="numeric" style={ui.input} />
-        </div>
-        <div>
           <label style={ui.fieldLabel}>{t(locale, "field.startedAt")}</label>
           <DateField value={startedAt} onChange={setStartedAt} locale={locale} />
         </div>
@@ -338,6 +354,35 @@ export function MetaForm({
           <DateField value={deadline} onChange={setDeadline} locale={locale} />
         </div>
       </div>
+
+      {/* Оплаты клиента: сумма + дата (по умолчанию сегодня), добавляются до полного расчёта. Суммы сверх стоимости поднимают итоговую стоимость. */}
+      <div style={{ marginTop: 14 }}>
+        <label style={ui.fieldLabel}>{t(locale, "field.payments")}</label>
+        <PaymentsEditor rows={payments} onChange={setPayments} currency={currency} locale={locale} />
+        {(() => {
+          const paidSum = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+          const costNum = Number(cost) || 0;
+          if (paidSum <= 0 && costNum <= 0) return null;
+          const remaining = Math.max(0, costNum - paidSum);
+          const total = Math.max(costNum, paidSum);
+          return (
+            <div style={{ ...ui.monoLabel, textTransform: "none", marginTop: 8, display: "flex", gap: 14, flexWrap: "wrap" }}>
+              <span style={{ color: "var(--accent)" }}>{t(locale, "dash.paid")}: {paidSum.toLocaleString()} {currency}</span>
+              <span style={{ color: remaining > 0 ? "#e8b339" : "var(--muted)" }}>{t(locale, "dash.unpaid")}: {remaining.toLocaleString()} {currency}</span>
+              {total > costNum && <span style={{ color: "var(--muted)" }}>{t(locale, "fin.projectTotal")}: {total.toLocaleString()} {currency}</span>}
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Показывать ли разработчику стоимость и оплаты (по умолчанию нет — только админ). */}
+      <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer", marginTop: 12 }}>
+        <input type="checkbox" checked={showFinanceToDev} onChange={(e) => setShowFinanceToDev(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />
+        <span>
+          <span style={{ fontSize: 14 }}>{t(locale, "projects.showFinanceToDev")}</span>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", display: "block", marginTop: 2 }}>{t(locale, "projects.showFinanceToDevHint")}</span>
+        </span>
+      </label>
 
       <div style={{ ...ui.monoLabel, marginTop: 18, marginBottom: 10 }}>{t(locale, "projects.repos")}</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

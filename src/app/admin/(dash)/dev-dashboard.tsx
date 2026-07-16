@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ProjectMeta } from "@/lib/tasks/types";
+import { projectFinance } from "@/lib/finance";
 import { type RepoSyncStatus } from "@/lib/repo-sync";
 import { t, type Locale } from "@/lib/i18n";
 import { DevActivityChart } from "./dev-activity-chart";
@@ -37,20 +38,10 @@ function money(cost: number | undefined, currency: string | undefined): string |
   return `${cost.toLocaleString()} ${currency || "₴"}`;
 }
 
-/** Оплата проекта: общая сумма, части, сколько оплачено/осталось. */
-function payment(meta: ProjectMeta) {
-  const cost = Number.isFinite(meta.cost) ? (meta.cost as number) : 0;
-  const parts = meta.parts && meta.parts >= 1 ? Math.floor(meta.parts) : 1;
-  const paidParts = Math.min(Math.max(Math.floor(meta.paidParts ?? 0), 0), parts);
-  const paid = cost > 0 ? Math.round((cost * paidParts) / parts) : 0;
-  const unpaid = Math.max(0, cost - paid);
-  return { cost, currency: meta.currency || "₴", parts, paidParts, paid, unpaid, isClient: cost > 0 };
-}
-
 function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: Locale }) {
   const m = metrics(p, now);
-  const cost = money(p.meta.cost, p.meta.currency);
-  const pay = payment(p.meta);
+  const pay = projectFinance(p.meta);
+  const cost = pay.isClient ? money(pay.effectiveCost, pay.currency) : null;
   return (
     <Link
       href={`/admin/projects/${p.key}`}
@@ -73,8 +64,8 @@ function ProjectCard({ p, now, locale }: { p: DashProject; now: number; locale: 
       {pay.isClient && (
         <div style={{ display: "flex", gap: 14, ...ui.monoLabel, textTransform: "none", marginTop: 8, flexWrap: "wrap" }}>
           <span style={{ color: "var(--accent)" }}>{t(locale, "dash.paid")}: {pay.paid.toLocaleString()} {pay.currency}</span>
-          <span style={{ color: pay.unpaid > 0 ? "#e8b339" : "var(--muted)" }}>{t(locale, "dash.unpaid")}: {pay.unpaid.toLocaleString()} {pay.currency}</span>
-          <span style={{ color: "var(--muted)" }}>{pay.paidParts}/{pay.parts} {t(locale, "dash.parts")}</span>
+          <span style={{ color: pay.remaining > 0 ? "#e8b339" : "var(--muted)" }}>{t(locale, "dash.unpaid")}: {pay.remaining.toLocaleString()} {pay.currency}</span>
+          {pay.payments.length > 0 && <span style={{ color: "var(--muted)" }}>{pay.payments.length} {t(locale, "fin.paymentsN")}</span>}
         </div>
       )}
 
@@ -110,15 +101,15 @@ function Stat({ value, label, color }: { value: string; label: string; color?: s
 
 /** Финансовый блок: проекты (всего/личные/клиентские) и деньги (всего/получено/осталось). */
 function FinBlock({ projects, locale }: { projects: DashProject[]; locale: Locale }) {
-  const client = projects.filter((p) => (p.meta.cost ?? 0) > 0);
+  const client = projects.filter((p) => projectFinance(p.meta).isClient);
   const personal = projects.length - client.length;
   const currency = client.find((p) => p.meta.currency)?.meta.currency || "₴";
   let total = 0, received = 0, notReceived = 0;
   for (const p of client) {
-    const pay = payment(p.meta);
-    total += pay.cost;
+    const pay = projectFinance(p.meta);
+    total += pay.effectiveCost;
     received += pay.paid;
-    notReceived += pay.unpaid;
+    notReceived += pay.remaining;
   }
   const fmt = (n: number) => `${n.toLocaleString()} ${currency}`;
 
@@ -154,7 +145,7 @@ function DevBlock({
   doneMap: Record<string, Record<string, number>>;
 }) {
   const currency = projects.find((p) => p.meta.currency)?.meta.currency || "₴";
-  const totalCost = projects.reduce((s, p) => s + (Number.isFinite(p.meta.cost) ? (p.meta.cost as number) : 0), 0);
+  const totalCost = projects.reduce((s, p) => s + projectFinance(p.meta).effectiveCost, 0);
   const openTasks = projects.reduce((s, p) => s + (p.total - p.done), 0);
 
   return (

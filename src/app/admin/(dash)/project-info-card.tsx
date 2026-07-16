@@ -5,6 +5,7 @@ import type { ProjectMeta } from "@/lib/tasks/types";
 import { listSpecs } from "@/lib/specs";
 import { fieldVisible } from "@/lib/field-visibility";
 import { getFieldDef } from "@/lib/project-fields";
+import { projectFinance } from "@/lib/finance";
 import { BUCKET_ORDER, BUCKET_LABEL, type Bucket } from "@/lib/statuses";
 import { type RepoSyncStatus } from "@/lib/repo-sync";
 import { t, type Locale } from "@/lib/i18n";
@@ -138,6 +139,31 @@ export function ProjectInfoCard({
 
       {open && (
         <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* Финансы (стоимость + оплаты с датами) — разработчику ТОЛЬКО если админ включил чекбокс showFinanceToDev. */}
+          {viewerDev && m.showFinanceToDev && (() => {
+            const fin = projectFinance(m);
+            if (!fin.isClient) return null;
+            return (
+              <div style={{ border: "1px solid var(--border-2)", borderRadius: 6, padding: 12, background: "var(--surface-2)" }}>
+                <div style={{ ...ui.monoLabel, color: "var(--accent)", marginBottom: 8, display: "flex", gap: 14, flexWrap: "wrap" }}>
+                  <span>{t(locale, "field.cost")}: {fin.effectiveCost.toLocaleString()} {fin.currency}</span>
+                  <span>{t(locale, "dash.paid")}: {fin.paid.toLocaleString()} {fin.currency}</span>
+                  <span style={{ color: fin.remaining > 0 ? "#e8b339" : "var(--muted)" }}>{t(locale, "dash.unpaid")}: {fin.remaining.toLocaleString()} {fin.currency}</span>
+                </div>
+                {fin.payments.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {fin.payments.map((p, i) => (
+                      <div key={i} style={{ display: "flex", gap: 12, fontSize: 13, fontFamily: "var(--font-mono)" }}>
+                        <span>{p.amount.toLocaleString()} {fin.currency}</span>
+                        {p.date && <span style={{ color: "var(--muted)" }}>{p.date}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {see("devUrl") && devUrl && <ExtLink href={devUrl} label={`${t(locale, "proj.devApp")}: ${devUrl}`} />}
             {see("prodUrl") && prodUrl && <ExtLink href={prodUrl} label={`${t(locale, "proj.prodApp")}: ${prodUrl}`} />}

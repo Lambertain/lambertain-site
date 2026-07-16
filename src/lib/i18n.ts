@@ -752,6 +752,13 @@ export const DICT: Record<string, Entry> = {
 
   // — поля проекта: экономика —
   "field.cost": { uk: "Вартість", ru: "Стоимость", en: "Cost" },
+  "field.payments": { uk: "Оплати клієнта", ru: "Оплаты клиента", en: "Client payments" },
+  "field.paymentAmount": { uk: "Сума", ru: "Сумма", en: "Amount" },
+  "field.addPayment": { uk: "Оплата", ru: "Оплата", en: "Payment" },
+  "fin.paymentsN": { uk: "оплат", ru: "оплат", en: "payments" },
+  "fin.projectTotal": { uk: "Разом", ru: "Итого", en: "Total" },
+  "projects.showFinanceToDev": { uk: "Показувати розробнику вартість і оплати", ru: "Показывать разработчику стоимость и оплаты", en: "Show cost & payments to developer" },
+  "projects.showFinanceToDevHint": { uk: "За замовчуванням фінанси бачить лише адмін.", ru: "По умолчанию финансы видит только админ.", en: "By default only admin sees finances." },
   "field.currency": { uk: "Валюта", ru: "Валюта", en: "Currency" },
   "field.parts": { uk: "Частин (платежів)", ru: "Частей (платежей)", en: "Parts (payments)" },
   "field.paidParts": { uk: "Оплачено частин", ru: "Оплачено частей", en: "Parts paid" },
