@@ -383,6 +383,24 @@ export async function setTaskClientVerifiable(taskId: string, val: boolean | nul
   await q("UPDATE tasks SET client_verifiable = $2 WHERE readable_id = $1", [taskId, val]);
 }
 
+/**
+ * Лёгкая инфа обо ВСЕХ незакрытых задачах проектов — для расчёта «головы очереди» (первая Open-задача, у которой
+ * тикает кружок «бери в работу») НЕЗАВИСИМО от пагинации доски. Доска грузит лишь limit-окно (updated_desc), и если
+ * ранние задачи проекта в него не попали, голова считалась неверно и кружок «бери» вылезал на случайной задаче.
+ */
+export async function projectQueueTasks(projectKeys: string[]): Promise<Array<{ id: string; projectKey: string; state: string | null; ownerAction: string | null; clientAction: string | null }>> {
+  if (!projectKeys.length) return [];
+  // internal=false: внутренние (PM/доступы, напр. «Сделать спеку») — не «бери в работу»-сигнал и скрыты от разработчика,
+  // они не должны становиться головой очереди (иначе у дева либо тикает не та задача, либо не тикает ничего).
+  const rows = await q<{ readable_id: string; key: string; status: string | null; owner_action: string | null; client_action: string | null }>(
+    `SELECT t.readable_id, p.key, t.status, t.owner_action, t.client_action
+       FROM tasks t JOIN projects p ON p.id = t.project_id
+      WHERE p.key = ANY($1) AND t.resolved_at IS NULL AND t.internal = false`,
+    [projectKeys],
+  );
+  return rows.map((r) => ({ id: r.readable_id, projectKey: r.key, state: r.status, ownerAction: r.owner_action, clientAction: r.client_action }));
+}
+
 /** Создать/обновить участника (member) — для людей, добавленных через Telegram. */
 export async function upsertMember(
   login: string,

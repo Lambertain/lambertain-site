@@ -5,7 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
-import { getReads, getProjectReads, getDepsFor, getStatusHistoryFor } from "@/lib/db";
+import { getReads, getProjectReads, getDepsFor, getStatusHistoryFor, projectQueueTasks } from "@/lib/db";
 import { statusDotRows } from "@/lib/status-timer";
 import { mergeFeedback } from "@/lib/feedback";
 import { visibleProjects } from "@/lib/scope";
@@ -28,7 +28,6 @@ const STALE_DAYS = 5;
  */
 function queueHeadIds(
   tasks: Array<{ id: string; projectKey: string; state?: string | null; ownerAction?: string | null; clientAction?: string | null }>,
-  blockedIds: Set<string>,
 ): Set<string> {
   const num = (id: string) => { const m = id.match(/(\d+)\s*$/); return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER; };
   const byProj = new Map<string, typeof tasks>();
@@ -38,7 +37,7 @@ function queueHeadIds(
     const busy = list.some((tk) => { const b = statusBucket(tk.state); return b === "inProgress" || b === "rework"; });
     if (busy) continue;
     const head = list
-      .filter((tk) => statusBucket(tk.state) === "notStarted" && !blockedIds.has(tk.id) && !tk.ownerAction && !tk.clientAction)
+      .filter((tk) => statusBucket(tk.state) === "notStarted" && !tk.ownerAction && !tk.clientAction)
       .sort((a, b) => num(a.id) - num(b.id))[0];
     if (head) heads.add(head.id);
   }
@@ -84,10 +83,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     // В режиме «Мои задачи» показываем только проекты, где есть мои АКТИВНЫЕ (не выполненные) задачи; на «Все» — все проекты.
     const activeKeys = new Set(tasks.filter((tk) => statusBucket(tk.state) !== "done").map((tk) => tk.projectKey));
     const projects = (mine ? projectsList.filter((p) => activeKeys.has(p.key)) : projectsList).map((p) => ({ key: p.key, name: p.name }));
-    const [depMap, histMap] = await Promise.all([getDepsFor(tasks.map((tk) => tk.id)), getStatusHistoryFor(tasks.map((tk) => tk.id))]);
+    const [depMap, histMap, headInfo] = await Promise.all([getDepsFor(tasks.map((tk) => tk.id)), getStatusHistoryFor(tasks.map((tk) => tk.id)), projectQueueTasks(projectsList.map((p) => p.key))]);
     const now = nowMs();
-    const blockedIds = new Set(tasks.filter((tk) => (depMap.get(tk.id) ?? []).some((d) => statusBucket(d.status) !== "done")).map((tk) => tk.id));
-    const heads = queueHeadIds(tasks, blockedIds);
+    // «Голова очереди» считается по ПОЛНОМУ набору задач проекта (headInfo), а не по limit-окну доски — иначе
+    // при пагинации кружок «бери в работу» вылезал на случайной задаче (не первой в очереди).
+    const heads = queueHeadIds(headInfo);
     const board: BoardTask[] = tasks.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
       const lastRead = reads.get(tk.id) ?? 0;
@@ -179,10 +179,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
     const merged0 = await mergeFeedback(me, all, raw);
     // Разработчик/сотрудник видит internal только адресованные деву (admin/super), но НЕ личные само-задачи супер-админа.
     const merged = me.realRole === "admin" ? merged0 : merged0.filter((tk) => !tk.internal || tk.createdByRole === "admin" || tk.createdByRole === "super");
-    const [depMap, histMap] = await Promise.all([getDepsFor(merged.map((tk) => tk.id)), getStatusHistoryFor(merged.map((tk) => tk.id))]);
+    const [depMap, histMap, headInfo] = await Promise.all([getDepsFor(merged.map((tk) => tk.id)), getStatusHistoryFor(merged.map((tk) => tk.id)), projectQueueTasks(visible.map((p) => p.key))]);
     const now = nowMs();
-    const blockedIds = new Set(merged.filter((tk) => (depMap.get(tk.id) ?? []).some((d) => statusBucket(d.status) !== "done")).map((tk) => tk.id));
-    const heads = queueHeadIds(merged, blockedIds);
+    // «Голова очереди» — по ПОЛНОМУ набору задач видимых проектов (не по limit-окну доски).
+    const heads = queueHeadIds(headInfo);
     const board: BoardTask[] = merged.map((tk) => {
       const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
       const lastRead = reads.get(tk.id) ?? 0;
