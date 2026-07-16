@@ -11,6 +11,7 @@ function SpecCard({ projectKey, spec, locale, onChange, onDelete }: {
   projectKey: string; spec: SpecRow; locale: Locale;
   onChange: (s: SpecRow) => void; onDelete: (key: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(false);
   const [title, setTitle] = useState(spec.title);
   const [body, setBody] = useState(spec.body);
@@ -44,8 +45,12 @@ function SpecCard({ projectKey, spec, locale, onChange, onDelete }: {
   return (
     <div style={{ ...ui.card, marginTop: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 15, fontWeight: 600 }}>{spec.title}</span>
-        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{spec.body.length.toLocaleString()} зн.</span>
+        {/* Заголовок-аккордеон: клик разворачивает текст спеки для чтения. */}
+        <button onClick={() => setOpen((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", padding: 0, textAlign: "left", flex: 1, minWidth: 0 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, color: "var(--muted)", transform: open ? "rotate(180deg)" : "none", transition: "transform .15s" }}><polyline points="6 9 12 15 18 9" /></svg>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>{spec.title}</span>
+          <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{spec.body.length.toLocaleString()} зн.</span>
+        </button>
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={kick} disabled={pK} style={{ ...ui.btnAccent, opacity: pK ? 0.6 : 1 }}>{pK ? t(locale, "kickoff.working") : t(locale, "specs.kickoff")}</button>
           <button onClick={() => setEdit((v) => !v)} style={ui.btn}>{t(locale, "specs.edit")}</button>
@@ -54,6 +59,13 @@ function SpecCard({ projectKey, spec, locale, onChange, onDelete }: {
 
       {created != null && <p style={{ fontSize: 14, color: "var(--accent)", marginTop: 10 }}>{t(locale, "kickoff.created", { n: String(created) })}</p>}
       {error && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 10 }}>{error}</p>}
+
+      {/* Read-view: текст спеки (Markdown как есть, с сохранением переносов) — для чтения мной и разработчиком. */}
+      {open && !edit && (
+        <div style={{ marginTop: 12, borderTop: "1px solid var(--border)", paddingTop: 12, whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 13, lineHeight: 1.6, color: "var(--text)", maxHeight: 600, overflowY: "auto" }}>
+          {spec.body || <span style={{ color: "var(--muted)" }}>—</span>}
+        </div>
+      )}
 
       {edit && (
         <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
