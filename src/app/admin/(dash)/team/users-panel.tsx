@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveUserProjects, renameUser, deleteUser } from "./actions";
+import { saveUserProjects, renameUser, deleteUser, changeUserRole } from "./actions";
 import { t, type Locale } from "@/lib/i18n";
+import type { Role } from "@/lib/tasks/types";
 import { ui } from "../../ui-styles";
+
+const ROLE_OPTS: Role[] = ["client", "employee", "contributor", "admin"];
 
 type Proj = { key: string; name: string };
 export type PanelUser = {
@@ -25,9 +28,17 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
   const [savedN, setSavedN] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  const [role, setRole] = useState(user.role);
+  const [savedR, setSavedR] = useState(false);
   const [pendP, startP] = useTransition();
   const [pendN, startN] = useTransition();
   const [pendD, startD] = useTransition();
+  const [pendR, startR] = useTransition();
+
+  function changeRole(r: string) {
+    setRole(r); setSavedR(false);
+    startR(async () => { const res = await changeUserRole(user.login, r as Role); if (!res.error) setSavedR(true); });
+  }
 
   function removeUser() {
     startD(async () => { const r = await deleteUser(user.login); if (!r.error) setDeleted(true); });
@@ -85,6 +96,18 @@ function Card({ user, projects, locale }: { user: PanelUser; projects: Proj[]; l
 
       {open && (
         <div style={{ padding: "0 14px 14px", borderTop: "1px solid var(--border)" }}>
+          {/* роль (смена уже приглашённому) */}
+          <label style={{ ...ui.fieldLabel, marginTop: 14 }}>{t(locale, "users.role")}</label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <select value={role} onChange={(e) => changeRole(e.target.value)} style={{ ...ui.input, maxWidth: 220 }}>
+              {ROLE_OPTS.map((r) => (
+                <option key={r} value={r}>{t(locale, `role.${r}`)}</option>
+              ))}
+            </select>
+            {pendR && <span style={{ ...ui.monoLabel, color: "var(--muted)" }}>…</span>}
+            {savedR && !pendR && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>✓</span>}
+          </div>
+
           {/* имя */}
           <label style={{ ...ui.fieldLabel, marginTop: 14 }}>{t(locale, "users.alias")}</label>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

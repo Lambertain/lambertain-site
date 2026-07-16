@@ -4,7 +4,7 @@
  * Server-side only.
  */
 import { randomBytes } from "node:crypto";
-import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet, deleteAccessRequest, reassignNullReporterToClient } from "./db";
+import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet, deleteAccessRequest, reassignNullReporterToClient, getLinkRoleByTgId } from "./db";
 import { notifyAdmin, notifyLogins } from "./notify";
 import { notifyProjectOnboarding } from "./onboarding-notify";
 import { t, normalizeLocale, DEFAULT_LOCALE } from "./i18n";
@@ -53,30 +53,37 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   const login = memberLogin(user);
   const fullName = user.firstName || user.username || login;
   const keys = (inv.project_keys || inv.project_key || "").split(",").map((k) => k.trim()).filter(Boolean);
-  await upsertMember(login, fullName, inv.role, user.id);
+  // ЗАЩИТА от перетирания роли: если tg-пользователь УЖЕ привязан с реальной ролью — инвайт НЕ меняет её,
+  // только добавляет проект. Иначе клиент, случайно кликнув чужой (employee/contributor) инвайт, слетал с роли
+  // client → employee. Легитимная смена роли — только через админ-UI «Команда» (changeUserRole).
+  const existing = await getLinkRoleByTgId(user.id);
+  const REAL: Role[] = ["client", "contributor", "employee", "admin"];
+  const role: Role = existing && REAL.includes(existing) ? existing : inv.role;
+  await upsertMember(login, fullName, role, user.id);
   // tg_links.project_key — primary; полный набор проектов — в member_projects (клиент/сотрудник — несколько); разработчик — ответственный на всех выбранных.
-  await upsertLink({ tg_id: user.id, youtrack_login: login, role: inv.role, full_name: fullName, project_key: keys[0] ?? null });
-  if (inv.role === "contributor" && keys.length) await setDevProjects(login, keys);
-  if ((inv.role === "employee" || inv.role === "client") && keys.length) await setMemberProjects(login, keys); // несколько проектов
+  await upsertLink({ tg_id: user.id, youtrack_login: login, role, full_name: fullName, project_key: keys[0] ?? null });
+  if (role === "contributor" && keys.length) await setDevProjects(login, keys);
+  if ((role === "employee" || role === "client") && keys.length) await setMemberProjects(login, keys); // несколько проектов
   // Клиент привязался к клиентским проектам → задачи, поставленные мной (kickoff/от меня), переводим на него постановщиком — по каждому проекту.
-  if (inv.role === "client") for (const k of keys) await reassignNullReporterToClient(k).catch(() => {});
+  if (role === "client") for (const k of keys) await reassignNullReporterToClient(k).catch(() => {});
   // Клиент с флагом онбординга — пометить его проект, чтобы показать инструкцию при входе.
-  if (inv.role === "client" && inv.show_onboarding && keys[0]) await setProjectShowOnboarding(keys[0], true);
+  if (role === "client" && inv.show_onboarding && keys[0]) await setProjectShowOnboarding(keys[0], true);
   // Клиент с привязанным набором инструкций — показать его при входе (баннер на /i/<token>).
-  if (inv.role === "client" && inv.instruction_set_token && keys[0]) await setProjectOnboardingSet(keys[0], inv.instruction_set_token);
+  if (role === "client" && inv.instruction_set_token && keys[0]) await setProjectOnboardingSet(keys[0], inv.instruction_set_token);
   await markInviteUsed(token, user.id);
   // Если у человека висела заявка на доступ — он уже вошёл по инвайту, заявку убираем (иначе дубль в «Команде»).
   await deleteAccessRequest(user.id).catch(() => {});
+  const roleKept = existing && REAL.includes(existing) && existing !== inv.role;
   await notifyAdmin(
-    `✅ <b>${fullName}</b> присоединился по приглашению\n` +
-      `Роль: ${ROLE_RU[inv.role] || inv.role}${keys.length ? ` · проекты: ${keys.join(", ")}` : ""}\n` +
-      `Логин: @${login}`,
+    `✅ <b>${fullName}</b> приєднався за запрошенням\n` +
+      `Роль: ${ROLE_RU[role] || role}${roleKept ? ` (інвайт був на «${ROLE_RU[inv.role] || inv.role}», але роль збережено — вже привʼязаний)` : ""}${keys.length ? ` · проєкти: ${keys.join(", ")}` : ""}\n` +
+      `Логін: @${login}`,
   );
   // Приветствие новому участнику — любой роли, на локали его устройства.
   const loc = normalizeLocale(user.languageCode) || DEFAULT_LOCALE;
-  await notifyLogins([login], t(loc, "welcome.joined", { role: t(loc, `role.${inv.role}`) })).catch(() => {});
+  await notifyLogins([login], t(loc, "welcome.joined", { role: t(loc, `role.${role}`) })).catch(() => {});
   // Онбординг по проектам: разработчику — сколько задач в работе; клиенту/сотруднику — что уже выполнено
   // (если задачи закрыли до его добавления — иначе он этого не увидит).
-  if (keys.length) await notifyProjectOnboarding(login, inv.role, keys).catch(() => {});
+  if (keys.length) await notifyProjectOnboarding(login, role, keys).catch(() => {});
   return true;
 }

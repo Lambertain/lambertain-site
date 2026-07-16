@@ -415,6 +415,18 @@ export async function upsertMember(
   );
 }
 
+/** Роль уже привязанного tg-пользователя (или null, если не привязан) — для защиты от перетирания роли инвайтом. */
+export async function getLinkRoleByTgId(tgId: number): Promise<Role | null> {
+  const r = await q<{ role: Role }>("SELECT role FROM tg_links WHERE tg_id = $1", [tgId]);
+  return r[0]?.role ?? null;
+}
+
+/** Сменить роль участника (в members И tg_links, по login). Для админ-UI «Команда». */
+export async function setMemberRole(login: string, role: Role): Promise<void> {
+  await q("UPDATE members SET role = $2 WHERE login = $1", [login, role]);
+  await q("UPDATE tg_links SET role = $2 WHERE youtrack_login = $1", [login, role]);
+}
+
 export async function upsertLink(link: TgLink): Promise<void> {
   await q(
     `INSERT INTO tg_links (tg_id, youtrack_login, role, full_name, project_key)

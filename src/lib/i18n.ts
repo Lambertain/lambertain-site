@@ -708,6 +708,7 @@ export const DICT: Record<string, Entry> = {
   "users.allProjects": { uk: "Всі проєкти", ru: "Все проекты", en: "All projects" },
   "users.noneMatch": { uk: "Немає за фільтром.", ru: "Нет по фильтру.", en: "Nothing matches the filter." },
   "users.alias": { uk: "Імʼя (бачите тільки ви)", ru: "Имя (видите только вы)", en: "Name (only you see it)" },
+  "users.role": { uk: "Роль", ru: "Роль", en: "Role" },
   "users.delete": { uk: "Видалити користувача", ru: "Удалить пользователя", en: "Delete user" },
   "users.deleteConfirm": { uk: "Видалити безповоротно? Доступ і привʼязки зникнуть (історія задач збережеться).", ru: "Удалить безвозвратно? Доступ и привязки исчезнут (история задач сохранится).", en: "Delete permanently? Access and links will be removed (task history is kept)." },
   "users.deleteYes": { uk: "Так, видалити", ru: "Да, удалить", en: "Yes, delete" },

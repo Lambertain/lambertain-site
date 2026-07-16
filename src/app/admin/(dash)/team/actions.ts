@@ -2,7 +2,7 @@
 
 import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
-import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember, getUserProjectKeys, reassignNullReporterToClient } from "@/lib/db";
+import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember, getUserProjectKeys, reassignNullReporterToClient, setMemberRole } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { sendTo } from "@/lib/notify";
 import { notifyProjectOnboarding } from "@/lib/onboarding-notify";
@@ -102,6 +102,26 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
     if (user?.role && added.length) await notifyProjectOnboarding(login, user.role, added).catch(() => {});
     // Клиент привязан к проекту → задачи, поставленные мной, переводим на него постановщиком.
     if (user?.role === "client") for (const k of added) await reassignNullReporterToClient(k).catch(() => {});
+    revalidatePath("/admin/team");
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Ошибка" };
+  }
+}
+
+/** Сменить роль уже приглашённого пользователя (client/employee/contributor/admin). */
+export async function changeUserRole(login: string, role: Role): Promise<{ ok?: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    if (!login) return { error: "no login" };
+    if (!PERSON_ROLES.includes(role)) return { error: "Недопустимая роль" };
+    await setMemberRole(login, role);
+    // Стал клиентом — задачи проектов без постановщика (поставленные мной) переводим на него постановщиком.
+    if (role === "client") {
+      const keys = await getUserProjectKeys(login).catch(() => [] as string[]);
+      for (const k of keys) await reassignNullReporterToClient(k).catch(() => {});
+    }
     revalidatePath("/admin/team");
     revalidatePath("/admin");
     return { ok: true };

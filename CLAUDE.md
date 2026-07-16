@@ -55,6 +55,7 @@
 - `POST /api/admin/guide-regenerate` `{ guideId, topic? }` → перегенерировать гайд-инструкцию; с `topic` — под ДРУГОЙ сервис (напр. SendGrid → Resend), тело/заголовок = `topic`.
 - `POST /api/admin/cleanup-mirror-noise` `{ dryRun? }` → разовая чистка шума зеркалирования код-ревью (дубли 🔎/💬 → одна копия; авто-комменты ошибок → удалить). `dryRun:true` — только счётчики. Идемпотентно.
 - `POST /api/admin/classify-verifiable` `{ projectKey?, dryRun?, reclassify?, moveReviewToDone? }` → бэкфилл `client_verifiable` по задачам (без `projectKey` — все проекты) + перевод неверифицируемых клиентских задач из Review в Done. Новые задачи классифицируются на kickoff. `client_verifiable=false` (внутренняя/техническая) → на готовности сразу Done минуя клиентское ревью; `true`/NULL → ревью клиенту с кнопками.
+- `POST /api/admin/member-role` `{ login, role }` (`client|employee|contributor|admin`) → сменить роль участника (members + tg_links). То же есть в UI «Команда». Инвайт роль уже привязанного НЕ меняет (защита от случайного перетирания).
 
 **Заведение/привязка проекта по API** (тоже `ADMIN_API_TOKEN`, не БД):
 - `POST /api/admin/project/link` `{ projectKey, name?, devGit?, clientGit?, defaultAssignee? }` → проставляет meta, возвращает **токен проекта**, раскладывает bootstrap CLAUDE.md в `Lambertain/*` дев-репо (layProtocol). Если проекта ещё нет — **создаёт его** (нужен `name`); ручной шаг «завести проект в UI» не требуется.
