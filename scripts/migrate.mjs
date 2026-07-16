@@ -85,6 +85,13 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS auto_done BOOLEAN NOT NULL DEFAULT fa
 -- бэкап, деплой-настройка, серверная интеграция без UI) → на готовности идёт сразу в Done, минуя клиентское
 -- ревью (клиент всё равно не может это проверить); NULL → ещё не классифицировано (ведёт себя как true — на ревью).
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS client_verifiable BOOLEAN;
+-- Backfill resolved_at для уже закрытых задач: раньше updateStatus его не проставлял → у Done-задач счётчик дней
+-- (кружок) не замораживался и «красный» продолжал расти после «Готово». Ставим момент последнего изменения.
+-- Идемпотентно (только где ещё NULL и статус — из корзины done, но не «доработка»).
+UPDATE tasks SET resolved_at = COALESCE(updated_at, now())
+  WHERE resolved_at IS NULL
+    AND status ~* '(done|закры|готов|fixed|complete|verified|выполн)'
+    AND status !~* '(доработ|rework|переработ)';
 -- Действие владельца: задача требует ручного ops-шага только владельца (деплой/регистрация/токен) — передаётся
 -- супер-админу «на доработку». Клиент видит «в работе» (status не меняется); это внутренний флаг.
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS owner_action TEXT;

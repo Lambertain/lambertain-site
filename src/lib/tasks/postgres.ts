@@ -5,6 +5,7 @@
 import type { TasksBackend, TaskFilter, Project, User, Task, Comment, Role } from "./types";
 import type { ProjectMeta } from "./types";
 import { q, withTransaction, logTaskEvent } from "../db";
+import { statusBucket } from "../statuses";
 
 function ms(v: string | Date | null | undefined): number | undefined {
   if (!v) return undefined;
@@ -228,7 +229,13 @@ export const postgresBackend: TasksBackend = {
     // DEV-32: журнал. Читаем прежний статус ДО апдейта; если реально изменился — пишем событие (актор/триггер из evt,
     // по умолчанию актор = система-автоматика). Логирование — единая choke-точка: любая смена статуса попадает в журнал.
     const before = await q<{ status: string | null }>("SELECT status FROM tasks WHERE readable_id = $1", [id]);
-    await q("UPDATE tasks SET status = $2, updated_at = now() WHERE readable_id = $1", [id, status]);
+    // resolved_at: при переходе в «Готово» фиксируем время (COALESCE — не сбиваем, если уже стояло → счётчик дней
+    // замораживается на моменте сдачи). При возврате из Готово (реворк/в работу) — снимаем, чтобы отсчёт возобновился.
+    const done = statusBucket(status) === "done";
+    await q(
+      "UPDATE tasks SET status = $2, updated_at = now(), resolved_at = CASE WHEN $3 THEN COALESCE(resolved_at, now()) ELSE NULL END WHERE readable_id = $1",
+      [id, status, done],
+    );
     const from = before[0]?.status ?? null;
     if (from !== status) {
       await logTaskEvent(id, { type: "status_change", from, to: status, actorRole: "system", ...evt });
