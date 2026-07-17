@@ -141,8 +141,10 @@ export default async function HomePage() {
       unread: isNew || hasNewComments,
       isNew,
       newComments,
-      blocked: blockers.length > 0,
-      blockers: blockers.map((b) => ({ id: b.id, summary: b.summary })),
+      // Завершённая задача НЕ блокируется незакрытыми зависимостями (её работа уже сделана) — иначе Done-задача
+      // с висящим блокером (напр. авто-принятая раньше зависимости) падала в «Не начато» с плашкой блокера.
+      blocked: statusBucket(tk.state) !== "done" && blockers.length > 0,
+      blockers: statusBucket(tk.state) === "done" ? [] : blockers.map((b) => ({ id: b.id, summary: b.summary })),
       // Клиенту ops-шаг агентства (ownerAction) не показываем; его собственное действие (clientAction) — показываем.
       ownerAction: me.role === "client" ? null : tk.ownerAction,
       reporterAction: tk.reporterAction,

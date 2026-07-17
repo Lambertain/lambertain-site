@@ -40,7 +40,9 @@ export async function GET(req: Request) {
     const comments = commentsRaw.filter((c) => c.visibility !== "client_nodev");
     // DEV-33: зависимости задачи + вычисляемая блокировка по ним (агент не видел этого → брал де-факто заблокированные).
     const dependsOn = deps.map((d) => d.id);
-    const blockedBy = deps.filter((d) => depUnfinished(d.status)).map((d) => ({ id: d.id, summary: d.summary, status: d.status }));
+    // Завершённую задачу зависимости не блокируют (работа сделана) — иначе Done с висящим блокером выглядит «не начата».
+    const taskDone = statusBucket(task?.state) === "done";
+    const blockedBy = taskDone ? [] : deps.filter((d) => depUnfinished(d.status)).map((d) => ({ id: d.id, summary: d.summary, status: d.status }));
     const effectiveBlocked = blockedBy.length > 0;
     // Эскалации (вопросы) и ответы ПОЛЬЗОВАТЕЛЯ — чтобы Claude понимал, на что уже ответили.
     // Отвечает «сторона пользователя»: клиент ИЛИ сотрудник (в проектах без клиента/с тех-поддержкой отвечает сотрудник —
@@ -89,7 +91,8 @@ export async function GET(req: Request) {
     count: tasks.length,
     tasks: tasks.map((t) => {
       const deps = depMap.get(t.id) ?? [];
-      const blockedBy = deps.filter((d) => depUnfinished(d.status)).map((d) => d.id);
+      // Завершённую задачу зависимости не блокируют (её работа сделана).
+      const blockedBy = statusBucket(t.state) === "done" ? [] : deps.filter((d) => depUnfinished(d.status)).map((d) => d.id);
       return {
         id: t.id,
         summary: t.summary,

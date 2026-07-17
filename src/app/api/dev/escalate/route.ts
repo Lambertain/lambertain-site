@@ -43,19 +43,23 @@ export async function POST(req: Request) {
     const task = await be.getTask(taskId);
 
     if (kind === "admin") {
-      // Вопрос/решение — ПОСТАНОВЩИКУ задачи (кто её создал), а не глобально супер-админу.
-      // Постановщик-член (напр. админ Настя) получает уведомление; иначе — супер-админ (Никита).
+      // Внутренний вопрос/решение — ПОСТАНОВЩИКУ задачи, но ТОЛЬКО если он из команды (напр. админ Настя).
+      // Если постановщик — клиент/сотрудник клиента, внутренний вопрос ему НЕ уводим (ни пушем с текстом, ни
+      // reporterAction-баром) — это внутренняя заметка разработчика, клиент её видеть не должен. Тогда шлём
+      // супер-админу (Никите). Раньше пуш с полным текстом уходил reporter'у безусловно → утечка клиенту.
+      const reporterTeamSide = !!task.reporter?.login && task.reporter.role !== "client" && task.reporter.role !== "employee";
       const body = `🔧 Вопрос разработчика (нужно решение):\n\n${question}`;
       await be.addComment(taskId, body, "internal", undefined, true, true);
-      // DEV-48: маркер «ждёт ответа постановщика» — НЕ меняем статус (иначе уходит в Blocked, куда постановщик
-      // не заглянет). Задача остаётся на первом табе; на доске — плашка + мини-секция постановщику. Снимется
-      // ответом постановщика (коммент). Снимаем плашку через 80 симв., полный вопрос — в комменте выше.
-      await setReporterAction(taskId, question).catch(() => {});
       await logTaskEvent(taskId, { type: "escalation", actorRole: "contributor", trigger: "escalate(admin)", details: { kind: "admin", question: question.slice(0, 300) } });
       const msg = `🔧 <b>Вопрос разработчика</b> · ${await taskTag(taskId)}: ${task.summary}\n${question.slice(0, 400)}`;
-      if (task.reporter?.login) await notifyLogins([task.reporter.login], msg, [], openBtn);
-      else await notifyAdmin(msg, openBtn);
-      return NextResponse.json({ ok: true, escalatedTo: task.reporter?.login || "admin" });
+      if (reporterTeamSide) {
+        // DEV-48: маркер «ждёт ответа постановщика» (плашка + мини-секция постановщику-члену команды). Снимется его ответом.
+        await setReporterAction(taskId, question).catch(() => {});
+        await notifyLogins([task.reporter!.login], msg, [], openBtn);
+      } else {
+        await notifyAdmin(msg, openBtn);
+      }
+      return NextResponse.json({ ok: true, escalatedTo: reporterTeamSide ? task.reporter!.login : "admin" });
     }
 
     // client: вопрос уходит на МОДЕРАЦИЮ супер-админу (клиент увидит после апрува). Задача блокируется до ответа.
