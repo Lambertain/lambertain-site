@@ -58,6 +58,9 @@ export async function GET(req: Request) {
     // (getDevAttachment пускает и задачные, и проектные вложения). Иначе разраб видит ссылку, но скачать не может.
     const devFiles = <T,>(v: T): T => (typeof v === "string" ? (v.replace(/\/api\/files\/(\d+)/g, "/api/dev/files/$1") as T) : v);
     const taskOut = task ? { ...task, description: devFiles(task.description) } : task;
+    // Задача ещё на утверждении (создана сотрудником/младшим админом, ждёт апрува админа/клиента) — НЕ бери
+    // в работу: из списка такие исключены, но при прямом запросе по id явно сигналим, чтобы дев не начинал.
+    const awaitingApproval = task?.approvalStatus === "pending";
     const commentsOut = comments.map((c) => ({ ...c, text: devFiles(c.text) }));
     // projectSpec — ПОЛНАЯ спека проекта (общий контекст; читай ДО эскалаций — там почти всё).
     // tags: { type, complexity (small|feature), skills:[slug] } — по skills тяни плейбуки из /api/dev/skills.
@@ -65,7 +68,7 @@ export async function GET(req: Request) {
     // ХТО і ЧОМУ змінив стан («X змінив статус через Y»), без розпитувань. Хронологічно; зливай із comments за ts.
     // dependsOn/blockedBy/effectiveBlocked (DEV-33): якщо effectiveBlocked=true — задача де-факто заблокована
     // незавершеними залежностями (blockedBy), НЕ бери в роботу, поки вони не закриті.
-    return NextResponse.json({ task: taskOut, tags, projectSpec: devFiles(projectSpecText(proj?.meta) || null), projectInfo: devFiles(proj?.meta.devInfo || null), comments: commentsOut, events, dependsOn, blockedBy, effectiveBlocked, awaitingClient, lastClientAnswer, answerImageIds });
+    return NextResponse.json({ task: taskOut, tags, projectSpec: devFiles(projectSpecText(proj?.meta) || null), projectInfo: devFiles(proj?.meta.devInfo || null), comments: commentsOut, events, dependsOn, blockedBy, effectiveBlocked, awaitingApproval, awaitingClient, lastClientAnswer, answerImageIds });
   }
 
   // Список задач проекта.
@@ -73,8 +76,12 @@ export async function GET(req: Request) {
   // Внутренние задачи (разработчик → админ, напр. доступы) не показываем в рабочей очереди Claude.
   // Внутренние задачи скрываем из очереди Claude — КРОМЕ поставленных админом разработчику мимо клиента
   // (created_by_role = admin/super): их разработчик берёт в работу, а клиент их не видит.
+  // Задачи на утверждении (approval_status=pending, напр. созданные сотрудником/младшим админом) в очередь
+  // разработчика НЕ отдаём: их сперва апрувит админ/клиент → assignProjectDevAndNotify отдаст дев после апрува.
+  // Иначе дев брал неутверждённую задачу и закрывал её (autoApprove) РАНЬШЕ, чем утверждающий её открыл.
   const tasks = (await be.listTasks({ projectKey, unresolvedOnly: !all, order: "updated_desc" }))
-    .filter((t) => !t.internal || t.createdByRole === "admin" || t.createdByRole === "super");
+    .filter((t) => !t.internal || t.createdByRole === "admin" || t.createdByRole === "super")
+    .filter((t) => t.approvalStatus !== "pending");
   // DEV-33: блокеры для всех задач разом — чтобы пометить де-факто заблокированные зависимостями.
   const depMap = await getDepsFor(tasks.map((t) => t.id));
   return NextResponse.json({

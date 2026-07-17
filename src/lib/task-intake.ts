@@ -188,13 +188,11 @@ export async function createRequestTaskCore(
     if (isFeedback) {
       await notifyAdmin(`💡 <b>Фидбек по порталу</b> · ${await taskTag(task.id)}: ${task.summary}\nОт: ${me.fullName}`, taskBtn(task.id)).catch(() => {});
     } else if (appr.pending && appr.approver) {
-      // Задача ждёт утверждения; разработчику отдадим только после апрува (до этого можно отредактировать).
+      // Задача ждёт утверждения; разработчику отдадим ТОЛЬКО после апрува (setApproval→assignProjectDevAndNotify).
       // best-effort: сбой уведомления не должен превращать уже созданную задачу в ошибку для пользователя.
+      // Дева до апрува НЕ пингуем и в его очередь (/api/dev/tasks) неутверждённую задачу НЕ отдаём — иначе он
+      // брал её в работу и закрывал (autoApprove) раньше, чем утверждающий успевал открыть (был этот баг).
       await notifyPendingApproval(appr.approver, projectKey, task.id, task.summary).catch(() => {});
-      // DEV-34: раньше при задаче от сотрудника ответственный разработчик НЕ получал пуш (узнавал лишь поллингом).
-      // Шлём ему heads-up, что пришла задача (она уже видна ему в /api/dev/tasks), пометив, что ждёт подтверждения.
-      const dev = project?.meta.defaultAssignee;
-      if (dev) await notifyLogins([dev], `🆕 <b>Нова задача (очікує підтвердження)</b> · ${await taskTag(task.id)}: ${task.summary}`, [], taskBtn(task.id)).catch(() => {});
     } else {
       // Без триажа: сразу назначаем разработчику проекта и шлём ему пуш — он сам прочитает задачу,
       // посмотрит код и задаст клиенту уточнения только при необходимости.

@@ -49,6 +49,7 @@
 **Управление задачей по API** (те же `ADMIN_API_TOKEN`, без БД):
 - `POST /api/admin/task-edit` `{ readableId, title?, description?, priority?, assigneeLogin? }` → правит переданные поля задачи (`priority`: `""`|`Critical`|`Major`|`Normal`|`Minor`; `assigneeLogin:null` снимает исполнителя). Меняются только присланные поля.
 - `POST /api/admin/task-status` `{ readableId, status, summary? }` → смена статуса (+синк Trello-карточки).
+- `POST /api/admin/task-approval` `{ readableId, status }` (`approved|rejected`) → утвердить/отклонить задачу на подтверждении (созданную сотрудником/младшим админом). `approved` + задача не завершена → отдаёт разработчику; уже Done → просто снимает флаг (для чистки исторических «pending на выполненной»).
 - `POST /api/admin/task-deps` `{ readableId, dependsOn: ["1A-1", ...] }` → **полностью заменяет** набор блокеров (только из того же проекта).
 - `POST /api/admin/comment` `{ readableId, body, visibleToClient?, review? }` → коммент от агентства (зеркалится в Trello при `visibleToClient`).
 - `POST /api/admin/set-client-action` `{ readableId, action, guideId?, field? }` → задать/переписать инструкцию ожидания клиента (текст-баннер под задачей + гайд + поле каталога). Уведомлений НЕ шлёт — пуш/коммент клиенту слать отдельно `comment`ом. Снять ожидание — `clear-action`.
