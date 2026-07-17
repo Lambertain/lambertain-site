@@ -10,8 +10,8 @@
 import { getBackend } from "./tasks";
 import { notifyAdmin, taskTag } from "./notify";
 import { PORTAL_BASE } from "./dev-protocol";
-import { isTransientGhError } from "./github";
-import { bumpFailStreak, clearFailStreak } from "./db";
+import { isTransientGhError, GitHubError } from "./github";
+import { bumpFailStreak, clearFailStreak, getState, setState } from "./db";
 
 const MARK = "⚠️ <b>Помилка"; // префикс коммента-ошибки (для дедупа)
 
@@ -50,6 +50,13 @@ export async function reportTaskError(
 /** Порог: сколько проходов поллера подряд должен держаться ТРАНЗИТНЫЙ сбой GitHub, прежде чем эскалировать. */
 const TRANSIENT_ESCALATE_AT = 3;
 
+// Глобальный троттл эскалаций ТРАНЗИТНЫХ сбоев GitHub. Инцидент GitHub (5xx/429) роняет СРАЗУ МНОГО PR/задач,
+// и раньше каждый ключ эскалировал отдельно → за ночь панель админа забивало десятками ⚠️ (по одному на PR).
+// Схлопываем в ОДНО общее уведомление не чаще раза в час, независимо от числа затронутых задач. Деталь по
+// каждой задаче остаётся в логе сервера. Ключ/окно храним в poller_state (переживает рестарты).
+const GH_TRANSIENT_NOTIFY_KEY = "poller:gh-transient:notifiedAt";
+const GH_TRANSIENT_WINDOW_MS = 60 * 60_000;
+
 /**
  * Репорт ошибки из ПОЛЛЕРА (deploy-sync: проверка мержа/публикации, зеркалирование ревью), терпимый к
  * транзитным сбоям GitHub. DEV-51: ошибки синка (rate-limit тощо) в ТРЕД ЗАДАЧИ НЕ пишем — только админу/в лог,
@@ -62,16 +69,24 @@ const TRANSIENT_ESCALATE_AT = 3;
  * @returns true, если ошибку эскалировали (уведомили админа).
  */
 export async function reportPollError(streakKey: string, taskId: string, where: string, err: unknown): Promise<boolean> {
+  const msg = (err instanceof Error ? err.message : String(err ?? "невідома помилка")).slice(0, 500);
   if (isTransientGhError(err)) {
     const streak = await bumpFailStreak(streakKey).catch(() => TRANSIENT_ESCALATE_AT); // не смогли посчитать → лучше показать
     if (streak < TRANSIENT_ESCALATE_AT) return false; // самоисправляющийся блип — тихо, следующий проход подтянет
-    // Уже эскалировали — НЕ долбим админа каждый проход поллера (5 мин): сообщаем на 1-й эскалации (streak===3)
-    // и далее лишь раз в ~час (каждый 12-й проход). Иначе стойкий сбой GitHub (напр. rate-limit на 2 часа)
-    // заваливает уведомлениями по каждому PR × каждый проход (был флуд ~200 повідомлень).
-    if (streak > TRANSIENT_ESCALATE_AT && (streak - TRANSIENT_ESCALATE_AT) % 12 !== 0) return false;
+    console.error(`[poll-error] ${taskId} · ${where}: ${msg}`); // деталь по КАЖДОЙ задаче — в лог, не в панель
+    // Системная деградация GitHub бьёт по многим ключам разом: НЕ шлём по одному ⚠️ на каждый PR (был флуд —
+    // за ночь десятки уведомлений). Одно общее уведомление на окно (раз в час), затронутые задачи видны в логе.
+    const now = Date.now();
+    const lastMs = Number(await getState(GH_TRANSIENT_NOTIFY_KEY).catch(() => "0")) || 0;
+    if (now - lastMs < GH_TRANSIENT_WINDOW_MS) return false; // уже предупредили в этом окне
+    await setState(GH_TRANSIENT_NOTIFY_KEY, String(now)).catch(() => {});
+    const status = err instanceof GitHubError ? err.status : null;
+    await notifyAdmin(
+      `⏳ <b>GitHub API тимчасово віддає помилки${status ? ` (${status})` : ""}</b> — автосинхронізація стадій і код-рев'ю кількох задач на паузі. Відновиться сама, дій не потрібно.`,
+    ).catch(() => {});
+    return true;
   }
-  // ТОЛЬКО админу (throttled выше) + в лог сервера — НЕ комментом в задачу.
-  const msg = (err instanceof Error ? err.message : String(err ?? "невідома помилка")).slice(0, 500);
+  // Неретрайная/логическая ошибка (404/422/бэд-URL) — реальная, редкая, актуальна: эскалируем сразу ПО ЗАДАЧЕ.
   console.error(`[poll-error] ${taskId} · ${where}: ${msg}`);
   await notifyAdmin(
     `⚠️ <b>${await taskTag(taskId).catch(() => taskId)}</b> · ${where}\n${msg}`,
