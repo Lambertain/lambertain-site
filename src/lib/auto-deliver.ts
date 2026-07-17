@@ -52,7 +52,8 @@ export async function autoDeliverAndNotify(projectKey: string, meta: ProjectMeta
     const ds = await autoDeliverIfConfigured(meta);
     if (!ds || !ds.length) return;
     // toDefault только в прямом режиме (squash в main) → публикация в прод. В PR-режиме — ждём мержа дева клиента.
-    if (ds.some((d) => d.toDefault)) await publishProjectToProd(projectKey).catch(() => {});
+    // no-op доставки (контент уже в проде) пропускаем: публиковать нечего, статус проекта и так актуальный.
+    if (ds.some((d) => d.toDefault && !d.noop)) await publishProjectToProd(projectKey).catch(() => {});
     // Проблемный деплой = ТЕРМИНАЛЬНО-плохой: провал сборки или в проде задеплоен НЕ наш коммит.
     // Промежуточные статусы (DEPLOYING/BUILDING/PENDING…) — деплой ещё ИДЁТ, это не ошибка: approveClientDeploy
     // ждёт финал лишь ~150с, а сборка Railway (build+preDeploy-миграция) бывает дольше → раньше на «ещё идёт»

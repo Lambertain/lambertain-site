@@ -205,6 +205,8 @@ export interface DeliverResult {
   toDefault: boolean;
   /** Ссылка на открытый/обновлённый Pull Request (в PR-режиме). */
   prUrl?: string;
+  /** true, если доставлять было нечего — контент клиента уже идентичен dev-HEAD (коммит/пуш/деплой пропущены). */
+  noop?: boolean;
 }
 
 const PR_BRANCH = "lambertain-delivery"; // служебная ветка доставки для PR-режима
@@ -251,8 +253,12 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
   // Карта path → blob-sha текущего клиентского дерева (для дельты). Truncated-дерево → карта пустая (безопасный
   // фолбэк на полный перенос).
   const clientBlobByPath = new Map<string, string>();
+  let parentTreeSha: string | null = null;
+  let parentCommitUrl = "";
   if (parentSha) {
-    const pc = await ghJson<{ tree: { sha: string } }>(`/repos/${clientRepo}/git/commits/${parentSha}`);
+    const pc = await ghJson<{ tree: { sha: string }; html_url?: string }>(`/repos/${clientRepo}/git/commits/${parentSha}`);
+    parentTreeSha = pc.tree.sha;
+    parentCommitUrl = pc.html_url || "";
     const ct = await ghJson<{ tree: TreeEntry[]; truncated?: boolean }>(`/repos/${clientRepo}/git/trees/${pc.tree.sha}?recursive=1`);
     if (!ct.truncated) for (const e of ct.tree) if (e.type === "blob" && e.sha) clientBlobByPath.set(e.path, e.sha);
   }
@@ -303,6 +309,12 @@ export async function deliverDevToClient(input: DeliverInput): Promise<DeliverRe
     method: "POST",
     body: JSON.stringify({ tree: entries }),
   });
+  // Доставлять нечего: собранное дерево совпадает с HEAD клиента (dev не менялся с прошлой доставки). НЕ создаём
+  // пустой коммит и НЕ пушим — иначе N одновременных приёмок дают N пустых коммитов + N force-push + N деплой-циклов
+  // (лишняя работа и гонка, из-за которой прилетал ложный «НЕ той коміт»). Деплой не триггерим (noop).
+  if (parentSha && parentTreeSha && clientTree.sha === parentTreeSha) {
+    return { clientRepo, branch: targetBranch, files: 0, commitUrl: parentCommitUrl, toDefault, noop: true };
+  }
   const commit = await ghJson<{ sha: string; html_url: string }>(`/repos/${clientRepo}/git/commits`, {
     method: "POST",
     body: JSON.stringify({ message: input.message, tree: clientTree.sha, parents: parentSha ? [parentSha] : [] }),
@@ -529,8 +541,9 @@ export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(Deliv
       asPR,
     });
     let deploy: DeployStatus | null = null;
-    // Деплой/апрув — только в прямом режиме (push в main триггерит деплой). В PR-режиме деплоить нечего (мержит дев клиента).
-    if (!asPR && res.toDefault) {
+    // Деплой/апрув — только в прямом режиме (push в main триггерит деплой). В PR-режиме деплоить нечего (мержит дев
+    // клиента). Для no-op доставки (ничего не пушили) деплоя тоже нет — не ждём/не апрувим впустую.
+    if (!asPR && res.toDefault && !res.noop) {
       const sha = (res.commitUrl.match(/\/commit\/([0-9a-f]+)/) || [])[1] || "";
       if (meta.clientDeploy?.railwayToken) {
         // Апрувим ИМЕННО доставленный коммит (ждём его появления), ошибки не глотаем — попадут в уведомление.

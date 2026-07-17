@@ -453,6 +453,7 @@ export const DICT: Record<string, Entry> = {
   "deliver.toBranch": { uk: "В окрему гілку — клієнт змержить сам", ru: "В отдельную ветку — клиент смержит сам", en: "To a separate branch — the client merges it" },
   "deliver.run": { uk: "Доставити", ru: "Доставить", en: "Deliver" },
   "deliver.done": { uk: "Доставлено {n} файлів у гілку {branch}", ru: "Доставлено {n} файлов в ветку {branch}", en: "Delivered {n} files to branch {branch}" },
+  "deliver.noop": { uk: "Доставляти нічого — контент клієнта вже актуальний (dev не змінювався).", ru: "Доставлять нечего — контент клиента уже актуальный (dev не менялся).", en: "Nothing to deliver — client content already up to date (dev unchanged)." },
   "deliver.commit": { uk: "Коміт", ru: "Коммит", en: "Commit" },
   "deliver.pr": { uk: "Pull Request", ru: "Pull Request", en: "Pull Request" },
   "deliver.schemaAuto": { uk: "Схема накотиться автоматично при деплої клієнта (preDeploy) — підтвердження не потрібне.", ru: "Схема накатится автоматически при деплое клиента (preDeploy) — подтверждение не нужно.", en: "Schema will be applied automatically on the client deploy (preDeploy) — no confirmation needed." },

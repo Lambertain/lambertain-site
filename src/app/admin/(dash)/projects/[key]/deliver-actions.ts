@@ -44,6 +44,7 @@ export interface DeliverResultUI {
   commitUrl: string;
   toDefault: boolean;
   prUrl?: string;
+  noop?: boolean;
   deploy?: DeployStatus | null;
 }
 
@@ -86,7 +87,8 @@ export async function runDeliver(
       });
       let deploy: DeployStatus | null = null;
       // Деплой/апрув — только в прямом режиме (push в main). В PR-режиме мержит дев клиента.
-      if (!asPR && res.toDefault) {
+      // no-op доставка (контент уже в проде) — пушить/деплоить нечего, апрув не запускаем.
+      if (!asPR && res.toDefault && !res.noop) {
         const sha = (res.commitUrl.match(/\/commit\/([0-9a-f]+)/) || [])[1] || "";
         if (proj.meta.clientDeploy?.railwayToken) {
           // Апрувим ИМЕННО наш коммит (ждём его появления в Railway), ошибки НЕ глотаем — показываем в UI.
@@ -105,8 +107,8 @@ export async function runDeliver(
       }
       results.push({ ...res, deploy });
     }
-    // Прямая доставка в main = публикация в прод. В PR-режиме — нет (ждём мержа дева клиента).
-    if (results.some((r) => r.toDefault)) await publishProjectToProd(key).catch(() => {});
+    // Прямая доставка в main = публикация в прод. В PR-режиме — нет (ждём мержа дева клиента). no-op — нечего.
+    if (results.some((r) => r.toDefault && !r.noop)) await publishProjectToProd(key).catch(() => {});
     return { results };
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Ошибка" };

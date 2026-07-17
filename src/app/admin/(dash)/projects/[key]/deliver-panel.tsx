@@ -138,12 +138,14 @@ export function DeliverPanel({ projectKey, locale, autoMigrate, autoDeliver, del
           {results.map((result, i) => (
             <div key={result.clientRepo + i} style={{ marginTop: i ? 14 : 0, paddingTop: i ? 14 : 0, borderTop: i ? "1px solid var(--border)" : "none" }}>
               <div style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>{result.clientRepo}</div>
-              <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--accent)", marginTop: 4 }}>
-                {t(locale, "deliver.done", { n: String(result.files), branch: result.branch })}
+              <p style={{ ...ui.monoLabel, textTransform: "none", color: result.noop ? "var(--muted)" : "var(--accent)", marginTop: 4 }}>
+                {result.noop ? t(locale, "deliver.noop") : t(locale, "deliver.done", { n: String(result.files), branch: result.branch })}
               </p>
-              <a href={result.commitUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>
-                {t(locale, "deliver.commit")} →
-              </a>
+              {!result.noop && (
+                <a href={result.commitUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btn, display: "inline-block", marginTop: 8, textDecoration: "none" }}>
+                  {t(locale, "deliver.commit")} →
+                </a>
+              )}
               {result.prUrl && (
                 <a href={result.prUrl} target="_blank" rel="noopener noreferrer" style={{ ...ui.btnAccent, display: "inline-block", marginTop: 8, marginLeft: 8, textDecoration: "none" }}>
                   {t(locale, "deliver.pr")} →
