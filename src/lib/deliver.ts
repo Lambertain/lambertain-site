@@ -388,6 +388,27 @@ async function commitReachable(repo: string, ancestor: string, head: string): Pr
   }
 }
 
+/**
+ * Идентичен ли КОНТЕНТ двух коммитов (сравнение tree.sha). Наш контент уже в проде, даже если задеплоен
+ * коммит с другим SHA — типичная гонка: несколько задач приняты разом → несколько авто-доставок одного и того
+ * же dev-HEAD в один клиентский репо force-пушат по очереди, и approveClientDeploy конкретной задачи видит
+ * СОСЕДНЮЮ доставку (то же дерево, другой squash-SHA). Детерминированно и не зависит от ancestry-compare
+ * (который ломается на осиротевшем при force-push коммите или пустом commitHash → был ложный «НЕ той коміт»).
+ */
+async function sameCommitTree(repo: string, a: string, b: string): Promise<boolean> {
+  if (!repo || !a || !b) return false;
+  try {
+    const [ca, cb] = await Promise.all([
+      ghJson<{ commit?: { tree?: { sha?: string } } }>(`/repos/${repo}/commits/${a}`),
+      ghJson<{ commit?: { tree?: { sha?: string } } }>(`/repos/${repo}/commits/${b}`),
+    ]);
+    const ta = ca.commit?.tree?.sha;
+    return !!ta && ta === cb.commit?.tree?.sha;
+  } catch {
+    return false;
+  }
+}
+
 async function railwayGql(token: string, query: string, variables: Record<string, unknown>): Promise<{ data?: Record<string, unknown>; errors?: unknown }> {
   const r = await fetch("https://backboard.railway.app/graphql/v2", {
     method: "POST",
@@ -522,10 +543,14 @@ export async function autoDeliverIfConfigured(meta: ProjectMeta): Promise<(Deliv
           (e): DeployStatus => ({ status: "ERROR", commit: sha.slice(0, 8), approved: false, note: e instanceof Error ? e.message : "ошибка статуса Vercel" }),
         );
       }
-      // Гонка доставок: пока ждали/апрувили деплой, более поздняя доставка обогнала нашу. Если задеплоенный
-      // коммит СОДЕРЖИТ наш (наш = предок) — контент уже в проде, это не «не той коміт», а нормальная обгонка.
-      if (deploy && deploy.matched === false && deploy.commit && sha && (await commitReachable(p.client, sha, deploy.commit))) {
-        deploy = { ...deploy, matched: true, note: [deploy.note, "новіша доставка обігнала — наш коміт уже в проді"].filter(Boolean).join("; ") };
+      // Гонка доставок: пока ждали/апрувили деплой, более поздняя доставка обогнала нашу. Контент уже в проде,
+      // если задеплоенный коммит СОДЕРЖИТ наш (наш = предок) ЛИБО у него ТО ЖЕ дерево (идентичный контент —
+      // соседняя одновременная доставка того же dev-HEAD). Иначе — ложный «НЕ той коміт» на нормальной обгонке.
+      if (
+        deploy && deploy.matched === false && deploy.commit && sha &&
+        ((await commitReachable(p.client, sha, deploy.commit)) || (await sameCommitTree(p.client, sha, deploy.commit)))
+      ) {
+        deploy = { ...deploy, matched: true, note: [deploy.note, "паралельна доставка обігнала — наш контент уже в проді"].filter(Boolean).join("; ") };
       }
     }
     out.push({ ...res, deploy });
