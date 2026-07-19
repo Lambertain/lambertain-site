@@ -97,6 +97,10 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
     { key: "titleId", label: { uk: "Title ID", ru: "Title ID", en: "Title ID" }, kind: "text" },
     { key: "secretKey", label: { uk: "Secret Key (Admin/Server)", ru: "Secret Key (Admin/Server)", en: "Secret Key (Admin/Server)" }, kind: "secret" },
   ] },
+  // Вчасно.Каса — ПРРО/фіскалізація: токен API каси для видачі фіскальних чеків (напр. онлайн-оплати). Потрібен розробнику/бекенду.
+  { key: "vchasnoKasa", group: "other", label: { uk: "Вчасно.Каса (ПРРО)", ru: "Вчасно.Касса (ПРРО)", en: "Vchasno.Kasa (fiscal)" }, subs: [
+    { key: "token", label: { uk: "Токен каси (API)", ru: "Токен кассы (API)", en: "Kasa token (API)" }, kind: "secret" },
+  ] },
 ];
 
 export function getFieldDef(key: string): ProjectFieldDef | undefined {
