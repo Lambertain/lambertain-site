@@ -1070,6 +1070,101 @@ export async function getTaskEvents(taskId: string): Promise<TaskEvent[]> {
     details: r.details,
   }));
 }
+
+// ---- Статус делегирования задачи клиентом своему сотруднику (видим клиенту) ----
+export interface DelegationStatus {
+  /** Логин делегированного сотрудника. */
+  toLogin: string;
+  /** Имя сотрудника (кому делегировано). */
+  toName: string;
+  /** Кто делегировал (имя клиента) — для подписи. */
+  byName: string | null;
+  /** Когда делегировано (ms). */
+  at: number;
+  /** Когда сотрудник открыл задачу после делегирования (ms) или null — ещё не открыл. */
+  seenAt: number | null;
+  /** Когда выполнил (client_action_done или статус→Done после делегирования) или null. */
+  doneAt: number | null;
+}
+/**
+ * Собирает статус делегирования из журнала (task_events: 'delegated', 'client_action_done', 'status_change')
+ * и трекинга прочтения (task_reads). Клиент делегировал задачу сотруднику — так он видит: кому/когда,
+ * прочитал ли сотрудник (как минимум) и когда выполнил (как максимум). Без делегирования — null.
+ * Регэксп done-статусов зеркалит statusBucket() → "done", чтобы не тянуть импорт в SQL-слой.
+ */
+export async function getDelegationStatus(taskId: string): Promise<DelegationStatus | null> {
+  const del = await q<{ to_login: string | null; to_name: string | null; by_name: string | null; ts: string }>(
+    `SELECT te.to_val AS to_login, m2.full_name AS to_name, m1.full_name AS by_name, te.created_at AS ts
+       FROM task_events te JOIN tasks t ON t.id = te.task_id
+       LEFT JOIN members m1 ON m1.login = te.actor_login
+       LEFT JOIN members m2 ON m2.login = te.to_val
+      WHERE t.readable_id = $1 AND te.type = 'delegated'
+      ORDER BY te.created_at DESC, te.id DESC LIMIT 1`,
+    [taskId],
+  );
+  const d = del[0];
+  if (!d?.to_login) return null;
+  const at = new Date(d.ts).getTime();
+
+  // Прочитано: сотрудник открывал задачу (task_reads пишется по login при заходе) — учитываем только после делегирования.
+  const seen = await q<{ last_read_at: string }>(
+    "SELECT last_read_at FROM task_reads WHERE login = $1 AND task_id = $2",
+    [d.to_login, taskId],
+  );
+  const seenMs = seen[0] ? new Date(seen[0].last_read_at).getTime() : null;
+  const seenAt = seenMs !== null && seenMs >= at ? seenMs : null;
+
+  // Выполнено: первое завершающее событие после делегирования — резолв клиентского действия или переход в Done.
+  const done = await q<{ ts: string }>(
+    `SELECT te.created_at AS ts
+       FROM task_events te JOIN tasks t ON t.id = te.task_id
+      WHERE t.readable_id = $1 AND te.created_at >= $2
+        AND ( te.type = 'client_action_done'
+           OR (te.type = 'status_change' AND te.to_val ~* '(done|закры|готов|fixed|complete|verified|выполн)') )
+      ORDER BY te.created_at ASC, te.id ASC LIMIT 1`,
+    [taskId, d.ts],
+  );
+  const doneAt = done[0] ? new Date(done[0].ts).getTime() : null;
+
+  return { toLogin: d.to_login, toName: d.to_name || d.to_login, byName: d.by_name, at, seenAt, doneAt };
+}
+
+/**
+ * Пакетно — время делегирования и завершения по списку задач (для «кружков давности» на клиентской доске:
+ * клиент видит, сколько «висит» задача, делегированная сотруднику — green<24ч / amber<48ч / red≥48ч).
+ * Возвращает только делегированные задачи. Завершение — первое событие завершения ПОСЛЕ делегирования.
+ */
+export async function getDelegationsFor(taskIds: string[]): Promise<Map<string, { at: number; doneAt: number | null }>> {
+  const out = new Map<string, { at: number; doneAt: number | null }>();
+  if (!taskIds.length) return out;
+  const del = await q<{ readable_id: string; ts: string }>(
+    `SELECT DISTINCT ON (t.readable_id) t.readable_id, te.created_at AS ts
+       FROM task_events te JOIN tasks t ON t.id = te.task_id
+      WHERE te.type = 'delegated' AND t.readable_id = ANY($1::text[])
+      ORDER BY t.readable_id, te.created_at DESC, te.id DESC`,
+    [taskIds],
+  );
+  if (!del.length) return out;
+  const delMap = new Map(del.map((r) => [r.readable_id, new Date(r.ts).getTime()]));
+  const ids = [...delMap.keys()];
+  const done = await q<{ readable_id: string; ts: string }>(
+    `SELECT t.readable_id, te.created_at AS ts
+       FROM task_events te JOIN tasks t ON t.id = te.task_id
+      WHERE t.readable_id = ANY($1::text[])
+        AND ( te.type = 'client_action_done'
+           OR (te.type = 'status_change' AND te.to_val ~* '(done|закры|готов|fixed|complete|verified|выполн)') )
+      ORDER BY t.readable_id, te.created_at ASC, te.id ASC`,
+    [ids],
+  );
+  const doneMap = new Map<string, number>();
+  for (const r of done) {
+    const at = delMap.get(r.readable_id)!;
+    const ts = new Date(r.ts).getTime();
+    if (ts >= at && !doneMap.has(r.readable_id)) doneMap.set(r.readable_id, ts); // первое завершение после делегирования
+  }
+  for (const [id, at] of delMap) out.set(id, { at, doneAt: doneMap.get(id) ?? null });
+  return out;
+}
 /**
  * Пакетно — история переходов статусов (status_change) по списку задач, для «кружков» на карточке.
  * Один запрос на весь список (как getDepsFor), чтобы не дёргать журнал по каждой задаче.

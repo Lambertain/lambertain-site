@@ -5,7 +5,7 @@ import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny, makeCommentClientVisible } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, setReporterAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue, reopenDeployStage } from "@/lib/db";
+import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, setReporterAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue, reopenDeployStage, logTaskEvent } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
@@ -192,6 +192,13 @@ export async function markClientActionDone(taskId: string, data: string): Promis
   } catch { /* best-effort, статус вторинний до збереження даних */ }
   // Нейтральний текст: дію міг виконати і делегований співробітник, не лише клієнт.
   await be.addComment(taskId, `✅ <b>Реєстрацію виконано.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
+  // Завершающее событие — питает карточку делегирования («Виконано · дата»).
+  await logTaskEvent(taskId, { type: "client_action_done", actorLogin: me.youtrackLogin ?? null, actorRole: me.role }).catch(() => {});
+  // Делегированный сотрудник выполнил действие → сообщаем клиенту (он делегировал, ждёт результат).
+  // Самого исполнителя исключаем (excludeTgId), чтобы не слать ему же его действие.
+  if (me.role === "employee") {
+    await notifyProjectClients(projectKey, `✅ <b>Співробітник виконав делеговану задачу</b> · ${await taskTag(taskId)}: ${task.summary}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }, me.tgId).catch(() => {});
+  }
   // Возвращаем разработчику: уведомляем ответственного, он продолжает (данные — в /api/dev/secrets).
   const dev = proj?.meta.defaultAssignee;
   if (dev) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${await taskTag(taskId)}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});
@@ -209,10 +216,13 @@ export async function delegateTask(taskId: string, employeeLogin: string): Promi
   const emp = emps.find((e) => e.login === employeeLogin);
   if (!emp) return { error: "Сотрудник не найден в проекте" };
   await assignTask(taskId, employeeLogin, { actorLogin: me.youtrackLogin ?? null, actorRole: me.role, trigger: "клієнт делегував співробітнику" });
+  // Событие делегирования (питает клиент-видимую карточку статуса: кому/коли + прочитано/виконано).
+  await logTaskEvent(taskId, { type: "delegated", to: employeeLogin, actorLogin: me.youtrackLogin ?? null, actorRole: me.role, details: { toName: emp.fullName } }).catch(() => {});
   const be = getBackend();
   const task = await be.getTask(taskId).catch(() => null);
   await notifyLogins([employeeLogin], `📋 <b>Вам делеговано задачу</b> · ${await taskTag(taskId)}: ${task?.summary ?? ""}\n${PORTAL_BASE}/admin/tasks/${taskId}`).catch(() => {});
-  await be.addComment(taskId, `➡️ <i>Делеговано співробітнику: ${emp.fullName}.</i>`, "internal").catch(() => {});
+  // Клиент-видимый след в ленте (клиент делегировал сам — без модерации), плюс карточка статуса над задачей.
+  await be.addComment(taskId, `➡️ <i>Делеговано співробітнику: ${emp.fullName}.</i>`, "client").catch(() => {});
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
 }

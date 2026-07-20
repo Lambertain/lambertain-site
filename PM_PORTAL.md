@@ -268,6 +268,13 @@ from_client, `moderation` publish/autoApprove) вызывают `warnClientUnrea
   `delegateTask`), **в т.ч. задачи, требующие действия клиента** (`clientAction` — регистрация/доступ). Тогда
   делегированный сотрудник видит `ClientActionBar` и сам выполняет действие (`markClientActionDone` разрешён
   клиенту, админу и сотруднику этого проекта). Данные так же уходят разработчику в `/api/dev/secrets`.
+  - **Контроль делегирования (клиенту видно):** `delegateTask` пишет событие `delegated` в журнал (`task_events`) +
+    клиент-видимый коммент. На странице задачи — карточка статуса (`getDelegationStatus`): кому/когда делеговано,
+    **прочитал ли сотрудник** (из `task_reads` — открывал ли задачу после делегирования) и **когда выполнил**
+    (событие `client_action_done` или переход в Done). На досках клиента (дашборд `ClientBoard`/`TaskTabs` и список
+    `/admin/tasks` → `TaskList`) — кружок давности `delegDot` (`getDelegationsFor` + `segmentDayNumber`/`dayColor`):
+    зелёный 1-е сутки / жёлтый 2-е / красный ≥3-х, при выполнении — зелёный ✓. Когда сотрудник выполняет
+    делегированное действие — клиенту уходит пуш (`notifyProjectClients`, исполнитель исключён по `excludeTgId`).
 
 ## Claude Code разработчика ↔ портал (протокол + эскалация)
 

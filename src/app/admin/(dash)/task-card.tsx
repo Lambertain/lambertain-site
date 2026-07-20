@@ -15,7 +15,22 @@ function daysSince(ms?: number | null): number | null {
   return Math.floor((Date.now() - ms) / 86400000);
 }
 
-export function TaskCard({ task, locale, unread, hideWorkers }: { task: Task; locale: Locale; unread?: boolean; hideWorkers?: boolean }) {
+// Кружок давности делегирования (клиенту): число дней «висения» задачи у сотрудника, цвет по возрасту.
+// green — первые сутки, amber — вторые, red — третьи и далее. При выполнении — зелёный ✓ (отсчёт заморожен).
+const DELEG_COLOR = (days: number): string => (days <= 1 ? "#3fb950" : days === 2 ? "#e8b339" : "#ff5b5b");
+function DelegDot({ days, done, locale }: { days: number; done: boolean; locale: Locale }) {
+  const bg = done ? "#3fb950" : DELEG_COLOR(days);
+  return (
+    <span
+      title={done ? t(locale, "delegate.status.title") : t(locale, "card.daysN", { n: days })}
+      style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, padding: "0 6px", borderRadius: 999, background: bg, color: "#000", fontSize: 12, fontWeight: 700 }}
+    >
+      {done ? "✓" : days}
+    </span>
+  );
+}
+
+export function TaskCard({ task, locale, unread, hideWorkers, deleg }: { task: Task; locale: Locale; unread?: boolean; hideWorkers?: boolean; deleg?: { days: number; done: boolean } }) {
   const stale = daysSince(task.updated);
   const isStale = task.resolved == null && stale != null && stale >= 5;
   // Клиент не видит разработчиков; сотрудник и клиент-репортёр — видны.
@@ -31,10 +46,11 @@ export function TaskCard({ task, locale, unread, hideWorkers }: { task: Task; lo
         {task.state && <span style={ui.monoLabel}>{task.state}</span>}
         {task.priority && <span style={ui.monoLabel}>· {task.priority}</span>}
         {isStale && (
-          <span style={{ ...ui.monoLabel, color: "#e8b339", marginLeft: "auto" }}>
+          <span style={{ ...ui.monoLabel, color: "#e8b339", marginLeft: isStale && !deleg ? "auto" : undefined }}>
             {t(locale, "card.stale", { n: stale! })}
           </span>
         )}
+        {deleg && <DelegDot days={deleg.days} done={deleg.done} locale={locale} />}
       </div>
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>{task.summary}</div>
       <div style={{ display: "flex", gap: 16, ...ui.monoLabel, textTransform: "none" }}>
@@ -53,14 +69,14 @@ export function TaskCard({ task, locale, unread, hideWorkers }: { task: Task; lo
   );
 }
 
-export function TaskList({ tasks, empty, locale, unreadIds, hideWorkers }: { tasks: Task[]; empty: string; locale: Locale; unreadIds?: Set<string>; hideWorkers?: boolean }) {
+export function TaskList({ tasks, empty, locale, unreadIds, hideWorkers, deleg }: { tasks: Task[]; empty: string; locale: Locale; unreadIds?: Set<string>; hideWorkers?: boolean; deleg?: Map<string, { days: number; done: boolean }> }) {
   if (!tasks.length) {
     return <p style={{ color: "var(--muted)", fontSize: 14 }}>{empty}</p>;
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
       {tasks.map((t) => (
-        <TaskCard key={t.id} task={t} locale={locale} unread={unreadIds?.has(t.id)} hideWorkers={hideWorkers} />
+        <TaskCard key={t.id} task={t} locale={locale} unread={unreadIds?.has(t.id)} hideWorkers={hideWorkers} deleg={deleg?.get(t.id)} />
       ))}
     </div>
   );

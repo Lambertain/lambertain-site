@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getBackend } from "@/lib/tasks";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
-import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, memberCard, projectHasClient, getTaskEvents } from "@/lib/db";
+import { getTaskDeps, getReads, getTaskTags, getGuide, guideText, getProjectEmployees, getAdmins, memberCard, projectHasClient, getTaskEvents, getDelegationStatus } from "@/lib/db";
 import { tgUsernameById } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { getLocale } from "@/lib/i18n-server";
@@ -54,11 +54,12 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   // (на боці клієнта буває кілька людей — задачу створив один, перевіряє інший).
   const isProjectClientSide = (me.role === "client" || me.role === "employee") && (me.projectKey === taskKey || (me.projectKeys?.includes(taskKey) ?? false));
 
-  let task, comments, deps, reads, users, tags, projects, events;
+  let task, comments, deps, reads, users, tags, projects, events, delegation;
   const readKey = me.youtrackLogin || me.fullName || "admin";
   try {
     // DEV-32: журнал событий — только команде (клиенту не тянем и не показываем).
-    [task, comments, deps, reads, users, tags, projects, events] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), be.listProjects(), me.role === "client" ? Promise.resolve([]) : getTaskEvents(id)]);
+    // Статус делегирования — питает карточку «кому/коли/прочитано/виконано» (в т.ч. клиенту).
+    [task, comments, deps, reads, users, tags, projects, events, delegation] = await Promise.all([be.getTask(id), be.getComments(id), getTaskDeps(id), getReads(readKey), isAdmin ? be.listUsers() : Promise.resolve([]), getTaskTags(id), be.listProjects(), me.role === "client" ? Promise.resolve([]) : getTaskEvents(id), getDelegationStatus(id)]);
   } catch (e) {
     return (
       <div>
@@ -227,6 +228,26 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             <span>{t(locale, "awaitAnswer.title")}</span>
           </div>
           <p style={{ fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>{t(locale, "awaitAnswer.body")}</p>
+        </div>
+      )}
+
+      {/* Статус делегирования: кому/коли делеговано + прочитав чи сотрудник (мінімум) + коли виконав (максимум).
+          Бачить сторона клієнта (делегатор та колеги) і команда — щоб клієнт міг проконтролювати сотрудника. */}
+      {delegation && (isProjectClientSide || isAdmin) && (
+        <div style={{ ...ui.card, padding: 14, marginTop: 16, borderColor: "var(--accent-line)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, ...ui.monoLabel, color: "var(--accent)" }}>
+            <span style={{ fontSize: 15 }}>➡️</span>
+            <span>{t(locale, "delegate.status.title")}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 8, fontSize: 14, lineHeight: 1.6 }}>
+            <span>{t(locale, "delegate.status.to", { name: delegation.toName })}{delegation.at ? ` · ${fmt(delegation.at, locale)}` : ""}</span>
+            <span style={{ color: delegation.seenAt ? "var(--text)" : "var(--muted)" }}>
+              {delegation.seenAt ? `✓ ${t(locale, "delegate.status.seen", { date: fmt(delegation.seenAt, locale) })}` : `◦ ${t(locale, "delegate.status.notSeen")}`}
+            </span>
+            <span style={{ color: delegation.doneAt ? "#b9ff4b" : "var(--muted)" }}>
+              {delegation.doneAt ? `✓ ${t(locale, "delegate.status.done", { date: fmt(delegation.doneAt, locale) })}` : `◦ ${t(locale, "delegate.status.inWork")}`}
+            </span>
+          </div>
         </div>
       )}
 

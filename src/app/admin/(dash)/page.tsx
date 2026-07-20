@@ -5,7 +5,8 @@ import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
-import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, doneCountsByProjectDay, getDepsFor, getEnabledGuides, guideText, commentTimesByTasks } from "@/lib/db";
+import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, doneCountsByProjectDay, getDepsFor, getEnabledGuides, guideText, commentTimesByTasks, getDelegationsFor } from "@/lib/db";
+import { segmentDayNumber } from "@/lib/status-timer";
 import { getProjectRepoSync } from "@/lib/repo-sync";
 import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
@@ -120,7 +121,11 @@ export default async function HomePage() {
         : merged.filter((tk) => !tk.internal || tk.createdByRole === "admin" || tk.createdByRole === "super");
   const depMap = await getDepsFor(filtered.map((tk) => tk.id));
   const commentTimes = await commentTimesByTasks(filtered.map((tk) => tk.id));
+  // Клиенту — давность делегированных сотруднику задач (кружок green/amber/red, ✓ при выполнении).
+  const nowDeleg = nowMs();
+  const delegRaw = me.role === "client" ? await getDelegationsFor(filtered.map((tk) => tk.id)) : new Map<string, { at: number; doneAt: number | null }>();
   const board: BoardTask[] = filtered.map((tk) => {
+    const dlg = delegRaw.get(tk.id);
     const blockers = (depMap.get(tk.id) ?? []).filter((d) => statusBucket(d.status) !== "done");
     const lastRead = reads.get(tk.id) ?? 0;
     // Новая задача — ещё не открытая (created позже последнего просмотра).
@@ -154,6 +159,7 @@ export default async function HomePage() {
       // (clientAction) либо вопрос-эскалация (blocked). Для мини-секции «Потребує вашої дії» вверху доски.
       clientAttention: me.role === "client" && (statusBucket(tk.state) === "review" || !!tk.clientAction || statusBucket(tk.state) === "blocked"),
       deployStage: tk.deployStage,
+      delegDot: dlg ? { days: segmentDayNumber(dlg.at, dlg.doneAt ?? nowDeleg), done: dlg.doneAt != null } : undefined,
     };
   });
 

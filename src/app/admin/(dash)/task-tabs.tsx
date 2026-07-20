@@ -35,6 +35,7 @@ export type BoardTask = {
   deployStage?: string | null; // pr → dev → prod (деплой-стадия, простыми словами для клиента)
   addressee?: AddresseeKey | null; // кому адресована (бейдж для команды; null — не показывать)
   statusRows?: StatusDot[][]; // кружки «дней в статусе» по строкам (внутренний вид); undefined — не показывать
+  delegDot?: { days: number; done: boolean }; // клиенту: давность делегированной сотруднику задачи (green/amber/red), ✓ при выполнении
 };
 
 const DOT_COLOR: Record<"green" | "amber" | "red", string> = { green: "#3fb950", amber: "#e8b339", red: "#ff5b5b" };
@@ -149,6 +150,15 @@ function Row({
         <AddresseeBadge addressee={task.addressee} locale={locale} />
         <DeployBadge stage={task.deployStage} locale={locale} />
         <span style={{ flex: 1 }} />
+        {/* Клиенту: кружок давности делегированной сотруднику задачи — green 1-е сутки / amber 2-е / red ≥3-х, ✓ при выполнении. */}
+        {task.delegDot && (
+          <span
+            title={task.delegDot.done ? t(locale, "delegate.status.title") : t(locale, "card.daysN", { n: task.delegDot.days })}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 22, height: 22, padding: "0 6px", borderRadius: 999, background: task.delegDot.done ? DOT_COLOR.green : DOT_COLOR[dayColor(task.delegDot.days)], color: "#000", fontSize: 12, fontWeight: 700 }}
+          >
+            {task.delegDot.done ? "✓" : task.delegDot.days}
+          </span>
+        )}
         <TaskBadge newComments={task.newComments} isNew={task.isNew} />
         {canDelete && (
           <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }}>

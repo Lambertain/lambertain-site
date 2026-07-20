@@ -5,8 +5,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale } from "@/lib/i18n-server";
 import { t } from "@/lib/i18n";
-import { getReads, getProjectReads, getDepsFor, getStatusHistoryFor, projectQueueTasks } from "@/lib/db";
-import { statusDotRows } from "@/lib/status-timer";
+import { getReads, getProjectReads, getDepsFor, getStatusHistoryFor, projectQueueTasks, getDelegationsFor } from "@/lib/db";
+import { statusDotRows, segmentDayNumber } from "@/lib/status-timer";
 import { mergeFeedback } from "@/lib/feedback";
 import { visibleProjects } from "@/lib/scope";
 import { statusBucket, BUCKET_ORDER, type Bucket } from "@/lib/statuses";
@@ -261,6 +261,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const stale = tasks.filter((x) => x.resolved == null && x.updated != null && x.updated < threshold);
   const fresh = tasks.filter((x) => !stale.includes(x));
 
+  // Кружки давности делегирования — только клиенту: сколько «висит» задача у его сотрудника
+  // (green<24ч / amber<48ч / red≥48ч). При выполнении отсчёт замораживается (зелёный ✓).
+  const now = nowMs();
+  const delegRaw = me.role === "client" ? await getDelegationsFor(tasks.map((x) => x.id)) : new Map<string, { at: number; doneAt: number | null }>();
+  const delegDots = new Map<string, { days: number; done: boolean }>();
+  for (const [id, d] of delegRaw) delegDots.set(id, { days: segmentDayNumber(d.at, d.doneAt ?? now), done: d.doneAt != null });
+
   return (
     <div>
       <div style={ui.monoLabel}>{kicker}</div>
@@ -271,11 +278,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           <div style={{ ...ui.monoLabel, color: "#e8b339" }}>
             {t(locale, "overdue.title")} · {stale.length}
           </div>
-          <TaskList tasks={stale} empty="" locale={locale} hideWorkers={me.role === "client"} />
+          <TaskList tasks={stale} empty="" locale={locale} hideWorkers={me.role === "client"} deleg={delegDots} />
         </div>
       )}
 
-      <TaskList tasks={fresh} empty={t(locale, "tasks.empty")} locale={locale} hideWorkers={me.role === "client"} />
+      <TaskList tasks={fresh} empty={t(locale, "tasks.empty")} locale={locale} hideWorkers={me.role === "client"} deleg={delegDots} />
     </div>
   );
 }
