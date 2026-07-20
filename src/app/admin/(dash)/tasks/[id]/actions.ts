@@ -5,7 +5,7 @@ import { getBackend } from "@/lib/tasks";
 import { draftClientMessage } from "@/lib/replies";
 import { submitForModeration, approveModeratedComment, editModeratedComment, rejectToInternal, editOwnPending, editOwnPublished, deleteOwnPublished, discardOwnPending, deleteCommentAny, editCommentAny, makeCommentClientVisible } from "@/lib/moderation";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
-import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, setReporterAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, enableProjectFieldValue, reopenDeployStage, logTaskEvent } from "@/lib/db";
+import { updateTaskFields, saveAttachment, setOwnerAction, setClientAction, setReporterAction, upsertSecret, getProjectFull, getProjectEmployees, getAdmins, assignTask, projectHasClient, getDevCommentForTask, saveGuideCollectValue, reopenDeployStage, logTaskEvent } from "@/lib/db";
 import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskTag } from "@/lib/notify";
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
@@ -173,25 +173,28 @@ export async function markClientActionDone(taskId: string, data: string): Promis
   if (!task.clientAction) return { error: "Действие уже выполнено" };
   const proj = await getProjectFull(projectKey);
   const value = (data || "").trim();
-  // Данные (токен/логины), которые ввёл клиент → деву (видит админ + Claude-код в /api/dev/secrets).
+  // Данные (токен/ссылка/логины), которые ввёл клиент → в настройки проекта (видит админ + Claude-код в /api/dev/secrets).
   if (value) {
-    const fk = task.clientActionField; // "fieldKey.subKey" — если задан, кладём в structured-поле каталога
-    if (fk && fk.includes(".")) {
-      const [k, s] = fk.split(".");
-      await enableProjectFieldValue(projectKey, k, s, value);
+    const fk = task.clientActionField; // "clientGit" | "fieldKey.subKey" каталога — либо разовый секрет.
+    if (fk === "clientGit" || (fk && fk.includes("."))) {
+      // clientGit → meta.clientGit; backed (railway/vercel) → meta.clientDeploy/clientVercel; каталог → customFields.
+      await saveGuideCollectValue(projectKey, fk, value);
     } else {
       await upsertSecret(projectKey, { name: `Реєстрація · ${taskId}`, value, note: task.clientAction.slice(0, 300), filledBy: "client" });
     }
   }
   await setClientAction(taskId, null, null, null);
-  // Дані надано → повертаємо задачу в роботу: вона чекала на клієнта (Blocked) або висіла в ревʼю.
-  // Без цього задача лишалась «Blocked» навіть після виконання дії (як коли клієнт відповідає коментарем).
+  // Задача-инструкция из гайда (autoDone) → сразу Done. Иначе — возвращаем в работу (ждала клиента: Blocked/Review).
   try {
-    const bucket = statusBucket(task.state);
-    if (bucket === "blocked" || bucket === "review") await be.updateStatus(taskId, "In Progress");
+    if (task.autoDone) {
+      await be.updateStatus(taskId, "Done");
+    } else {
+      const bucket = statusBucket(task.state);
+      if (bucket === "blocked" || bucket === "review") await be.updateStatus(taskId, "In Progress");
+    }
   } catch { /* best-effort, статус вторинний до збереження даних */ }
   // Нейтральний текст: дію міг виконати і делегований співробітник, не лише клієнт.
-  await be.addComment(taskId, `✅ <b>Реєстрацію виконано.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
+  await be.addComment(taskId, `✅ <b>Виконано.</b>${value ? " Дані надано." : ""}`, "client").catch(() => {});
   // Завершающее событие — питает карточку делегирования («Виконано · дата»).
   await logTaskEvent(taskId, { type: "client_action_done", actorLogin: me.youtrackLogin ?? null, actorRole: me.role }).catch(() => {});
   // Делегированный сотрудник выполнил действие → сообщаем клиенту (он делегировал, ждёт результат).
@@ -199,10 +202,10 @@ export async function markClientActionDone(taskId: string, data: string): Promis
   if (me.role === "employee") {
     await notifyProjectClients(projectKey, `✅ <b>Співробітник виконав делеговану задачу</b> · ${await taskTag(taskId)}: ${task.summary}`, [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` }, me.tgId).catch(() => {});
   }
-  // Возвращаем разработчику: уведомляем ответственного, он продолжает (данные — в /api/dev/secrets).
+  // Дев-работа продолжается только у обычных clientAction-задач (не autoDone-инструкций): уведомляем ответственного.
   const dev = proj?.meta.defaultAssignee;
-  if (dev) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${await taskTag(taskId)}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});
-  await notifyAdmin(`✅ <b>Клиент выполнил регистрацию</b> · ${await taskTag(taskId)}: ${task.summary}`).catch(() => {});
+  if (dev && !task.autoDone) await notifyLogins([dev], `🔑 <b>Клієнт надав дані</b> · ${await taskTag(taskId)}: ${task.summary}\nПродовжуй — секрети в /api/dev/secrets.`).catch(() => {});
+  await notifyAdmin(`✅ <b>Клиент виконав дію</b> · ${await taskTag(taskId)}: ${task.summary}`).catch(() => {});
   revalidatePath(`/admin/tasks/${taskId}`);
   return { ok: true };
 }

@@ -5,10 +5,9 @@ import type { TaskFilter } from "@/lib/tasks/types";
 import { getPrincipal, isSuperAdmin } from "@/lib/principal";
 import { visibleProjects } from "@/lib/scope";
 import { mergeFeedback } from "@/lib/feedback";
-import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, doneCountsByProjectDay, getDepsFor, getEnabledGuides, guideText, commentTimesByTasks, getDelegationsFor } from "@/lib/db";
+import { getReads, getProjectReads, listProjectsWithMeta, taskCountsByProject, doneCountsByProjectDay, getDepsFor, commentTimesByTasks, getDelegationsFor } from "@/lib/db";
 import { segmentDayNumber } from "@/lib/status-timer";
 import { getProjectRepoSync } from "@/lib/repo-sync";
-import { ClientGuides } from "./client-guides";
 import { statusBucket, type Bucket } from "@/lib/statuses";
 import { ProjectInfoCard } from "./project-info-card";
 import { addMonth } from "./project-timeline";
@@ -241,31 +240,17 @@ export default async function HomePage() {
     );
   }
 
-  // —— Клиент: онбординг-баннер + «Подготовка» (гайды) + инфо своего проекта + задачи ——
+  // —— Клиент: инфо своего проекта + задачи (инструкции приходят задачами в «Потрібна ваша дія», не пассивным блоком) ——
   const myProject = me.role === "client" ? visible.find((p) => p.key === me.projectKey) : undefined;
-  const showOnboarding = me.role === "client" && !!myProject?.meta.showOnboarding;
   const instructionSetToken = me.role === "client" ? myProject?.meta.onboardingSetToken : undefined;
   // Карточки всех клиентских проектов (кроме feedback) — по ключу; ClientBoard покажет карточку ВЫБРАННОГО проекта.
   const clientProjects = me.role === "client" ? visible.filter((p) => !p.meta.feedback) : [];
   const projectCards: Record<string, React.ReactNode> = Object.fromEntries(
     clientProjects.map((p) => [p.key, <ProjectInfoCard key={p.key} project={p} now={now} locale={locale} />]),
   );
-  // Гайды по ВСЕМ клиентским проектам (клиент может быть в нескольких), без дублей по id.
-  const clientGuides = me.role === "client"
-    ? (await Promise.all(clientProjects.map((p) => getEnabledGuides(p.key).catch(() => []))))
-        .flat().filter((g, i, a) => a.findIndex((x) => x.id === g.id) === i)
-    : [];
 
   return (
     <div>
-      <ClientGuides guides={clientGuides.map((g) => ({ id: g.id, ...guideText(g, locale) }))} locale={locale} />
-      {showOnboarding && (
-        <Link href="/onboarding" style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", marginBottom: 18, borderRadius: 10, border: "1px solid var(--accent-line)", background: "rgba(185,255,75,0.06)", textDecoration: "none", color: "var(--text)" }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
-          <span style={{ fontSize: 14, flex: 1 }}>{t(locale, "onb.banner")}</span>
-          <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>{t(locale, "onb.bannerCta")}</span>
-        </Link>
-      )}
       {instructionSetToken && (
         <a href={`/i/${instructionSetToken}`} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", marginBottom: 18, borderRadius: 10, border: "1px solid var(--accent-line)", background: "rgba(185,255,75,0.06)", textDecoration: "none", color: "var(--text)" }}>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />

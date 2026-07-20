@@ -1,53 +1,54 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveProjectGuides } from "../../project-actions";
+import { createGuideTask } from "../../project-actions";
 import { ui } from "../../../ui-styles";
 
-type G = { id: number; title: string };
+type G = { id: number; title: string; collects: boolean };
 
-export function ProjectGuides({ projectKey, guides, enabled }: { projectKey: string; guides: G[]; enabled: number[] }) {
-  const [sel, setSel] = useState<number[]>(enabled);
-  const [saved, setSaved] = useState(false);
+function GuideRow({ projectKey, g }: { projectKey: string; g: G }) {
   const [pending, start] = useTransition();
-  const dirty = sel.slice().sort().join(",") !== enabled.slice().sort().join(",");
-
-  function toggle(id: number) {
-    setSaved(false);
-    setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  function send() {
+    setErr(null);
+    start(async () => {
+      const r = await createGuideTask(projectKey, g.id);
+      if (r.error) setErr(r.error);
+      else { setDone(true); setTimeout(() => setDone(false), 4000); }
+    });
   }
-  function save() {
-    start(async () => { const r = await saveProjectGuides(projectKey, sel); if (!r.error) setSaved(true); });
-  }
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", border: "1px solid var(--border-2)", borderRadius: 4 }}>
+      <span style={{ flex: 1, fontSize: 14 }}>
+        {g.title}
+        {g.collects && <span style={{ ...ui.monoLabel, textTransform: "none", color: "#e8b339", marginLeft: 8 }}>· сбор данных</span>}
+      </span>
+      {done ? (
+        <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>Задача создана ✓</span>
+      ) : (
+        <button onClick={send} disabled={pending} style={{ ...ui.btn, opacity: pending ? 0.5 : 1, whiteSpace: "nowrap" }}>{pending ? "…" : "Создать задачу"}</button>
+      )}
+      {err && <span style={{ ...ui.monoLabel, textTransform: "none", color: "#ff5b5b" }}>{err}</span>}
+    </div>
+  );
+}
 
+/** «Гайды клиенту»: отправить гайд клиенту задачей (в любой момент). Задача → «Потрібна ваша дія» + пуш в ТГ. */
+export function ProjectGuides({ projectKey, guides }: { projectKey: string; guides: G[] }) {
   return (
     <div style={{ ...ui.card, marginTop: 16 }}>
       <div style={{ ...ui.monoLabel, color: "var(--accent)" }}>Гайды клиенту</div>
-      <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 6 }}>Что клиент увидит в «Подготовке». Обычно включают после спеки — что нужно зарегистрировать.</p>
+      <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 6 }}>
+        Отправьте гайд клиенту задачей — она появится у него в «Потрібна ваша дія» и придёт пуш в Telegram.
+        Гайд со сбором данных попросит вписать значение (токен/ссылку) — оно попадёт в настройки проекта.
+      </p>
       {guides.length === 0 ? (
         <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 10 }}>Сначала добавьте гайды в разделе «Гайды».</p>
       ) : (
-        <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2, border: "1px solid var(--border-2)", padding: 6, marginTop: 12 }}>
-            {guides.map((g) => {
-              const on = sel.includes(g.id);
-              return (
-                <button key={g.id} onClick={() => toggle(g.id)} style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", padding: "8px", background: on ? "var(--surface-2)" : "transparent", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 14 }}>
-                  <span style={{ width: 15, height: 15, flexShrink: 0, border: `1px solid ${on ? "var(--accent)" : "var(--border-2)"}`, background: on ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {on && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
-                  </span>
-                  {g.title}
-                </button>
-              );
-            })}
-          </div>
-          {(dirty || saved) && (
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12 }}>
-              <button onClick={save} disabled={pending || !dirty} style={{ ...ui.btnAccent, opacity: pending || !dirty ? 0.5 : 1 }}>{pending ? "…" : "Сохранить"}</button>
-              {saved && !dirty && <span style={{ ...ui.monoLabel, color: "var(--accent)" }}>Сохранено ✓</span>}
-            </div>
-          )}
-        </>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 12 }}>
+          {guides.map((g) => <GuideRow key={g.id} projectKey={projectKey} g={g} />)}
+        </div>
       )}
     </div>
   );

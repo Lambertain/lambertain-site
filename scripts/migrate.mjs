@@ -202,6 +202,9 @@ ALTER TABLE guides ADD COLUMN IF NOT EXISTS title_ru TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS body_ru TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS title_en TEXT;
 ALTER TABLE guides ADD COLUMN IF NOT EXISTS body_en TEXT;
+-- Гайд может собирать данные у клиента: collect_field = "clientGit" или "fieldKey.subKey" каталога project-fields.
+-- Клиент вписывает значение в поле под гайдом → оно сохраняется в настройки проекта (meta/customFields), видно разработчику.
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS collect_field TEXT;
 -- Какие гайды включены клиенту по проекту.
 CREATE TABLE IF NOT EXISTS project_guides (
   project_key TEXT NOT NULL,

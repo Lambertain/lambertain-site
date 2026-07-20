@@ -2,9 +2,12 @@
 
 import { useState, useRef, useTransition } from "react";
 import { saveGuide, removeGuide, uploadGuideImage } from "./actions";
+import { collectTargets } from "@/lib/project-fields";
 import { ui } from "../../ui-styles";
 
-type G = { id: number; slug: string; title: string; body: string; ord: number; title_ru: string | null; body_ru: string | null; title_en: string | null; body_en: string | null };
+type G = { id: number; slug: string; title: string; body: string; ord: number; title_ru: string | null; body_ru: string | null; title_en: string | null; body_en: string | null; collect_field: string | null };
+
+const COLLECT_OPTS = collectTargets();
 
 type Loc = "uk" | "ru" | "en";
 const LOCS: { k: Loc; label: string }[] = [{ k: "uk", label: "UA" }, { k: "ru", label: "RU" }, { k: "en", label: "EN" }];
@@ -15,6 +18,7 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
   const [bodies, setBodies] = useState<Record<Loc, string>>({ uk: g?.body ?? "", ru: g?.body_ru ?? "", en: g?.body_en ?? "" });
   const [slug, setSlug] = useState(g?.slug ?? "");
   const [ord, setOrd] = useState(String(g?.ord ?? 100));
+  const [collectField, setCollectField] = useState(g?.collect_field ?? "");
   const [msg, setMsg] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -59,9 +63,10 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
       const r = await saveGuide({
         id: g?.id, slug: isNew ? slug : undefined, title: titles.uk, body: bodies.uk, ord: Number(ord) || 100,
         loc: { title_ru: titles.ru, body_ru: bodies.ru, title_en: titles.en, body_en: bodies.en },
+        collectField: collectField || null,
       });
       if (r.error) setMsg(r.error);
-      else { setMsg("Сохранено ✓"); if (isNew) { setTitles({ uk: "", ru: "", en: "" }); setBodies({ uk: "", ru: "", en: "" }); setSlug(""); setOrd("100"); } }
+      else { setMsg("Сохранено ✓"); if (isNew) { setTitles({ uk: "", ru: "", en: "" }); setBodies({ uk: "", ru: "", en: "" }); setSlug(""); setOrd("100"); setCollectField(""); } }
     });
   }
 
@@ -82,6 +87,14 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
         <input value={ord} onChange={(e) => setOrd(e.target.value)} placeholder="№" title="Порядок" style={{ ...ui.input, width: 64 }} />
       </div>
       <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} onPaste={onPaste} placeholder="Текст инструкции (markdown). Вставьте скрин из буфера — Ctrl+V." rows={6} style={{ ...ui.input, width: "100%", resize: "vertical", marginTop: 8, fontSize: 13, lineHeight: 1.5 }} />
+      {/* Сбор данных: если задано — под гайдом у клиента появится поле, введённое значение уйдёт в настройки проекта. */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>Собирать данные у клиента:</span>
+        <select value={collectField} onChange={(e) => setCollectField(e.target.value)} style={{ ...ui.input, width: "auto", minWidth: 240 }}>
+          <option value="">— не собирать</option>
+          {COLLECT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label.ru}</option>)}
+        </select>
+      </div>
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
         <button onClick={save} disabled={pending || !titles.uk.trim()} style={{ ...ui.btnAccent, opacity: pending || !titles.uk.trim() ? 0.5 : 1 }}>{pending ? "…" : isNew ? "Создать гайд" : "Сохранить"}</button>
         {!isNew && g && (confirm ? (

@@ -106,3 +106,24 @@ export const PROJECT_FIELD_DEFS: ProjectFieldDef[] = [
 export function getFieldDef(key: string): ProjectFieldDef | undefined {
   return PROJECT_FIELD_DEFS.find((f) => f.key === key);
 }
+
+// ——— Цели сбора данных гайдом (клиент вписывает значение в поле под гайдом → сохраняется в настройки проекта) ———
+export type CollectTarget = { value: string; label: L; kind: "text" | "url" | "secret" };
+
+/** Плоский список целей сбора: спец. `clientGit` + каждое подполе каталога как `fieldKey.subKey`. */
+export function collectTargets(): CollectTarget[] {
+  const out: CollectTarget[] = [
+    { value: "clientGit", label: { uk: "Посилання на репозиторій (Git)", ru: "Ссылка на репозиторий (Git)", en: "Repository link (Git)" }, kind: "url" },
+  ];
+  for (const f of PROJECT_FIELD_DEFS) {
+    for (const s of f.subs) {
+      out.push({
+        value: `${f.key}.${s.key}`,
+        label: { uk: `${f.label.uk} · ${s.label.uk}`, ru: `${f.label.ru} · ${s.label.ru}`, en: `${f.label.en} · ${s.label.en}` },
+        kind: s.kind ?? "text",
+      });
+    }
+  }
+  return out;
+}
+

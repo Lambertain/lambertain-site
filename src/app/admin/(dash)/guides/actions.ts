@@ -17,20 +17,21 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "guide";
 }
 
-export async function saveGuide(input: { id?: number; slug?: string; title: string; body: string; ord: number; loc?: { title_ru?: string; body_ru?: string; title_en?: string; body_en?: string } }): Promise<{ ok?: boolean; id?: number; error?: string }> {
+export async function saveGuide(input: { id?: number; slug?: string; title: string; body: string; ord: number; loc?: { title_ru?: string; body_ru?: string; title_en?: string; body_en?: string }; collectField?: string | null }): Promise<{ ok?: boolean; id?: number; error?: string }> {
   await requireAdmin();
   if (!input.title.trim()) return { error: "Заголовок пуст" };
   const loc = {
     title_ru: input.loc?.title_ru?.trim() || null, body_ru: input.loc?.body_ru ?? null,
     title_en: input.loc?.title_en?.trim() || null, body_en: input.loc?.body_en ?? null,
   };
+  const collectField = input.collectField?.trim() || null;
   if (input.id) {
-    await updateGuide(input.id, input.title.trim(), input.body, input.ord, loc);
+    await updateGuide(input.id, input.title.trim(), input.body, input.ord, loc, collectField);
     revalidatePath("/admin/guides");
     return { ok: true, id: input.id };
   }
   const slug = input.slug?.trim() || slugify(input.title);
-  const r = await createGuide(slug, input.title.trim(), input.body, input.ord, loc);
+  const r = await createGuide(slug, input.title.trim(), input.body, input.ord, loc, collectField);
   revalidatePath("/admin/guides");
   return r.error ? { error: r.error } : { ok: true, id: r.id };
 }

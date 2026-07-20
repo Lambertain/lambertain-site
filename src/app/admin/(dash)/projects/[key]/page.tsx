@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/principal";
-import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, getProjectGuideIds, listLinks, memberProjectsMap, listProjectsWithMeta } from "@/lib/db";
+import { getProjectFull, getProjectTokens, getBriefByProject, listGuides, listLinks, memberProjectsMap, listProjectsWithMeta } from "@/lib/db";
 import { ProjectGuides } from "./project-guides";
 import { ProjectUsersPanel } from "./project-users";
 import type { PanelUser } from "../../team/users-panel";
@@ -23,8 +23,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
   await requireAdmin();
   const { key } = await params;
   const locale = await getLocale();
-  const [proj, tokens, users, brief, guides, enabledGuides, links, memberProj, allProjects] = await Promise.all([
-    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), getProjectGuideIds(key), listLinks(), memberProjectsMap(), listProjectsWithMeta(),
+  const [proj, tokens, users, brief, guides, links, memberProj, allProjects] = await Promise.all([
+    getProjectFull(key), getProjectTokens(), getBackend().listUsers(), getBriefByProject(key), listGuides(), listLinks(), memberProjectsMap(), listProjectsWithMeta(),
   ]);
   const contributors = users
     .filter((u) => u.role === "contributor" || u.role === "admin")
@@ -96,7 +96,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
         </div>
       )}
 
-      <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title }))} enabled={enabledGuides} />
+      <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title, collects: !!g.collect_field }))} />
 
       <SpecsPanel projectKey={key} locale={locale} initialSpecs={listSpecs(proj.meta)} />
 

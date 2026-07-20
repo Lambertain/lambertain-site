@@ -7,6 +7,7 @@ import { Pool } from "pg";
 import { randomBytes } from "node:crypto";
 import type { Role } from "./tasks/types";
 import type { StatusEvent } from "./status-timer";
+import { getFieldDef } from "./project-fields";
 
 declare global {
   var _pmPool: Pool | undefined;
@@ -1993,10 +1994,12 @@ export async function getBriefByProject(projectKey: string): Promise<Brief | nul
 export interface Guide {
   id: number; slug: string; title: string; body: string; ord: number;
   title_ru: string | null; body_ru: string | null; title_en: string | null; body_en: string | null;
+  /** Какое поле проекта собирает этот гайд у клиента: "clientGit" или "fieldKey.subKey" каталога project-fields. null — не собирает. */
+  collect_field: string | null;
 }
 export interface GuideLoc { title_ru?: string | null; body_ru?: string | null; title_en?: string | null; body_en?: string | null }
 
-const GUIDE_COLS = "id, slug, title, body, ord, title_ru, body_ru, title_en, body_en";
+const GUIDE_COLS = "id, slug, title, body, ord, title_ru, body_ru, title_en, body_en, collect_field";
 
 /** Заголовок+тело гайда на нужной локали с fallback на uk (основную). */
 export function guideText(g: Guide, locale: "uk" | "ru" | "en"): { title: string; body: string } {
@@ -2012,21 +2015,21 @@ export async function getGuide(id: number): Promise<Guide | null> {
   const rows = await q<Guide>(`SELECT ${GUIDE_COLS} FROM guides WHERE id = $1`, [id]);
   return rows[0] ?? null;
 }
-export async function createGuide(slug: string, title: string, body: string, ord: number, loc?: GuideLoc): Promise<{ id?: number; error?: string }> {
+export async function createGuide(slug: string, title: string, body: string, ord: number, loc?: GuideLoc, collectField?: string | null): Promise<{ id?: number; error?: string }> {
   try {
     const rows = await q<{ id: number }>(
-      "INSERT INTO guides (slug, title, body, ord, title_ru, body_ru, title_en, body_en) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
-      [slug, title, body, ord, loc?.title_ru ?? null, loc?.body_ru ?? null, loc?.title_en ?? null, loc?.body_en ?? null],
+      "INSERT INTO guides (slug, title, body, ord, title_ru, body_ru, title_en, body_en, collect_field) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id",
+      [slug, title, body, ord, loc?.title_ru ?? null, loc?.body_ru ?? null, loc?.title_en ?? null, loc?.body_en ?? null, collectField || null],
     );
     return { id: rows[0].id };
   } catch {
     return { error: "slug занят" };
   }
 }
-export async function updateGuide(id: number, title: string, body: string, ord: number, loc?: GuideLoc): Promise<void> {
+export async function updateGuide(id: number, title: string, body: string, ord: number, loc?: GuideLoc, collectField?: string | null): Promise<void> {
   await q(
-    "UPDATE guides SET title=$2, body=$3, ord=$4, title_ru=$5, body_ru=$6, title_en=$7, body_en=$8 WHERE id=$1",
-    [id, title, body, ord, loc?.title_ru ?? null, loc?.body_ru ?? null, loc?.title_en ?? null, loc?.body_en ?? null],
+    "UPDATE guides SET title=$2, body=$3, ord=$4, title_ru=$5, body_ru=$6, title_en=$7, body_en=$8, collect_field=$9 WHERE id=$1",
+    [id, title, body, ord, loc?.title_ru ?? null, loc?.body_ru ?? null, loc?.title_en ?? null, loc?.body_en ?? null, collectField || null],
   );
 }
 export async function deleteGuide(id: number): Promise<void> {
@@ -2044,12 +2047,43 @@ export async function setProjectGuides(projectKey: string, guideIds: number[]): 
     await q("INSERT INTO project_guides (project_key, guide_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [projectKey, gid]);
   }
 }
-/** Включённые клиенту гайды проекта (для кабинета клиента). */
+/** Включённые клиенту гайды проекта (для кабинета клиента). Тянем все локали + collect_field. */
 export async function getEnabledGuides(projectKey: string): Promise<Guide[]> {
   return q<Guide>(
-    "SELECT g.id, g.slug, g.title, g.body, g.ord FROM guides g JOIN project_guides pg ON pg.guide_id=g.id WHERE pg.project_key=$1 ORDER BY g.ord, g.title",
+    `SELECT ${GUIDE_COLS.split(", ").map((c) => "g." + c).join(", ")} FROM guides g JOIN project_guides pg ON pg.guide_id=g.id WHERE pg.project_key=$1 ORDER BY g.ord, g.title`,
     [projectKey],
   );
+}
+
+/**
+ * Сохранить введённое клиентом значение гайда в настройки проекта.
+ * collectField: "clientGit" → meta.clientGit; иначе "fieldKey.subKey" каталога project-fields:
+ * backed-поля (railway/vercel) пишем в meta.clientDeploy/clientVercel (их читает деплой), остальные — в customFields
+ * (видно разработчику в /api/dev/secrets). Поле каталога при этом включается в проект.
+ */
+export async function saveGuideCollectValue(projectKey: string, collectField: string, value: string): Promise<void> {
+  const v = value.trim();
+  if (!collectField) return;
+  if (collectField === "clientGit") {
+    const p = await getProjectFull(projectKey);
+    if (!p) return;
+    await setProjectMeta(projectKey, p.name, { ...p.meta, clientGit: v });
+    return;
+  }
+  const [fieldKey, subKey] = collectField.split(".");
+  if (!fieldKey || !subKey) return;
+  const def = getFieldDef(fieldKey);
+  if (def?.backed) {
+    const p = await getProjectFull(projectKey);
+    if (!p) return;
+    const meta = { ...p.meta } as ProjectMeta & Record<string, unknown>;
+    const cur = (meta[def.backed] ?? {}) as Record<string, string>;
+    meta[def.backed] = { ...cur, [subKey]: v };
+    meta.enabledFields = Array.from(new Set([...(meta.enabledFields ?? []), fieldKey]));
+    await setProjectMeta(projectKey, p.name, meta);
+    return;
+  }
+  await enableProjectFieldValue(projectKey, fieldKey, subKey, v);
 }
 
 /** Сохранить картинку гайда (base64) → id. Отдаётся через /api/guide-files/<id>. */

@@ -26,7 +26,7 @@ const NAV: Record<Role, { href: string; key: string }[]> = {
     { href: "/admin/onboarding", key: "nav.onboarding" },
   ],
   contributor: [{ href: "/admin", key: "nav.projects" }, { href: "/admin/tasks", key: "nav.tasks" }],
-  client: [{ href: "/admin", key: "nav.tasks" }, { href: "/admin/crew", key: "nav.crew" }, { href: "/onboarding", key: "nav.onboarding" }],
+  client: [{ href: "/admin", key: "nav.tasks" }, { href: "/admin/crew", key: "nav.crew" }],
   employee: [{ href: "/admin", key: "nav.tasks" }],
   unknown: [],
 };
@@ -42,14 +42,8 @@ export default async function DashLayout({ children }: { children: React.ReactNo
   ]);
   const projectNames: Record<string, string> = Object.fromEntries(allProjects.map((p) => [p.key, p.name]));
 
-  // Таб «Инструкция» у клиента — только если онбординг для его проекта ВКЛЮЧЕН (иначе не показываем по умолчанию).
-  let nav = NAV[principal.role] ?? [];
-  if (principal.role === "client") {
-    // Клиент может быть в нескольких проектах — таб показываем, если онбординг включён хотя бы у одного.
-    const myKeys = principal.projectKeys?.length ? principal.projectKeys : principal.projectKey ? [principal.projectKey] : [];
-    const onboardingOn = allProjects.some((p) => myKeys.includes(p.key) && (p.meta.showOnboarding || p.meta.onboardingSetToken));
-    if (!onboardingOn) nav = nav.filter((n) => n.key !== "nav.onboarding");
-  }
+  // Инструкции клиенту теперь приходят задачами («Потрібна ваша дія»), отдельного таба «Инструкция» у клиента нет.
+  const nav = NAV[principal.role] ?? [];
 
   return (
     <div style={{ ...ui.page, height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>

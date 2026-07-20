@@ -1,10 +1,11 @@
 "use server";
 
 import { getPrincipal } from "@/lib/principal";
-import { getProjectFull, setProjectMeta, setTaskTags, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, projectReporterLogin } from "@/lib/db";
+import { getProjectFull, setProjectMeta, setTaskTags, setProjectGuides, upsertSecret, deleteSecret, deleteProjectCascade, saveProjectAttachment, projectReporterLogin, getGuide, setClientAction } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
 import { decomposeSpec, type KickoffTask } from "@/lib/kickoff";
-import { notifyLogins, notifyProjectClients } from "@/lib/notify";
+import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
+import { PORTAL_BASE } from "@/lib/dev-protocol";
 import { getSpec, projectSpecText, upsertSpec, removeSpec } from "@/lib/specs";
 import { revalidatePath } from "next/cache";
 
@@ -49,6 +50,46 @@ export async function saveProjectGuides(projectKey: string, guideIds: number[]):
   revalidatePath(`/admin/projects/${projectKey}`);
   revalidatePath("/admin");
   return { ok: true };
+}
+
+/**
+ * Создать клиенту задачу из гайда (в любой момент проекта). Задача попадает в «Потрібна ваша дія» клиента,
+ * ему уходит пуш в Telegram. Гайд показывается как инструкция; если гайд собирает данные (collect_field) —
+ * под задачей поле ввода, значение сохраняется в настройки проекта (см. markClientActionDone → saveGuideCollectValue).
+ * autoDone: при выполнении/«Готово» задача сразу закрывается (это действие клиента, дев-работы нет). Admin.
+ */
+export async function createGuideTask(projectKey: string, guideId: number): Promise<{ ok?: boolean; taskId?: string; error?: string }> {
+  const me = await getPrincipal();
+  if (!me || me.realRole !== "admin") return { error: "Нет прав" };
+  const proj = await getProjectFull(projectKey);
+  if (!proj) return { error: "Проект не найден" };
+  const guide = await getGuide(guideId);
+  if (!guide) return { error: "Гайд не найден" };
+  const be = getBackend();
+  const clientLogin = await projectReporterLogin(projectKey);
+  const task = await be.createTask({
+    projectKey,
+    summary: guide.title,
+    description: "",
+    assigneeLogin: null,
+    reporterLogin: clientLogin,
+    approvalStatus: "approved",
+    autoDone: true,        // выполнил клиент → сразу Done (нет дев-работы/ревью)
+    clientVerifiable: false,
+    internal: false,
+  });
+  const prompt = guide.collect_field
+    ? "Виконайте інструкцію та впишіть дані нижче."
+    : "Виконайте інструкцію та натисніть «Готово».";
+  await setClientAction(task.id, prompt, guideId, guide.collect_field);
+  await notifyProjectClients(
+    projectKey,
+    `📋 <b>Потрібна ваша дія</b> · ${await taskTag(task.id)}: ${guide.title}\nВідкрийте задачу — там інструкція${guide.collect_field ? " і поле для даних" : ""}.`,
+    [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${task.id}` },
+  ).catch(() => {});
+  revalidatePath("/admin");
+  revalidatePath(`/admin/projects/${projectKey}`);
+  return { ok: true, taskId: task.id };
 }
 
 /**
