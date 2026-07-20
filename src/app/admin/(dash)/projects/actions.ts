@@ -108,6 +108,12 @@ export async function saveMeta(
     const prev = await getProjectFull(key);
     // Тип проекта управляется отдельным переключателем (setProjectKind), форма его НЕ трогает — сохраняем как есть.
     meta.projectType = prev?.meta.projectType;
+    // Деплой-креды (Railway/Vercel) форма лишь ОТРАЖАЕТ (проекция customFields.railway/vercel → clientDeploy/clientVercel),
+    // а задаются они через deploy-config API/панель. Если форма открыта ДО того, как креды задали out-of-band, её
+    // снапшот пустой и автосейв затирал clientDeploy/clientVercel (баг FINE spirit: пропадала автодоставка). Защита:
+    // ПУСТАЯ проекция формы НЕ перетирает уже сохранённые креды; непустая (админ реально ввёл) — перезаписывает.
+    if (!meta.clientDeploy?.railwayToken && prev?.meta.clientDeploy?.railwayToken) meta.clientDeploy = prev.meta.clientDeploy;
+    if (!meta.clientVercel?.token && prev?.meta.clientVercel?.token) meta.clientVercel = prev.meta.clientVercel;
     await setProjectMeta(key, name, meta);
     // Привязали/обновили наш dev-репо → автоматически разложить туда протокол (новые репо подхватываются сами).
     if (meta.devGit) after(() => layProtocol(key));
