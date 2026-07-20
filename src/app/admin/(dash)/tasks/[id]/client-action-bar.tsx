@@ -5,9 +5,16 @@ import { markClientActionDone } from "./actions";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
-/** Блок «нужна ваша регистрация»: инструкция-гайд + поле для данных + кнопка «Готово». Виден клиенту/админу. */
-export function ClientActionBar({ taskId, action, guide }: {
-  taskId: string; action: string; guide?: { title: string; body: string } | null;
+/**
+ * Блок «потрібна ваша дія»: инструкция-гайд + (если задача собирает данные) поле ввода + «Готово».
+ * collect — структурированное поле сбора (лейбл + тип); showInput=false → инструкция без ввода (только «Готово»).
+ */
+export function ClientActionBar({ taskId, action, guide, collect, showInput = true }: {
+  taskId: string;
+  action: string;
+  guide?: { title: string; body: string } | null;
+  collect?: { label: string; kind: "text" | "url" | "secret" } | null;
+  showInput?: boolean;
 }) {
   const [data, setData] = useState("");
   const [openGuide, setOpenGuide] = useState(true);
@@ -21,6 +28,9 @@ export function ClientActionBar({ taskId, action, guide }: {
       if (r.error) setMsg(r.error);
     });
   }
+
+  const label = collect?.label ?? "Дані після реєстрації (токен / логін / посилання)";
+  const secret = collect?.kind === "secret";
 
   return (
     <div style={{ ...ui.card, padding: 18, marginTop: 16, borderColor: "#e8b339", background: "rgba(232,179,57,0.06)" }}>
@@ -37,12 +47,20 @@ export function ClientActionBar({ taskId, action, guide }: {
         </div>
       )}
 
-      <label style={{ ...ui.fieldLabel, marginTop: 14 }}>Дані після реєстрації (токен / логін / посилання)</label>
-      <textarea value={data} onChange={(e) => setData(e.target.value)} rows={3} placeholder="Вставте сюди отримані дані (напр. токен бота)" style={{ ...ui.input, resize: "vertical", fontSize: 14, lineHeight: 1.5 }} />
+      {showInput && (
+        <>
+          <label style={{ ...ui.fieldLabel, marginTop: 14 }}>{label}</label>
+          {secret ? (
+            <input value={data} onChange={(e) => setData(e.target.value)} type="password" placeholder="Вставте значення" style={{ ...ui.input, fontSize: 14, fontFamily: "var(--font-mono)" }} />
+          ) : (
+            <textarea value={data} onChange={(e) => setData(e.target.value)} rows={collect ? 2 : 3} placeholder="Вставте сюди отримані дані" style={{ ...ui.input, resize: "vertical", fontSize: 14, lineHeight: 1.5 }} />
+          )}
+        </>
+      )}
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
         <button onClick={done} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{pending ? "…" : "Готово"}</button>
-        <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>Дані надійдуть розробнику автоматично.</span>
+        {showInput && <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>Дані збережуться в налаштування проєкту.</span>}
         {msg && <span style={{ ...ui.monoLabel, textTransform: "none", color: "#ff5b5b" }}>{msg}</span>}
       </div>
     </div>

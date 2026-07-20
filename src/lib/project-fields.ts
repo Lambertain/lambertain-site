@@ -127,3 +127,9 @@ export function collectTargets(): CollectTarget[] {
   return out;
 }
 
+/** Резолв цели сбора по строке `collect_field` гайда / `clientActionField` задачи (лейбл + тип инпута у клиента). */
+export function collectTarget(value: string | null | undefined): CollectTarget | undefined {
+  if (!value) return undefined;
+  return collectTargets().find((t) => t.value === value);
+}
+

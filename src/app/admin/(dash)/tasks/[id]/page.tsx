@@ -27,6 +27,7 @@ import { ReporterHover } from "./reporter-hover";
 import { DeployBadge } from "../../deploy-badge";
 import { AddresseeBadge } from "../../addressee-badge";
 import { taskAddressee } from "@/lib/task-addressee";
+import { collectTarget } from "@/lib/project-fields";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
@@ -216,7 +217,13 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           Видно клиенту, админу И сотруднику этого проекта — чтобы клиент мог делегировать сотруднику
           в т.ч. задачи, требующие его действия (регистрация/доступ), а тот их выполнил. */}
       {task.clientAction && (isProjectClientSide || isAdmin) && (
-        <ClientActionBar taskId={task.id} action={task.clientAction} guide={clientGuide} />
+        <ClientActionBar
+          taskId={task.id}
+          action={task.clientAction}
+          guide={clientGuide}
+          collect={(() => { const c = collectTarget(task.clientActionField); return c ? { label: c.label[locale], kind: c.kind } : null; })()}
+          showInput={!!task.clientActionField || !task.autoDone}
+        />
       )}
 
       {/* Задача чекає на відповідь КЛІЄНТА (розробник поставив питання → Blocked, без блокувань-залежностей).
