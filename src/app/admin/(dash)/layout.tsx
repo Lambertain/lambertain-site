@@ -23,7 +23,6 @@ const NAV: Record<Role, { href: string; key: string }[]> = {
     { href: "/admin/contracts", key: "nav.contracts" },
     { href: "/admin/skills", key: "nav.skills" },
     { href: "/admin/team", key: "nav.team" },
-    { href: "/admin/onboarding", key: "nav.onboarding" },
   ],
   contributor: [{ href: "/admin", key: "nav.projects" }, { href: "/admin/tasks", key: "nav.tasks" }],
   client: [{ href: "/admin", key: "nav.tasks" }, { href: "/admin/crew", key: "nav.crew" }],

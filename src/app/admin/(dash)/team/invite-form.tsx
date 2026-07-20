@@ -15,7 +15,6 @@ export function InviteForm({ projects, locale, sets = [] }: { projects: Proj[]; 
   const [link, setLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false); // онбординг-инструкция — по умолчанию ВЫКЛ (включаю осознанно для конкретного клиента)
   const [setToken, setSetToken] = useState("");
   const [pending, start] = useTransition();
 
@@ -58,7 +57,7 @@ export function InviteForm({ projects, locale, sets = [] }: { projects: Proj[]; 
   function gen() {
     setError(null); setLink(null); setCopied(false);
     start(async () => {
-      const res = await createInviteLink(role, selected, showOnboarding, setToken || null);
+      const res = await createInviteLink(role, selected, false, setToken || null);
       if (res.error) setError(res.error);
       else setLink(res.link ?? null);
     });
@@ -118,19 +117,6 @@ export function InviteForm({ projects, locale, sets = [] }: { projects: Proj[]; 
         {addErr && <p style={{ ...ui.monoLabel, color: "#ff5b5b", textTransform: "none", marginTop: 8 }}>{addErr}</p>}
       </div>
       </>
-      )}
-
-      {/* Клиенту — опция показать онбординг-инструкцию при входе */}
-      {role === "client" && (
-        <button
-          onClick={() => setShowOnboarding((v) => !v)}
-          style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, background: "transparent", border: "none", color: "var(--text)", cursor: "pointer", fontSize: 14, padding: 0 }}
-        >
-          <span style={{ width: 15, height: 15, flexShrink: 0, border: `1px solid ${showOnboarding ? "var(--accent)" : "var(--border-2)"}`, background: showOnboarding ? "var(--accent)" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {showOnboarding && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>}
-          </span>
-          <span>{t(locale, "invite.showOnboarding")}</span>
-        </button>
       )}
 
       {/* Клиенту — какой НАБОР инструкций показать при входе (баннер на /i/<token>) */}

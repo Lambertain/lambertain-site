@@ -9,6 +9,10 @@ type G = { id: number; slug: string; title: string; body: string; ord: number; t
 
 const COLLECT_OPTS = collectTargets();
 
+// Кнопка панели форматирования; noBlur — не терять выделение в textarea при клике по кнопке.
+const TB: React.CSSProperties = { ...ui.monoLabel, textTransform: "none", minWidth: 28, height: 28, padding: "0 7px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "1px solid var(--border-2)", color: "var(--muted)", cursor: "pointer", borderRadius: 3 };
+const noBlur = (e: React.MouseEvent) => e.preventDefault();
+
 type Loc = "uk" | "ru" | "en";
 const LOCS: { k: Loc; label: string }[] = [{ k: "uk", label: "UA" }, { k: "ru", label: "RU" }, { k: "en", label: "EN" }];
 
@@ -24,6 +28,7 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
   const [confirm, setConfirm] = useState(false);
   const [pending, start] = useTransition();
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const fileImgRef = useRef<HTMLInputElement>(null);
   if (removed) return null;
 
   const title = titles[loc];
@@ -37,23 +42,58 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
     setBody((b) => b.slice(0, pos) + text + b.slice(pos));
     setTimeout(() => { if (ta) { ta.focus(); ta.selectionStart = ta.selectionEnd = pos + text.length; } }, 0);
   }
-  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    const imgs = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
-    if (!imgs.length) return;
-    e.preventDefault();
-    setMsg("Загрузка картинки…");
-    imgs.forEach((f) => {
+  // Загрузка картинок/файлов (буфер, drag&drop, кнопка) → guide-files → markdown в позицию курсора.
+  function uploadInsert(files: FileList | File[] | null) {
+    const arr = Array.from(files ?? []);
+    if (!arr.length) return;
+    setMsg("Загрузка…");
+    arr.forEach((f) => {
       const reader = new FileReader();
       reader.onload = () => {
         const [meta, data] = String(reader.result).split(",");
         const mime = meta.slice(5, meta.indexOf(";"));
         start(async () => {
           const r = await uploadGuideImage(mime, data);
-          if (r.url) { insertAtCursor(`\n![](${r.url})\n`); setMsg("Картинка вставлена ✓"); }
+          if (r.url) { insertAtCursor(mime.startsWith("image/") ? `\n![](${r.url})\n` : `\n[${f.name || "файл"}](${r.url})\n`); setMsg("Вставлено ✓"); }
           else setMsg(r.error || "Ошибка загрузки");
         });
       };
       reader.readAsDataURL(f);
+    });
+  }
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.clipboardData.files);
+    if (!files.length) return;
+    e.preventDefault();
+    uploadInsert(files);
+  }
+  function onDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length) { e.preventDefault(); uploadInsert(files); }
+  }
+
+  // — тулбар форматирования (как у поля задачи/коммента): обёртка выделения markdown / префикс строк —
+  function withSel(fn: (v: string, s: number, e: number) => { value: string; start: number; end: number }) {
+    const ta = bodyRef.current;
+    const s = ta ? ta.selectionStart : body.length;
+    const e = ta ? ta.selectionEnd : body.length;
+    const res = fn(body, s, e);
+    setBody(res.value);
+    setTimeout(() => { if (ta) { ta.focus(); ta.selectionStart = res.start; ta.selectionEnd = res.end; } }, 0);
+  }
+  function wrapSel(before: string, after: string, ph: string) {
+    withSel((v, s, e) => {
+      const sel = v.slice(s, e) || ph;
+      return { value: v.slice(0, s) + before + sel + after + v.slice(e), start: s + before.length, end: s + before.length + sel.length };
+    });
+  }
+  function prefixLines(prefix: string | ((line: string, i: number) => string)) {
+    withSel((v, s, e) => {
+      const ls = v.lastIndexOf("\n", s - 1) + 1;
+      const nextNl = v.indexOf("\n", e);
+      const le = nextNl === -1 ? v.length : nextNl;
+      const out = v.slice(ls, le).split("\n").map((l, i) => (typeof prefix === "function" ? prefix(l, i + 1) : prefix + l)).join("\n");
+      return { value: v.slice(0, ls) + out + v.slice(le), start: ls, end: ls + out.length };
     });
   }
 
@@ -86,7 +126,24 @@ function Editor({ g, isNew }: { g?: G; isNew?: boolean }) {
         {isNew && <input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="slug (опц.)" style={{ ...ui.input, width: 140 }} />}
         <input value={ord} onChange={(e) => setOrd(e.target.value)} placeholder="№" title="Порядок" style={{ ...ui.input, width: 64 }} />
       </div>
-      <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} onPaste={onPaste} placeholder="Текст инструкции (markdown). Вставьте скрин из буфера — Ctrl+V." rows={6} style={{ ...ui.input, width: "100%", resize: "vertical", marginTop: 8, fontSize: 13, lineHeight: 1.5 }} />
+      {/* Панель форматирования (как у поля задачи/коммента): жирный/курсив, размеры-заголовки, списки, ссылка, картинка/файл. */}
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        <button type="button" onMouseDown={noBlur} onClick={() => wrapSel("**", "**", "жирный")} title="Жирный" style={{ ...TB, fontWeight: 700 }}>B</button>
+        <button type="button" onMouseDown={noBlur} onClick={() => wrapSel("*", "*", "курсив")} title="Курсив" style={{ ...TB, fontStyle: "italic" }}>I</button>
+        <button type="button" onMouseDown={noBlur} onClick={() => wrapSel("`", "`", "код")} title="Моноширинный" style={{ ...TB, fontFamily: "var(--font-mono)" }}>{"</>"}</button>
+        <span style={{ width: 1, height: 18, background: "var(--border-2)", margin: "0 2px" }} />
+        <button type="button" onMouseDown={noBlur} onClick={() => prefixLines("# ")} title="Заголовок 1 (крупный)" style={{ ...TB, fontSize: 15, fontWeight: 700 }}>H1</button>
+        <button type="button" onMouseDown={noBlur} onClick={() => prefixLines("## ")} title="Заголовок 2 (средний)" style={{ ...TB, fontSize: 13, fontWeight: 700 }}>H2</button>
+        <button type="button" onMouseDown={noBlur} onClick={() => prefixLines("### ")} title="Заголовок 3 (мелкий)" style={{ ...TB, fontSize: 11, fontWeight: 700 }}>H3</button>
+        <span style={{ width: 1, height: 18, background: "var(--border-2)", margin: "0 2px" }} />
+        <button type="button" onMouseDown={noBlur} onClick={() => prefixLines("- ")} title="Список" style={TB}>•</button>
+        <button type="button" onMouseDown={noBlur} onClick={() => prefixLines((l, i) => `${i}. ${l}`)} title="Нумерованный список" style={TB}>1.</button>
+        <button type="button" onMouseDown={noBlur} onClick={() => wrapSel("[", "](url)", "текст ссылки")} title="Ссылка" style={TB}>🔗</button>
+        <span style={{ width: 1, height: 18, background: "var(--border-2)", margin: "0 2px" }} />
+        <input ref={fileImgRef} type="file" multiple hidden onChange={(e) => { uploadInsert(e.target.files); e.target.value = ""; }} />
+        <button type="button" onMouseDown={noBlur} onClick={() => fileImgRef.current?.click()} title="Картинка / файл" style={TB}>🖼</button>
+      </div>
+      <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} onPaste={onPaste} onDrop={onDrop} onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) e.preventDefault(); }} placeholder="Текст инструкции (markdown). Жирный/размеры/ссылки — кнопками выше. Скрин — Ctrl+V, вставить или перетащить файл." rows={7} style={{ ...ui.input, width: "100%", resize: "vertical", marginTop: 8, fontSize: 13, lineHeight: 1.5 }} />
       {/* Сбор данных: если задано — под гайдом у клиента появится поле, введённое значение уйдёт в настройки проекта. */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
         <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>Собирать данные у клиента:</span>
