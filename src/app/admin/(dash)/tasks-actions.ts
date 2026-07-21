@@ -75,9 +75,18 @@ export async function updateTaskStatus(id: string, status: string): Promise<{ ok
 export async function deleteTask(id: string): Promise<{ ok?: boolean; error?: string }> {
   const me = await getPrincipal();
   if (!me) return { error: "Не авторизован" };
-  const adminOrClient = me.role === "admin" || me.role === "client" || me.realRole === "admin";
-  let allowed = adminOrClient;
-  // Автор (разработчик/сотрудник/клиент) может удалить СВОЮ задачу, пока она ещё НЕ взята в работу (статус Open).
+  const isAdmin = me.role === "admin" || me.realRole === "admin";
+  let allowed = isAdmin;
+  // Клиент удаляет задачу СВОЕГО проекта, но только пока она НЕ взята в работу (Open/notStarted).
+  // В работе/на приёмке/выполненную клиенту удалять нельзя — иначе он сносит уже сделанное разработчиком.
+  if (!allowed && me.role === "client") {
+    try {
+      const task = await getBackend().getTask(id);
+      const mine = visibleProjects(me, await getBackend().listProjects()).some((p) => p.key === task.projectKey);
+      if (mine && statusBucket(task.state) === "notStarted") allowed = true;
+    } catch { /* ignore */ }
+  }
+  // Автор (разработчик/сотрудник) может удалить СВОЮ задачу, пока она ещё НЕ взята в работу (статус Open).
   if (!allowed && me.youtrackLogin) {
     try {
       const task = await getBackend().getTask(id);

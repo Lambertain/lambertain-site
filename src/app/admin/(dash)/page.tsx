@@ -151,14 +151,19 @@ export default async function HomePage() {
       blockers: statusBucket(tk.state) === "done" ? [] : blockers.map((b) => ({ id: b.id, summary: b.summary })),
       // Клиенту ops-шаг агентства (ownerAction) не показываем; его собственное действие (clientAction) — показываем.
       ownerAction: me.role === "client" ? null : tk.ownerAction,
-      reporterAction: tk.reporterAction,
-      awaitingMyAnswer: !!tk.reporterAction && !!me.youtrackLogin && tk.reporter?.login === me.youtrackLogin,
+      // reporterAction — вопрос разработчика ПОСТАНОВЩИКУ (агентству), внутренняя коммуникация dev↔агентство.
+      // Клиенту её не показываем (иначе внутренние заметки «не клиенту» светятся в его доске).
+      reporterAction: me.role === "client" ? null : tk.reporterAction,
+      awaitingMyAnswer: me.role !== "client" && !!tk.reporterAction && !!me.youtrackLogin && tk.reporter?.login === me.youtrackLogin,
       clientAction: tk.clientAction,
       // DEV-42: клиенту нужно действие — задача готова к приёмке (review), либо ждёт его ответа/регистрации
       // (clientAction) либо вопрос-эскалация (blocked). Для мини-секции «Потребує вашої дії» вверху доски.
       clientAttention: me.role === "client" && (statusBucket(tk.state) === "review" || !!tk.clientAction || statusBucket(tk.state) === "blocked"),
       deployStage: tk.deployStage,
       delegDot: dlg ? { days: segmentDayNumber(dlg.at, dlg.doneAt ?? nowDeleg), done: dlg.doneAt != null } : undefined,
+      // Клиенту разрешаем удалять задачу только пока она НЕ взята в работу (Open/notStarted); в работе/на приёмке/
+      // выполненную — нельзя (корзину скрываем). Для остальных ролей ограничение не задаём.
+      deletable: me.role === "client" ? statusBucket(tk.state) === "notStarted" : undefined,
     };
   });
 

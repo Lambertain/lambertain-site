@@ -36,6 +36,7 @@ export type BoardTask = {
   addressee?: AddresseeKey | null; // кому адресована (бейдж для команды; null — не показывать)
   statusRows?: StatusDot[][]; // кружки «дней в статусе» по строкам (внутренний вид); undefined — не показывать
   delegDot?: { days: number; done: boolean }; // клиенту: давность делегированной сотруднику задачи (green/amber/red), ✓ при выполнении
+  deletable?: boolean; // per-task право удаления (клиент: только пока задача не взята в работу). undefined = не ограничивать
 };
 
 const DOT_COLOR: Record<"green" | "amber" | "red", string> = { green: "#3fb950", amber: "#e8b339", red: "#ff5b5b" };
@@ -160,7 +161,7 @@ function Row({
           </span>
         )}
         <TaskBadge newComments={task.newComments} isNew={task.isNew} />
-        {canDelete && (
+        {canDelete && task.deletable !== false && (
           <button onClick={() => setConfirm(true)} title={t(locale, "common.delete")} style={{ display: "flex", background: "transparent", border: "none", color: "var(--muted)", cursor: "pointer", padding: 4 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
           </button>
