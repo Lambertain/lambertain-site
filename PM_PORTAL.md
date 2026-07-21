@@ -547,7 +547,10 @@ DATABASE_URL                         Postgres (локально 5434, на Railw
 #   DEPLOY_SYNC      — деплой-стадия задач + зеркало код-ревью (дёргает /api/admin/deploy-sync; GitHub-логика на портале):
 #                      'pr'→'dev' (PR смержен в develop), 'dev'→'prod' (develop слит в main клиента → «Опубліковано»),
 #                      и зеркалирование код-ревью из GitHub PR (inline/вердикт/комменты) внутренними комментами в задачу
-#                      (pr-review-sync.ts, курсор tasks.pr_review_synced_at) — Claude-разраб видит фидбек ревьюера в задаче.
+#                      (pr-review-sync.ts, курсор task_prs.review_synced_at) — Claude-разраб видит фидбек ревьюера в задаче.
+#                      Атрибуция: коммент под PR от участника с привязанным members.github_login (POST /api/admin/member-github)
+#                      идёт ОТ него (напр. клиентский разработчик) + пуш ответственному разрабу; иначе — анонимно от «Lambertain».
+#                      Базлайн — по ВРЕМЕНИ (элементы старше курсора молча, новее — постятся); НЕ по mirrored.size (глушило 1-ю волну).
 #                      Мультирепо (extraRepos: backend+app) → НЕСКОЛЬКО PR на задачу (task_prs); стадия двигается,
 #                      когда ВСЕ PR смержены/опубликованы, ревью зеркалится по каждому. В gitflow PR привязываются
 #                      АВТОМАТИЧЕСКИ при доставке (deliverGitflowAndNotify), ручной /api/dev/pr не нужен (есть
