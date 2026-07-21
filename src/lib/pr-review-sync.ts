@@ -14,8 +14,10 @@
  * Server-side only.
  */
 import { getBackend } from "./tasks";
-import { setPrReviewSynced, taskDbId, getMirroredForPr, markMirroredItem, updateMirroredSig, updateCommentBody, getState, setState } from "./db";
+import { setPrReviewSynced, taskDbId, getMirroredForPr, markMirroredItem, updateMirroredSig, updateCommentBody, getState, setState, memberByGithubLogin, getProjectFull } from "./db";
 import { ghFetchRetry, GitHubError } from "./github";
+import { notifyLogins, taskTag } from "./notify";
+import { PORTAL_BASE } from "./dev-protocol";
 
 const API = "https://api.github.com";
 const GH = { Authorization: `Bearer ${process.env.GITHUB_TOKEN || ""}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
@@ -54,7 +56,7 @@ interface ReviewComment { id: number; user?: GhUser; body?: string; created_at: 
 interface Review { id: number; user?: GhUser; body?: string; state?: string; submitted_at?: string | null; html_url?: string }
 interface IssueComment { id: number; user?: GhUser; body?: string; created_at: string; updated_at?: string; html_url?: string }
 
-interface MirrorItem { type: "review" | "inline" | "issue"; ghId: number; tsMs: number; sig: string; text: string }
+interface MirrorItem { type: "review" | "inline" | "issue"; ghId: number; tsMs: number; sig: string; text: string; authorGh?: string }
 
 /**
  * Синхронизировать код-ревью одного PR в задачу. Возвращает число ВНОВЬ зазеркаленных комментов (правки не считаем).
@@ -67,7 +69,9 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
   if (!tid) return 0;
 
   const firstPass = syncedAt == null;
-  const cursorMs = syncedAt ? syncedAt.getTime() : null;
+  // Курсор = «до этого времени уже учтено». На первом проходе — «сейчас»: вся существующая на момент
+  // первой привязки история засевается молча, а постятся только элементы НОВЕЕ курсора (см. цикл ниже).
+  const cursorMs = syncedAt ? syncedAt.getTime() : Date.now();
 
   const base = `/repos/${p.owner}/${p.repo}`;
   // Тянем полные списки (per_page=100) с ETag — дедуп по id, поэтому since как механизм дедупа больше не нужен.
@@ -81,7 +85,7 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
   for (const c of inline) {
     const loc = c.path ? ` · <code>${esc(c.path)}${c.line ?? c.original_line ? ":" + (c.line ?? c.original_line) : ""}</code>` : "";
     items.push({
-      type: "inline", ghId: c.id, tsMs: Date.parse(c.created_at), sig: `${c.updated_at || c.created_at}#${(c.body || "").length}`,
+      type: "inline", ghId: c.id, tsMs: Date.parse(c.created_at), sig: `${c.updated_at || c.created_at}#${(c.body || "").length}`, authorGh: c.user?.login,
       text: `🔎 <b>Код-рев'ю</b> · @${esc(c.user?.login || "?")}${loc}\n\n${esc(clip(c.body || ""))}${c.html_url ? "\n\n" + c.html_url : ""}`,
     });
   }
@@ -93,13 +97,13 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
     if (!r.body?.trim() && !hasVerdict) continue;
     const stateLabel = r.state === "CHANGES_REQUESTED" ? "потрібні правки" : r.state === "APPROVED" ? "схвалено" : "коментар";
     items.push({
-      type: "review", ghId: r.id, tsMs: Date.parse(ts), sig: `${ts}#${r.state}#${(r.body || "").length}`,
+      type: "review", ghId: r.id, tsMs: Date.parse(ts), sig: `${ts}#${r.state}#${(r.body || "").length}`, authorGh: r.user?.login,
       text: `🔎 <b>Рев'ю PR: ${stateLabel}</b> · @${esc(r.user?.login || "?")}${r.body?.trim() ? "\n\n" + esc(clip(r.body)) : ""}${r.html_url ? "\n\n" + r.html_url : ""}`,
     });
   }
   for (const c of issues) {
     items.push({
-      type: "issue", ghId: c.id, tsMs: Date.parse(c.created_at), sig: `${c.updated_at || c.created_at}#${(c.body || "").length}`,
+      type: "issue", ghId: c.id, tsMs: Date.parse(c.created_at), sig: `${c.updated_at || c.created_at}#${(c.body || "").length}`, authorGh: c.user?.login,
       text: `💬 <b>Коментар у PR</b> · @${esc(c.user?.login || "?")}\n\n${esc(clip(c.body || ""))}${c.html_url ? "\n\n" + c.html_url : ""}`,
     });
   }
@@ -108,11 +112,20 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
   items.sort((a, b) => a.tsMs - b.tsMs); // хронологически
 
   const mirrored = await getMirroredForPr(prUrl);
-  // Базлайн: первый проход под id-системой для этого PR (маппинга ещё нет). Засеваем ВСЕ текущие элементы
-  // молча, без коментов — чтобы не завалить задачу историей фидбека (и не перепостить то, что старый
-  // временной курсор мог продублировать). Посты идут только с последующих циклов — на реально НОВЫЕ элементы.
-  const baseline = mirrored.size === 0;
+  // Базлайн — по ВРЕМЕНИ, а не по размеру. Элементы старше курсора (а на первом проходе — вся текущая
+  // история) засеваем молча: защита от заваливания задачи историей при первой привязке PR и от дублей
+  // старого временного курсора (DEV-51). Всё НОВЕЕ курсора — постим. Прежняя завязка `mirrored.size===0`
+  // глушила ПЕРВУЮ волну комментов на каждом PR (наши PR создаются пустыми, комменты приходят позже),
+  // из-за чего фидбек ревьюера не попадал в задачу и висел незамеченным в GitHub.
   const be = getBackend();
+  const memberCache = new Map<string, { login: string; fullName: string; role: string } | null>();
+  const resolveMember = async (gh?: string) => {
+    const g = (gh || "").trim();
+    if (!g) return null;
+    if (!memberCache.has(g)) memberCache.set(g, await memberByGithubLogin(g).catch(() => null));
+    return memberCache.get(g) ?? null;
+  };
+  const postedByMember: { name: string; text: string }[] = [];
   let posted = 0;
   for (const it of items) {
     const key = `${it.type}:${it.ghId}`;
@@ -125,13 +138,36 @@ export async function syncPrReview(taskId: string, prUrl: string, syncedAt: Date
       }
       continue;
     }
-    if (baseline) {
-      await markMirroredItem(tid, prUrl, it.type, it.ghId, null, it.sig); // seed без коммента
-    } else {
-      const c = await be.addComment(taskId, it.text, "internal", undefined, true, false);
-      await markMirroredItem(tid, prUrl, it.type, it.ghId, Number(c.id), it.sig);
-      posted++;
+    if (it.tsMs <= cursorMs) {
+      await markMirroredItem(tid, prUrl, it.type, it.ghId, null, it.sig); // старше курсора → история, seed без коммента
+      continue;
     }
+    // Новый элемент. Автора (GitHub-логин) атрибутируем участнику портала, если он привязан
+    // (напр. клиентский разработчик) — тогда коммент идёт ОТ него, а не анонимно от «Lambertain».
+    // visibility=internal: это dev↔dev фидбек, клиенту он не виден.
+    const member = await resolveMember(it.authorGh);
+    const c = await be.addComment(taskId, it.text, "internal", member?.login, true, false);
+    await markMirroredItem(tid, prUrl, it.type, it.ghId, Number(c.id), it.sig);
+    posted++;
+    if (member) postedByMember.push({ name: member.fullName || member.login, text: it.text });
+  }
+
+  // Новое ревью от привязанного участника (клиентского разработчика) → пуш ответственному разработчику,
+  // чтобы фидбек не висел незамеченным в GitHub (первопричина затримок з доробками).
+  if (postedByMember.length) {
+    try {
+      const task = await be.getTask(taskId);
+      const proj = await getProjectFull(task.projectKey).catch(() => null);
+      const dev = task.assignee?.login || proj?.meta.defaultAssignee || null;
+      if (dev) {
+        const tag = await taskTag(taskId).catch(() => taskId);
+        const who = postedByMember[0].name;
+        const preview = postedByMember[0].text.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().slice(0, 300);
+        const more = postedByMember.length > 1 ? ` (+${postedByMember.length - 1})` : "";
+        const link = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
+        await notifyLogins([dev], `🔎 <b>Код-рев'ю у PR</b> · ${who}${more} · ${tag}\n${preview}`, [], link).catch(() => {});
+      }
+    } catch { /* пуш best-effort — коммент уже додано */ }
   }
 
   // Курсор-базлайн: первый проход — ставим now() (не тянем историю); дальше — сдвигаем на максимум по времени.

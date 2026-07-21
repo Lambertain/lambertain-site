@@ -334,6 +334,24 @@ export async function projectReporterLogin(projectKey: string): Promise<string |
   return (await getProjectType(projectKey)) === "client" ? await getProjectClientLogin(projectKey) : null;
 }
 
+/** Участник по его GitHub-логину (без учёта регистра) → его портальный login. null — маппинга нет. */
+export async function memberByGithubLogin(githubLogin: string): Promise<{ login: string; fullName: string; role: string } | null> {
+  const g = String(githubLogin || "").trim();
+  if (!g) return null;
+  const r = await q<{ login: string; full_name: string; role: string }>(
+    "SELECT login, full_name, role FROM members WHERE LOWER(github_login) = LOWER($1) LIMIT 1",
+    [g],
+  );
+  return r[0] ? { login: r[0].login, fullName: r[0].full_name, role: r[0].role } : null;
+}
+
+/** Задать/снять GitHub-логин участника (для атрибуции его PR-комментов). Пустой githubLogin — очистить. */
+export async function setMemberGithubLogin(login: string, githubLogin: string | null): Promise<boolean> {
+  const val = githubLogin && githubLogin.trim() ? githubLogin.trim() : null;
+  const r = await q<{ login: string }>("UPDATE members SET github_login=$2 WHERE login=$1 RETURNING login", [login, val]);
+  return r.length > 0;
+}
+
 /**
  * Переназначить постановщиком клиента у задач, поставленных мной (reporter IS NULL, т.е. супер-админ/kickoff)
  * в КЛИЕНТСКОМ проекте. Личные внутренние задачи (internal) не трогаем. Вызывается при добавлении клиента

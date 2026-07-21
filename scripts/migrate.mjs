@@ -68,6 +68,10 @@ ALTER TABLE invites ADD COLUMN IF NOT EXISTS project_keys TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS instruction_set_token TEXT;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS show_onboarding BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE members ADD COLUMN IF NOT EXISTS alias TEXT;
+-- GitHub-логин участника: для атрибуции его комментов под PR (код-ревью клиентского разработчика)
+-- к его же учётке на портале при зеркалировании из GitHub. Заполняется через POST /api/admin/member-github.
+ALTER TABLE members ADD COLUMN IF NOT EXISTS github_login TEXT;
+CREATE INDEX IF NOT EXISTS idx_members_github_login ON members (LOWER(github_login));
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_role TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_ref TEXT;
