@@ -7,7 +7,8 @@
  * Вызывать в фоне через after() — не блокировать ответ/экшен.
  */
 import { autoDeliverIfConfigured, isDeployPublished } from "./deliver";
-import { deliverGitflow } from "./sync-client";
+import { deliverGitflow, syncClientToDev } from "./sync-client";
+import { getBackend } from "./tasks";
 import { enrichDeliveredPRs } from "./pr-enrich";
 import { publishProjectToProd } from "./deploy-stage";
 import { setTaskPr } from "./db";
@@ -24,6 +25,17 @@ import type { ProjectMeta } from "./tasks/types";
 export async function deliverGitflowAndNotify(projectKey: string, meta: ProjectMeta, branch: string, taskId: string): Promise<void> {
   try {
     const results = await deliverGitflow(meta, branch, "develop", `${taskId}: ${branch}`, `Lambertain · задача ${taskId} · гілка ${branch}`);
+    // Гейт-страховка: конфликт с клиентским develop (редкая гонка — pre-check при сдаче прошёл, а develop потом
+    // ушёл вперёд). git-sync конфликтную ветку НЕ пушил и PR НЕ открывал → возвращаем задачу на ребейз, чтобы
+    // конфликтный PR не ушёл клиенту. Освежаем зеркало для ребейза + репорт разработчику с файлами.
+    const conflicting = results.filter((r) => r.mergeable === false);
+    if (conflicting.length) {
+      await syncClientToDev(meta).catch(() => {});
+      const files = conflicting.map((c) => `${c.clientRepo}: ${(c.conflicts ?? []).join(", ")}`).join("; ");
+      await reportTaskError(taskId, `конфлікт при доставці гілки ${branch} — PR не відкрито, потрібен ребейз на свіжий develop`, files);
+      await getBackend().updateStatus(taskId, "In Progress", { actorRole: "system", trigger: "конфлікт при gitflow-доставці — повернуто на ребейз" }).catch(() => {});
+      return;
+    }
     const delivered = results.filter((r) => r.prUrl);
     if (delivered.length) {
       // Автопривязка ВСЕХ открытых PR к задаче (мультирепо: backend+app → несколько PR) → поллер

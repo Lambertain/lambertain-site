@@ -15,6 +15,7 @@ import { notifyLogins, notifyProjectClients, taskTag } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { submitForModeration } from "@/lib/moderation";
 import { autoDeliverAndNotify, deliverGitflowAndNotify } from "@/lib/auto-deliver";
+import { checkGitflowConflicts, syncClientToDev } from "@/lib/sync-client";
 import { syncTaskToTrello } from "@/lib/trello";
 import { PORTAL_BASE } from "@/lib/dev-protocol";
 
@@ -45,6 +46,28 @@ export async function POST(req: Request) {
     if (status === "Review") {
       const task = await be.getTask(taskId);
       const proj = await getProjectFull(projectKey).catch(() => null);
+
+      // ── Pre-delivery конфликт-гейт (gitflow) ──────────────────────────────────────────────────
+      // ПЕРЕД сменой статуса и анонсом клиенту проверяем, сольётся ли feature-ветка с АКТУАЛЬНЫМ
+      // клиентским develop (у разработчика к клиентскому репо доступа нет — проверяет портал своим
+      // токеном-коллаборатором). Конфликт → сдачу ОТКЛОНЯЕМ: задача остаётся In Progress, клиент ничего
+      // не получает, разработчику возвращаем список конфликтующих файлов — он ребейзит на свежий develop
+      // и сдаёт заново. Так конфликт виден разработчику ДО пиара, а конфликтный PR не доходит до клиента.
+      // Fail-open: если проверка недоступна/ошиблась (null) — сдачу НЕ блокируем (гейт в самой доставке — 2-я линия).
+      if (proj?.meta.gitflowDelivery && branch) {
+        const checks = await checkGitflowConflicts(proj.meta, branch).catch(() => null);
+        const conflicting = checks?.filter((c) => c.mergeable === false) ?? [];
+        if (conflicting.length) {
+          const m = proj.meta;
+          after(() => syncClientToDev(m).catch(() => {})); // освежить client-sync/develop, чтобы ребейз был против свежего кода
+          return NextResponse.json({
+            ok: false, conflict: true, status: "In Progress",
+            error: "Гілка конфліктує з актуальним клієнтським develop — здачу відхилено. Портал уже освіжає client-sync/develop: ребейзни свою гілку на origin/client-sync/develop, виріши конфлікти, запуш і здай задачу знову.",
+            conflicts: conflicting.map((c) => ({ repo: c.clientRepo, files: c.conflicts ?? [] })),
+          }, { status: 409 });
+        }
+      }
+
       // Кто закрывает задачу на готовности:
       //  • autoDone (спека супер-админа) / autoApprove (доверенный разраб) + постановщик НЕ клиент → сразу Done.
       //  • НЕ верифицируема клиентом (client_verifiable=false — внутренняя/техническая: миграция, схема, бэкап,
@@ -122,6 +145,12 @@ export async function POST(req: Request) {
     after(() => syncTaskToTrello(taskId, status)); // Trello: карточку под новый статус (напр. «В процесі»)
     if (status === "In Progress") {
       await setDeployStage(taskId, "pr", { actorRole: "contributor", trigger: "розробник взяв у роботу" }).catch(() => {}); // взял в работу → «Готується»
+      // Часть 1 (авто-свежесть): взял задачу в работу → освежаем зеркало клиентского develop в наш dev-репо
+      // (client-sync/develop), чтобы разработчик ветвился от актуального кода и заранее видел конфликты, а не
+      // полагался на ручной /api/dev/sync. Только для gitflow-проектов. Фоном, best-effort.
+      after(async () => {
+        try { const p = await getProjectFull(projectKey); if (p?.meta.gitflowDelivery) await syncClientToDev(p.meta); } catch { /* синк вторичен */ }
+      });
       // Клиенту — «взяли в роботу» по этой задаче, ОДИН раз (только при первом переходе в работу). Фоном.
       after(async () => {
         try {

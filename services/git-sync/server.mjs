@@ -120,7 +120,7 @@ async function openPR(clientRepo, head, base, title, body) {
  * Ветка создана разработчиком от client-sync/<base> (зеркало клиентского base, те же SHA) → общая база,
  * push переносит только её коммиты. upToDate=false → клиентский base ушёл вперёд, нужен ресинк/ребейз (но PR откроется).
  */
-async function deliverBranch({ devGit, clientGit, branch, base = "develop", title, body }) {
+async function deliverBranch({ devGit, clientGit, branch, base = "develop", title, body, checkOnly = false }) {
   const devRepo = repoFromGit(devGit), clientRepo = repoFromGit(clientGit);
   if (!devRepo || !clientRepo) return { error: "не распознан dev/client репозиторий" };
   if (!branch) return { error: "branch обязателен" };
@@ -136,10 +136,35 @@ async function deliverBranch({ devGit, clientGit, branch, base = "develop", titl
     // Свежий ли base в основе ветки (иначе develop ушёл вперёд → лучше ресинкнуться).
     const anc = await git(["merge-base", "--is-ancestor", `refs/remotes/client/${base}`, `refs/heads/${branch}`], dir);
     const upToDate = anc.code === 0;
+
+    // Реальная проверка СЛИЯНИЯ (конфликты) против актуального клиентского base — ДО push/PR, без рабочей копии.
+    // merge-tree сливает два коммита и пишет дерево: exit 0 — чисто; exit 1 — конфликт (файлы в stdout после
+    // строки с OID дерева, формат --name-only); прочий код — merge-tree не смог (старый git и т.п.) → НЕ блокируем
+    // доставку (fail-open, mergeable:true), чтобы баг проверки не застопорил весь пайплайн.
+    // Без --name-only (той флаг лише з git 2.40; у bookworm 2.39). На конфлікті (exit 1) stdout = OID дерева +
+    // рядки конфліктних файлів у форматі `<mode> <object> <stage>\t<path>` + інформаційні повідомлення. Витягаємо
+    // шляхи саме з records-рядків (regex), ігноруючи повідомлення; дедуп по stage 1/2/3.
+    const mt = await git(["merge-tree", "--write-tree", `refs/remotes/client/${base}`, `refs/heads/${branch}`], dir);
+    let mergeable = true, conflicts = [];
+    if (mt.code === 1) {
+      mergeable = false;
+      const seen = new Set();
+      for (const l of mt.stdout.split("\n")) {
+        const m = l.match(/^\d{6} [0-9a-f]{7,64} [123]\t(.+)$/);
+        if (m && !seen.has(m[1])) { seen.add(m[1]); conflicts.push(m[1]); }
+      }
+      if (!conflicts.length) conflicts = ["(конфлікт злиття — деталі при ребейзі)"];
+    }
+
+    // checkOnly — только проверка (для pre-delivery гейта при сдаче): ничего не пушим и PR не открываем.
+    if (checkOnly) return { clientRepo, branch, base, upToDate, mergeable, conflicts };
+    // Конфликтный PR клиенту НЕ отправляем: не пушим и не открываем PR — возвращаем разработчику как есть.
+    if (!mergeable) return { clientRepo, branch, base, upToDate, mergeable, conflicts };
+
     const push = await git(["push", "--force", clientUrl, `refs/heads/${branch}:refs/heads/${branch}`], dir);
     if (push.code !== 0) return { error: `push client ${branch}: ${redact(push.stderr).slice(0, 200)}` };
     const pr = await openPR(clientRepo, branch, base, title || branch, body || "");
-    return { clientRepo, branch, base, upToDate, ...pr };
+    return { clientRepo, branch, base, upToDate, mergeable, ...pr };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -179,14 +204,14 @@ async function handleSync(req, res) {
   return send(res, 200, { results });
 }
 
-async function handleDeliver(req, res) {
+async function handleDeliver(req, res, forceCheck = false) {
   const auth = req.headers.authorization || "";
   if (!SECRET || auth !== `Bearer ${SECRET}`) return send(res, 403, { error: "forbidden" });
   if (!GITHUB_TOKEN) return send(res, 500, { error: "нет GITHUB_TOKEN" });
   let b;
   try { b = JSON.parse(await readBody(req)); } catch { return send(res, 400, { error: "bad json" }); }
   if (!b?.devGit || !b?.clientGit || !b?.branch) return send(res, 400, { error: "devGit, clientGit, branch обязательны" });
-  const r = await deliverBranch(b);
+  const r = await deliverBranch({ ...b, checkOnly: forceCheck || b.checkOnly === true });
   return send(res, r.error ? 422 : 200, r);
 }
 
@@ -198,6 +223,11 @@ const server = createServer((req, res) => {
   }
   if (req.method === "POST" && req.url === "/deliver") {
     handleDeliver(req, res).catch((e) => send(res, 500, { error: String(e?.message || e) }));
+    return;
+  }
+  // Только проверка слияния feature-ветки с клиентским base (конфликты) — без push/PR. Для pre-delivery гейта.
+  if (req.method === "POST" && req.url === "/check") {
+    handleDeliver(req, res, true).catch((e) => send(res, 500, { error: String(e?.message || e) }));
     return;
   }
   send(res, 404, { error: "not found" });
