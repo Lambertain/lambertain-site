@@ -2,18 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { markClientActionDone } from "./actions";
+import { validateCollectValue, collectHint } from "@/lib/project-fields";
 import { Markdown } from "../../markdown";
 import { ui } from "../../../ui-styles";
 
 /**
  * Блок «потрібна ваша дія»: инструкция-гайд + (если задача собирает данные) поле ввода + «Готово».
- * collect — структурированное поле сбора (лейбл + тип); showInput=false → инструкция без ввода (только «Готово»).
+ * collect — структурированное поле сбора (лейбл + тип + ключ для валидации); showInput=false → без ввода.
+ * Если поле сбора задано (collect) — ввод обязателен и валидируется по формату (жёсткая блокировка «Готово»).
  */
 export function ClientActionBar({ taskId, action, guide, collect, showInput = true }: {
   taskId: string;
   action: string;
   guide?: { title: string; body: string } | null;
-  collect?: { label: string; kind: "text" | "url" | "secret" } | null;
+  collect?: { field: string; label: string; kind: "text" | "url" | "secret" } | null;
   showInput?: boolean;
 }) {
   const [data, setData] = useState("");
@@ -21,7 +23,14 @@ export function ClientActionBar({ taskId, action, guide, collect, showInput = tr
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
+  // Валидация формата — только для структурированных полей сбора (токен/ссылка/почта и т.п.).
+  const trimmed = data.trim();
+  const formatErr = collect && trimmed ? validateCollectValue(collect.field, collect.kind, data) : null;
+  // Поле сбора → ввод обязателен и должен пройти формат; свободный ввод (без collect) — необязателен.
+  const canSubmit = collect ? !!trimmed && !formatErr : true;
+
   function done() {
+    if (!canSubmit) return;
     setMsg(null);
     start(async () => {
       const r = await markClientActionDone(taskId, data);
@@ -51,15 +60,20 @@ export function ClientActionBar({ taskId, action, guide, collect, showInput = tr
         <>
           <label style={{ ...ui.fieldLabel, marginTop: 14 }}>{label}</label>
           {secret ? (
-            <input value={data} onChange={(e) => setData(e.target.value)} type="password" placeholder="Вставте значення" style={{ ...ui.input, fontSize: 14, fontFamily: "var(--font-mono)" }} />
+            <input value={data} onChange={(e) => setData(e.target.value)} type="password" placeholder="Вставте значення" style={{ ...ui.input, fontSize: 14, fontFamily: "var(--font-mono)", borderColor: formatErr ? "#ff5b5b" : undefined }} />
           ) : (
-            <textarea value={data} onChange={(e) => setData(e.target.value)} rows={collect ? 2 : 3} placeholder="Вставте сюди отримані дані" style={{ ...ui.input, resize: "vertical", fontSize: 14, lineHeight: 1.5 }} />
+            <textarea value={data} onChange={(e) => setData(e.target.value)} rows={collect ? 2 : 3} placeholder="Вставте сюди отримані дані" style={{ ...ui.input, resize: "vertical", fontSize: 14, lineHeight: 1.5, borderColor: formatErr ? "#ff5b5b" : undefined }} />
+          )}
+          {collect && (
+            formatErr
+              ? <p style={{ ...ui.monoLabel, textTransform: "none", color: "#ff5b5b", marginTop: 6 }}>{formatErr}</p>
+              : <p style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)", marginTop: 6 }}>Формат: {collectHint(collect.field, collect.kind)}.</p>
           )}
         </>
       )}
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
-        <button onClick={done} disabled={pending} style={{ ...ui.btnAccent, opacity: pending ? 0.5 : 1 }}>{pending ? "…" : "Готово"}</button>
+        <button onClick={done} disabled={pending || !canSubmit} title={!canSubmit && collect ? "Впишіть дані у правильному форматі" : undefined} style={{ ...ui.btnAccent, opacity: pending || !canSubmit ? 0.5 : 1, cursor: !canSubmit ? "not-allowed" : "pointer" }}>{pending ? "…" : "Готово"}</button>
         {showInput && <span style={{ ...ui.monoLabel, textTransform: "none", color: "var(--muted)" }}>Дані збережуться в налаштування проєкту.</span>}
         {msg && <span style={{ ...ui.monoLabel, textTransform: "none", color: "#ff5b5b" }}>{msg}</span>}
       </div>

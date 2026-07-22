@@ -96,7 +96,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ key: s
         </div>
       )}
 
-      <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title, collects: !!g.collect_field }))} />
+      <ProjectGuides projectKey={key} guides={guides.map((g) => ({ id: g.id, title: g.title, collectField: g.collect_field }))} />
 
       <SpecsPanel projectKey={key} locale={locale} initialSpecs={listSpecs(proj.meta)} />
 

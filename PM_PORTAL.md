@@ -411,17 +411,21 @@ Lamb.dev всегда идёт **последним** во всех списка
 Гайд отдаётся клиенту **отдельной задачей**, которую админ создаёт в любой момент проекта (не пассивная страница/
 чекбокс). Клиент выполняет её индивидуально; при вводе данных или нажатии «Готово» — задача сразу в **Done**, а
 данные (токены/ссылки) попадают в настройки проекта. Создание уведомляет клиента в Telegram.
-- **Создание** — блок «Гайды клиенту» на странице проекта (`project-guides.tsx`): у каждого гайда кнопка
-  «Создать задачу». Server-action `createGuideTask(projectKey, guideId)` → `createTask` (постановщик = клиент,
-  `autoDone:true`, без исполнителя) + `setClientAction(taskId, prompt, guideId, guide.collect_field)` + пуш клиенту
-  (`notifyProjectClients` с кнопкой). Задача видна клиенту в секции «Потрібна ваша дія» (`clientAttention`).
-- **Выполнение** — `ClientActionBar` на странице задачи: показывает инструкцию (гайд `clientActionGuide`) + поле
-  ввода + «Готово». `markClientActionDone`: значение → `saveGuideCollectValue` (`clientGit` → `meta.clientGit`;
-  backed railway/vercel → `meta.clientDeploy/clientVercel`; каталог → `customFields`, видно разработчику в
-  `/api/dev/secrets`), задача (`autoDone`) → **Done**. Дев не дёргается («продовжуй» шлём только не-autoDone задачам).
-- **Сбор данных — в самом гайде.** `guides.collect_field`: `"clientGit"` или `"fieldKey.subKey"` каталога
-  `project-fields`. Редактор гайда (`/admin/guides`) — селект «Собирать данные» (`collectTargets()`). Гайд со сбором
-  помечен «· сбор данных» в блоке проекта.
+- **Создание** — блок «Гайды клиенту» на странице проекта (`project-guides.tsx`): у каждого гайда селект «Собрать:»
+  (поле проекта, куда уйдут данные) + кнопка «Создать задачу». Селект дефолтится на `guide.collect_field`, но
+  его можно переопределить при отправке. Server-action `createGuideTask(projectKey, guideId, collectField?)` →
+  `createTask` (постановщик = клиент, `autoDone:true`, без исполнителя) + `setClientAction(taskId, prompt, guideId, collect)`
+  (`collect` = выбор в блоке, иначе дефолт гайда) + пуш клиенту. Задача видна клиенту в секции «Потрібна ваша дія».
+- **Выполнение** — `ClientActionBar` на странице задачи: инструкция (гайд `clientActionGuide`) + поле ввода + «Готово».
+  Если задано поле сбора (`clientActionField`) — ввод **обязателен и валидируется по формату** (жёсткая блокировка кнопки
+  `validateCollectValue`/`collectHint` из `project-fields`: телеграм-токен `\d+:…`, git-url, email, GA-id и т.п.; под
+  полем — подсказка формата / красная ошибка). `markClientActionDone` дублирует проверку **на сервере** (мусор в обход UI
+  не пройдёт), затем значение → `saveGuideCollectValue` (`clientGit` → `meta.clientGit`; backed railway/vercel →
+  `meta.clientDeploy/clientVercel`; каталог → `customFields`, видно разработчику в `/api/dev/secrets`), задача
+  (`autoDone`) → **Done**. Дев не дёргается («продовжуй» шлём только не-autoDone задачам).
+- **Сбор данных — в гайде ИЛИ при отправке.** `guides.collect_field` (`"clientGit"` / `"fieldKey.subKey"` каталога
+  `project-fields`) = дефолт; селект «Собрать:» в блоке проекта переопределяет его на конкретную отправку. Форматы
+  проверок — реестр `BY_TARGET`/`BY_KIND` в `project-fields.ts` (пополняется рядом с полями каталога).
 - **Редактор тела гайда** (`guides-panel.tsx`) — как поле задачи/коммента: панель форматирования (жирный/курсив/код,
   заголовки H1–H3 = разные размеры, списки, ссылка) + загрузка картинок/файлов (кнопка, `Ctrl+V`, drag&drop →
   `uploadGuideImage` → `/api/guide-files/<id>`). Мультилокальность uk/ru/en (табы).

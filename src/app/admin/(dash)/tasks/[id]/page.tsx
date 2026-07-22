@@ -221,7 +221,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           taskId={task.id}
           action={task.clientAction}
           guide={clientGuide}
-          collect={(() => { const c = collectTarget(task.clientActionField); return c ? { label: c.label[locale], kind: c.kind } : null; })()}
+          collect={(() => { const c = collectTarget(task.clientActionField); return c ? { field: c.value, label: c.label[locale], kind: c.kind } : null; })()}
           showInput={!!task.clientActionField || !task.autoDone}
         />
       )}

@@ -58,13 +58,16 @@ export async function saveProjectGuides(projectKey: string, guideIds: number[]):
  * под задачей поле ввода, значение сохраняется в настройки проекта (см. markClientActionDone → saveGuideCollectValue).
  * autoDone: при выполнении/«Готово» задача сразу закрывается (это действие клиента, дев-работы нет). Admin.
  */
-export async function createGuideTask(projectKey: string, guideId: number): Promise<{ ok?: boolean; taskId?: string; error?: string }> {
+export async function createGuideTask(projectKey: string, guideId: number, collectField?: string | null): Promise<{ ok?: boolean; taskId?: string; error?: string }> {
   const me = await getPrincipal();
   if (!me || me.realRole !== "admin") return { error: "Нет прав" };
   const proj = await getProjectFull(projectKey);
   if (!proj) return { error: "Проект не найден" };
   const guide = await getGuide(guideId);
   if (!guide) return { error: "Гайд не найден" };
+  // Какое поле проекта соберёт клиент: явный выбор в блоке «Гайды клиенту» (может переопределить дефолт гайда),
+  // либо (если не передано) — collect_field, заданный в редакторе гайда. Пустая строка = «не собирать».
+  const collect = collectField === undefined ? (guide.collect_field ?? null) : (collectField || null);
   const be = getBackend();
   const clientLogin = await projectReporterLogin(projectKey);
   const task = await be.createTask({
@@ -78,13 +81,13 @@ export async function createGuideTask(projectKey: string, guideId: number): Prom
     clientVerifiable: false,
     internal: false,
   });
-  const prompt = guide.collect_field
+  const prompt = collect
     ? "Виконайте інструкцію та впишіть дані нижче."
     : "Виконайте інструкцію та натисніть «Готово».";
-  await setClientAction(task.id, prompt, guideId, guide.collect_field);
+  await setClientAction(task.id, prompt, guideId, collect);
   await notifyProjectClients(
     projectKey,
-    `📋 <b>Потрібна ваша дія</b> · ${await taskTag(task.id)}: ${guide.title}\nВідкрийте задачу — там інструкція${guide.collect_field ? " і поле для даних" : ""}.`,
+    `📋 <b>Потрібна ваша дія</b> · ${await taskTag(task.id)}: ${guide.title}\nВідкрийте задачу — там інструкція${collect ? " і поле для даних" : ""}.`,
     [], { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${task.id}` },
   ).catch(() => {});
   revalidatePath("/admin");

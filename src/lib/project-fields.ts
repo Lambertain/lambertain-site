@@ -133,3 +133,54 @@ export function collectTarget(value: string | null | undefined): CollectTarget |
   return collectTargets().find((t) => t.value === value);
 }
 
+// ——— Валидация значений, которые вписывает клиент (жёсткая: неверный формат → сохранить нельзя) ———
+// Модуль чистый (без server-only импортов) → используется и на клиенте (ClientActionBar), и на сервере.
+// Ключ правила — точная цель сбора (`clientGit` | `fieldKey.subKey`); фолбэк — по `kind` подполя.
+type Validator = { test: (v: string) => boolean; hint: string };
+
+const reUrl = /^https?:\/\/[^\s]+\.[^\s]{2,}/i;
+const reGit = /^(https?:\/\/[^\s]+|git@[^\s:]+:[^\s]+)$/i; // https://… или git@host:path
+const reEmail = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const reTgToken = /^\d{6,12}:[A-Za-z0-9_-]{30,}$/;   // 123456789:AA...(~35)
+const reGaId = /^(G|GT|UA|AW)-[A-Z0-9-]+$/i;         // Measurement/Ads ID
+const rePhone = /^\+?\d[\d\s()-]{6,}$/;
+
+// Точечные форматы (важные — то, что нельзя перепутать: токены/ключи/ссылки/почта).
+const BY_TARGET: Record<string, Validator> = {
+  "clientGit": { test: (v) => reGit.test(v), hint: "посилання на git-репозиторій (https://… або git@…)" },
+  "telegram.token": { test: (v) => reTgToken.test(v), hint: "токен бота виду 123456789:AA… (цифри, двокрапка, ~35 символів)" },
+  "telegram.handle": { test: (v) => /^@?[A-Za-z0-9_]{4,}$/.test(v), hint: "@юзернейм (латиниця, цифри, підкреслення)" },
+  "resend.apiKey": { test: (v) => /^re_[A-Za-z0-9_]{10,}$/.test(v), hint: "ключ Resend виду re_…" },
+  "resend.from": { test: (v) => reEmail.test(v), hint: "email-адреса відправника" },
+  "resend.managerInbox": { test: (v) => reEmail.test(v), hint: "email-адреса" },
+  "email.address": { test: (v) => reEmail.test(v), hint: "email-адреса" },
+  "cloudflare.email": { test: (v) => reEmail.test(v), hint: "email-адреса акаунта" },
+  "googleAnalytics.id": { test: (v) => reGaId.test(v), hint: "Measurement ID виду G-XXXXXXX" },
+  "whatsapp.phone": { test: (v) => rePhone.test(v), hint: "номер телефону" },
+  "viber.phone": { test: (v) => rePhone.test(v), hint: "номер телефону" },
+};
+
+// Фолбэк по типу подполя.
+const BY_KIND: Record<string, Validator> = {
+  url: { test: (v) => reUrl.test(v), hint: "посилання виду https://…" },
+  secret: { test: (v) => v.trim().length > 0 && !/\s/.test(v), hint: "токен/ключ без пробілів" },
+  text: { test: (v) => v.trim().length > 0, hint: "не порожнє значення" },
+};
+
+function ruleFor(targetValue: string, kind: string): Validator {
+  return BY_TARGET[targetValue] ?? BY_KIND[kind] ?? BY_KIND.text;
+}
+
+/** Подсказка ожидаемого формата для поля (показываем клиенту под инпутом). */
+export function collectHint(targetValue: string, kind: string): string {
+  return ruleFor(targetValue, kind).hint;
+}
+
+/** Проверка значения. Возвращает текст ошибки (укр., клиенту) или null, если формат верный / значение пустое. */
+export function validateCollectValue(targetValue: string, kind: string, value: string): string | null {
+  const v = (value ?? "").trim();
+  if (!v) return null; // пустое — не «неверный формат»; обязательность обеспечивает UI (кнопка выключена)
+  const rule = ruleFor(targetValue, kind);
+  return rule.test(v) ? null : `Невірний формат — очікується ${rule.hint}.`;
+}
+

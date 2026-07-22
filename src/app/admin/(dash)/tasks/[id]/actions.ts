@@ -10,6 +10,7 @@ import { notifyLogins, notifyProjectClients, notifyAdmin, attachmentIdsIn, taskT
 import { statusBucket } from "@/lib/statuses";
 import { clientStepFromAction, generateGuide } from "@/lib/handoff-classify";
 import { autoDeliverAndNotify } from "@/lib/auto-deliver";
+import { collectTarget, validateCollectValue } from "@/lib/project-fields";
 import { syncTaskToTrello, mirrorCommentToTrello } from "@/lib/trello";
 import { projectSpecText } from "@/lib/specs";
 import { revalidatePath } from "next/cache";
@@ -177,6 +178,12 @@ export async function markClientActionDone(taskId: string, data: string): Promis
   if (value) {
     const fk = task.clientActionField; // "clientGit" | "fieldKey.subKey" каталога — либо разовый секрет.
     if (fk === "clientGit" || (fk && fk.includes("."))) {
+      // Серверная защита формата (в обход UI): мусор не должен попасть в поле проекта.
+      const t = collectTarget(fk);
+      if (t) {
+        const err = validateCollectValue(t.value, t.kind, value);
+        if (err) return { error: err };
+      }
       // clientGit → meta.clientGit; backed (railway/vercel) → meta.clientDeploy/clientVercel; каталог → customFields.
       await saveGuideCollectValue(projectKey, fk, value);
     } else {
