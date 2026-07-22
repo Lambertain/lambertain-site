@@ -15,7 +15,8 @@ import { reportPollError, clearPollError } from "@/lib/task-error";
 import { syncPrReview } from "@/lib/pr-review-sync";
 import { computeProjectRepoSync, invalidateSyncCache } from "@/lib/repo-sync";
 import { autoDeliverIfConfigured } from "@/lib/deliver";
-import { notifyAdmin } from "@/lib/notify";
+import { notifyAdmin, notifyLogins, taskTag } from "@/lib/notify";
+import { getBackend } from "@/lib/tasks";
 import { ghFetchRetry, GitHubError, githubCoreRemaining } from "@/lib/github";
 
 function bearer(req: Request): string | null {
@@ -30,14 +31,45 @@ function parsePr(prUrl: string): { owner: string; repo: string; num: string } | 
   return m ? { owner: m[1], repo: m[2], num: m[3] } : null;
 }
 
-/** Смержен ли PR. Бросает при ошибке сети/доступа (чтобы её было видно, а не молча проглотить). */
-async function prMerged(prUrl: string): Promise<boolean> {
+/** Состояние PR: смержен ли + mergeable_state ('clean'|'dirty'|'behind'|'blocked'|'unknown'|…).
+ *  'dirty' = конфликт слияния (мог появиться ПОСЛЕ открытия PR — напр. смержили соседнюю задачу в develop).
+ *  Бросает при ошибке сети/доступа (чтобы её было видно, а не молча проглотить). */
+async function prState(prUrl: string): Promise<{ merged: boolean; mergeableState: string | null }> {
   const p = parsePr(prUrl);
   if (!p) throw new Error(`не GitHub PR URL: ${prUrl}`);
   const r = await ghFetchRetry(`https://api.github.com/repos/${p.owner}/${p.repo}/pulls/${p.num}`, { headers: GH, cache: "no-store" });
   if (!r.ok) throw new GitHubError(r.status, `GitHub ${r.status} GET pull #${p.num}: ${(await r.text()).slice(0, 200)}`);
-  const j = (await r.json()) as { merged?: boolean; merged_at?: string | null };
-  return !!(j.merged || j.merged_at);
+  const j = (await r.json()) as { merged?: boolean; merged_at?: string | null; mergeable_state?: string | null };
+  return { merged: !!(j.merged || j.merged_at), mergeableState: j.mergeable_state ?? null };
+}
+
+/**
+ * Уведомить разработчика, если уже ОТКРЫТЫЙ PR стал конфликтным (mergeable_state='dirty') — конфликт появился
+ * ПОСЛЕ сдачи (напр. смержили соседнюю задачу в develop). Гейт при сдаче такое не ловит (он на момент сдачи).
+ * Дедуп через флаг в poller_state: уведомляем ОДИН раз при переходе в конфликт, снимаем флаг когда PR снова
+ * чист/смержен → при новом конфликте уведомим снова. 'behind'/'blocked'/'unknown'/null — НЕ конфликт (ветка
+ * просто отстала или GitHub ещё считает) — не тревожим. Статус задачи не трогаем (она в Review, ждёт мержа).
+ */
+async function warnPrConflicts(taskId: string, prs: string[], states: { merged: boolean; mergeableState: string | null }[]): Promise<void> {
+  for (let i = 0; i < prs.length; i++) {
+    const prUrl = prs[i], s = states[i];
+    const flagKey = `prdirty:${prUrl}`;
+    if (s.merged || s.mergeableState === "clean") {
+      if (await getState(flagKey).catch(() => null)) await setState(flagKey, "").catch(() => {}); // конфликт ушёл — снять флаг
+      continue;
+    }
+    if (s.mergeableState !== "dirty") continue; // не конфликт (behind/blocked/unknown/null) — GitHub ещё считает или ветка отстала
+    if (await getState(flagKey).catch(() => null)) continue; // уже уведомили про этот конфликт
+    await setState(flagKey, "1").catch(() => {});
+    const repo = prUrl.replace("https://github.com/", "").replace(/\/pull\/\d+$/, "");
+    const body = `⚠️ <b>PR став конфліктним</b>\n\nPR у <code>${repo}</code> більше не зливається з клієнтським <code>develop</code> — імовірно, змержили сусідню задачу. Потрібен ребейз: <code>git fetch origin</code> → <code>git rebase origin/client-sync/develop</code> → виріши конфлікти → <code>git push -f</code>.\n${prUrl}`;
+    await getBackend().addComment(taskId, body, "internal", undefined, true, false).catch(() => {});
+    const task = await getBackend().getTask(taskId).catch(() => null);
+    const dev = task?.assignee?.login;
+    const btn = { text: "Відкрити PR", url: prUrl };
+    if (dev) await notifyLogins([dev], `⚠️ <b>${await taskTag(taskId)}</b>: PR став конфліктним — потрібен ребейз на свіжий develop`, [], btn).catch(() => {});
+    else await notifyAdmin(`⚠️ <b>${await taskTag(taskId)}</b>: PR став конфліктним (${repo}), розробника не призначено`, btn).catch(() => {});
+  }
 }
 
 /**
@@ -72,8 +104,11 @@ export async function POST(req: Request) {
   for (const t of prTasks) {
     const key = `ghfail:merge:${t.readable_id}`;
     try {
-      const merged = await Promise.all(t.prs.map(prMerged));
-      if (merged.every(Boolean)) { await advanceStage(t.readable_id, "dev", t.prs.length > 1 ? "усі PR змержені в develop" : "PR змержено в develop"); promotedToDev++; }
+      const states = await Promise.all(t.prs.map(prState));
+      if (states.every((s) => s.merged)) { await advanceStage(t.readable_id, "dev", t.prs.length > 1 ? "усі PR змержені в develop" : "PR змержено в develop"); promotedToDev++; }
+      // Мониторинг конфликтов уже открытых PR: PR был чист при сдаче, но стал конфликтным позже (напр. смержили
+      // соседнюю задачу в develop). Гейт при сдаче такое не ловит — сообщаем разработчику здесь, чтобы ребейзнул.
+      await warnPrConflicts(t.readable_id, t.prs, states);
       await clearPollError(key);
     } catch (e) {
       await reportPollError(key, t.readable_id, "перевірка мержу PR (pr→dev)", e);
