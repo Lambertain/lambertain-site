@@ -1614,6 +1614,41 @@ export async function createNotification(recipientTgId: number, opts: { taskId?:
   );
 }
 
+export interface PendingNotifRow { id: number; project_key: string; roles: string; text: string; button_text: string | null; button_url: string | null; created_at: string }
+
+/**
+ * Отложить клиентское уведомление проекта, когда получателей ещё нет (клиент/сотрудник не подключён к боту) —
+ * досылается при его присоединении (flushPendingForClient). Одинаковый текст по проекту повторно не копим.
+ */
+export async function enqueuePendingNotification(projectKey: string, text: string, button?: { text: string; url: string } | null, roles = "client,employee"): Promise<void> {
+  const dup = await q<{ id: number }>(
+    "SELECT id FROM pending_notifications WHERE project_key = $1 AND text = $2 AND delivered_at IS NULL LIMIT 1",
+    [projectKey, text],
+  ).catch(() => [] as { id: number }[]);
+  if (dup.length) return;
+  await q(
+    "INSERT INTO pending_notifications (project_key, roles, text, button_text, button_url) VALUES ($1,$2,$3,$4,$5)",
+    [projectKey, roles, text, button?.text ?? null, button?.url ?? null],
+  ).catch(() => {});
+}
+
+/**
+ * Забрать и атомарно «застолбить» (delivered_at=now) отложенные уведомления проекта для присоединившейся роли.
+ * `FOR UPDATE SKIP LOCKED` + пометка в одном стейтменте → повторный/конкурентный вызов не выдаст те же строки дважды.
+ */
+export async function takePendingNotifications(projectKey: string, role: string): Promise<PendingNotifRow[]> {
+  return q<PendingNotifRow>(
+    `UPDATE pending_notifications SET delivered_at = now()
+       WHERE id IN (
+         SELECT id FROM pending_notifications
+          WHERE project_key = $1 AND delivered_at IS NULL AND $2 = ANY(string_to_array(roles, ','))
+          ORDER BY created_at
+          FOR UPDATE SKIP LOCKED )
+     RETURNING id, project_key, roles, text, button_text, button_url, created_at`,
+    [projectKey, role],
+  ).catch(() => [] as PendingNotifRow[]);
+}
+
 export async function listUnreadNotifications(recipientTgId: number): Promise<Notification[]> {
   return q<Notification>(
     `SELECT id, task_id, project_key, title, link, count, created_at FROM notifications

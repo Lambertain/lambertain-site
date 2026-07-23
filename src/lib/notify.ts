@@ -1,5 +1,5 @@
 /** Отправка уведомлений в Telegram (адресно по ролям + картинки). Server-side only. */
-import { q, getAttachment, logNotification, createNotification, wasRecentlyNotified } from "./db";
+import { q, getAttachment, logNotification, createNotification, wasRecentlyNotified, enqueuePendingNotification, takePendingNotifications } from "./db";
 import { PUBLIC_SITE, PORTAL_BASE } from "./dev-protocol";
 
 /** Кнопка-ссылка под сообщением. */
@@ -189,7 +189,37 @@ export async function notifyLogins(logins: string[], text: string, attachmentIds
 
 /** Уведомить клиента/сотрудника проекта. Возвращает число получателей (0 → клиент не подключён к боту). */
 export async function notifyProjectClients(projectKey: string, text: string, attachmentIds: number[] = [], button?: LinkButton, excludeTgId?: number): Promise<number> {
-  return sendWithImages(await tgIdsForProject(projectKey, ["client", "employee"]), text, attachmentIds, button, excludeTgId);
+  const ids = await tgIdsForProject(projectKey, ["client", "employee"]);
+  const n = await sendWithImages(ids, text, attachmentIds, button, excludeTgId);
+  // Никого из клиентов/сотрудников проекта нет в боте → не теряем событие: откладываем до его присоединения.
+  if (ids.length === 0) await enqueuePendingNotification(projectKey, text, button).catch(() => {});
+  return n;
+}
+
+/**
+ * Досыл отложенных клиентских уведомлений присоединившемуся клиенту/сотруднику: пока он не был подключён к боту,
+ * события копились (enqueuePendingNotification); при привязке доставляем их (пуш + колокольчик) в хронологическом
+ * порядке по каждому его проекту. Возвращает число досланных. Вызывать после создания tg-привязки.
+ */
+export async function flushPendingForClient(tgId: number, role: string, projectKeys: string[]): Promise<number> {
+  let sent = 0;
+  for (const pk of projectKeys.filter(Boolean)) {
+    const rows = await takePendingNotifications(pk, role);
+    for (const r of rows) {
+      const button = r.button_url ? { text: r.button_text || "Відкрити", url: r.button_url } : undefined;
+      await sendWithImages([tgId], r.text, attachmentIdsIn(r.text), button);
+      sent++;
+    }
+  }
+  return sent;
+}
+
+/** То же по логину (когда tg_id под рукой нет): резолвит привязку и досылает. Для уже привязанного участника,
+ *  которого добавили в новый проект с накопленными уведомлениями. */
+export async function flushPendingForLogin(login: string, role: string, projectKeys: string[]): Promise<number> {
+  let sent = 0;
+  for (const tgId of await tgIdsForLogins([login])) sent += await flushPendingForClient(tgId, role, projectKeys);
+  return sent;
 }
 
 /** Привязан ли к боту хоть один клиент/сотрудник проекта (т.е. дойдёт ли до клиента уведомление). */
@@ -198,12 +228,13 @@ export async function hasLinkedClient(projectKey: string): Promise<boolean> {
 }
 
 /**
- * Предупредить команду (постановщика-разработчика + админа), что клиентское уведомление НЕ доставлено —
- * клиент проекта не подключён к боту. Иначе разработчик ждёт ответа по задаче, которую клиент не видел.
+ * Предупредить команду (постановщика-разработчика + админа), что клиент ещё не подключён к боту.
+ * Уведомление не потеряно — оно отложено (pending_notifications) и будет доставлено автоматически при
+ * присоединении клиента; предупреждение нужно, чтобы разработчик знал, почему клиент пока молчит по задаче.
  */
 export async function warnClientUnreachable(projectKey: string, taskId: string, summary: string, devLogin?: string | null): Promise<void> {
   const btn = { text: "Відкрити задачу", url: `${PORTAL_BASE}/admin/tasks/${taskId}` };
-  const msg = `⚠️ <b>Клієнт не отримав сповіщення</b> · ${await taskTag(taskId)}: ${summary}\nКлієнт проєкту «${projectKey}» не підключений до бота — повідомлення не доставлено. Зв'яжіться з ним напряму.`;
+  const msg = `⚠️ <b>Клієнт ще не приєднався</b> · ${await taskTag(taskId)}: ${summary}\nКлієнт проєкту «${projectKey}» не підключений до бота — сповіщення відкладено й буде доставлено автоматично, щойно він приєднається.`;
   await notifyAdmin(msg, btn).catch(() => {});
   if (devLogin) await notifyLogins([devLogin], msg, [], btn).catch(() => {});
 }

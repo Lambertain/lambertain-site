@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/principal";
 import { generateInvite } from "@/lib/invites";
 import { upsertLink, upsertMember, deleteAccessRequest, setDevProjects, createProject, generateProjectKey, renameMember, setLinkProject, setMemberProjects, deleteMember, getUserProjectKeys, reassignNullReporterToClient, setMemberRole } from "@/lib/db";
 import { getBackend } from "@/lib/tasks";
-import { sendTo } from "@/lib/notify";
+import { sendTo, flushPendingForClient, flushPendingForLogin } from "@/lib/notify";
 import { notifyProjectOnboarding } from "@/lib/onboarding-notify";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
@@ -72,6 +72,7 @@ export async function approveAccess(
     await sendTo(tgId, "✅ Доступ открыт. Откройте PM-портал через меню бота — теперь вы авторизованы.");
     // Онбординг по проекту: разработчику — задачи в работе; клиенту/сотруднику — что уже выполнено.
     if (projectKey) await notifyProjectOnboarding(login, role, [projectKey]).catch(() => {});
+    if ((role === "client" || role === "employee") && projectKey) await flushPendingForClient(tgId, role, [projectKey]).catch(() => {});
     if (role === "client" && projectKey) await reassignNullReporterToClient(projectKey).catch(() => {});
     revalidatePath("/admin/team");
     return { ok: true };
@@ -100,6 +101,7 @@ export async function saveUserProjects(login: string, keys: string[]): Promise<{
     // Онбординг ТОЛЬКО по добавленным проектам: разработчику — задачи в работе; клиенту/сотруднику — что уже выполнено.
     const added = keys.filter((k) => !before.includes(k));
     if (user?.role && added.length) await notifyProjectOnboarding(login, user.role, added).catch(() => {});
+    if ((user?.role === "client" || user?.role === "employee") && added.length) await flushPendingForLogin(login, user.role, added).catch(() => {});
     // Клиент привязан к проекту → задачи, поставленные мной, переводим на него постановщиком.
     if (user?.role === "client") for (const k of added) await reassignNullReporterToClient(k).catch(() => {});
     revalidatePath("/admin/team");

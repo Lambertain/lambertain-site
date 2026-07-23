@@ -285,6 +285,19 @@ CREATE TABLE IF NOT EXISTS notifications (
   read_at         TIMESTAMPTZ);
 CREATE INDEX IF NOT EXISTS notifications_recipient_unread ON notifications (recipient_tg_id) WHERE read_at IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS notifications_unread_task ON notifications (recipient_tg_id, task_id) WHERE read_at IS NULL AND task_id IS NOT NULL;
+-- Отложенные клиентские уведомления: копятся, когда в момент события к боту НЕ подключён ни один
+-- клиент/сотрудник проекта (иначе пуш терялся). Досылаются при его присоединении (flushPendingForClient):
+-- пуш в Telegram + запись в колокольчик, в хронологическом порядке. roles — на какие роли рассчитано событие.
+CREATE TABLE IF NOT EXISTS pending_notifications (
+  id           SERIAL PRIMARY KEY,
+  project_key  TEXT NOT NULL,
+  roles        TEXT NOT NULL DEFAULT 'client,employee',
+  text         TEXT NOT NULL,
+  button_text  TEXT,
+  button_url   TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  delivered_at TIMESTAMPTZ);
+CREATE INDEX IF NOT EXISTS idx_pending_notif_project ON pending_notifications (project_key) WHERE delivered_at IS NULL;
 -- Страховка от дублей номеров задач (основная защита — advisory-lock в createTask).
 -- best-effort: если в проде уже есть дубль (project_id, num) — индекс не создастся, но миграция не упадёт.
 DO $$ BEGIN

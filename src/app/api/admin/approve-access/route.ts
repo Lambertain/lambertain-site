@@ -6,7 +6,7 @@
  */
 import { NextResponse } from "next/server";
 import { approveAccessRequest } from "@/lib/db";
-import { sendTo } from "@/lib/notify";
+import { sendTo, flushPendingForClient } from "@/lib/notify";
 import { readJsonSmart } from "@/lib/req-body";
 import { revalidatePath } from "next/cache";
 import type { Role } from "@/lib/tasks/types";
@@ -31,6 +31,8 @@ export async function POST(req: Request) {
   const res = await approveAccessRequest(tgId, projectKey, role);
   if ("error" in res) return NextResponse.json(res, { status: 404 });
   await sendTo(tgId, "✅ Доступ открыт. Откройте PM-портал через меню бота — теперь вы авторизованы.").catch(() => {});
+  // Досылаем накопившиеся уведомления проекта (пока клиент/сотрудник не был подключён к боту).
+  if ((res.role === "client" || res.role === "employee") && projectKey) await flushPendingForClient(tgId, res.role, [projectKey]).catch(() => {});
   revalidatePath("/admin/team");
   return NextResponse.json({ ok: true, ...res, projectKey });
 }

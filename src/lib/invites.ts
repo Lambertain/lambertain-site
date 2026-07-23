@@ -5,7 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { createInvite, getInvite, markInviteUsed, upsertLink, upsertMember, setDevProjects, setMemberProjects, setProjectShowOnboarding, setProjectOnboardingSet, deleteAccessRequest, reassignNullReporterToClient, getLinkRoleByTgId } from "./db";
-import { notifyAdmin, notifyLogins } from "./notify";
+import { notifyAdmin, notifyLogins, flushPendingForClient } from "./notify";
 import { notifyProjectOnboarding } from "./onboarding-notify";
 import { t, normalizeLocale, DEFAULT_LOCALE } from "./i18n";
 import type { Role } from "./tasks/types";
@@ -85,5 +85,7 @@ export async function redeemInvite(token: string, user: TgUser): Promise<boolean
   // Онбординг по проектам: разработчику — сколько задач в работе; клиенту/сотруднику — что уже выполнено
   // (если задачи закрыли до его добавления — иначе он этого не увидит).
   if (keys.length) await notifyProjectOnboarding(login, role, keys).catch(() => {});
+  // Досылаем клиенту/сотруднику уведомления, накопившиеся пока он не был подключён к боту.
+  if ((role === "client" || role === "employee") && keys.length) await flushPendingForClient(user.id, role, keys).catch(() => {});
   return true;
 }
