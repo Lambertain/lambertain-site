@@ -45,7 +45,8 @@ export async function GET(req: Request) {
 
 /**
  * Установить флаги режима доставки проекта (merge в meta).
- * POST /api/admin/project/config  { projectKey, gitflowDelivery?, autoDeliver?, clientDeliverPR?, clientAutoMigrate?, autoApprove?, deliverBranch? }
+ * POST /api/admin/project/config  { projectKey, gitflowDelivery?, autoDeliver?, clientDeliverPR?, clientAutoMigrate?, autoApprove?, deliverBranch?, sheetId? }
+ *   sheetId — ID Google-таблиці обліку задач (авто-оновлення поллером через /api/admin/sheet-sync); "" прибирає.
  */
 export async function POST(req: Request) {
   const expected = process.env.ADMIN_API_TOKEN;
@@ -65,6 +66,15 @@ export async function POST(req: Request) {
     if (typeof b[f] === "boolean") { meta[f] = (b[f] as boolean) || undefined; set[f] = b[f]; }
   }
   if (typeof b.deliverBranch === "string") { meta.deliverBranch = (b.deliverBranch as string).trim() || undefined; set.deliverBranch = meta.deliverBranch ?? null; }
+  // ID Google-таблиці обліку задач (авто-оновлення через /api/admin/sheet-sync + поллер). "" — прибрати.
+  if (typeof b.sheetId === "string") {
+    const cf = { ...(meta.customFields ?? {}) };
+    const id = (b.sheetId as string).trim();
+    if (id) cf.sheet = { ...(cf.sheet ?? {}), id };
+    else delete cf.sheet;
+    meta.customFields = cf;
+    set.sheetId = id || null;
+  }
   // Клиентский Railway-деплой (для авто-апрува деплоя порталом): railwayToken + projectId/environmentId/serviceId (+ pgServiceId).
   if (b.clientDeploy && typeof b.clientDeploy === "object") {
     const cd = b.clientDeploy as Record<string, unknown>;

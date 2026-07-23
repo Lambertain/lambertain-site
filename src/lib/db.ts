@@ -913,6 +913,14 @@ export async function listPrStageTasksMulti(): Promise<{ readable_id: string; pr
        WHERE t.deploy_stage='pr' GROUP BY t.readable_id`,
   );
 }
+/** Все PR проекта (по строке на PR, любая стадия) — для авто-обліку в Google-таблице (sheet-sync). */
+export async function listTaskPrs(projectKey: string): Promise<{ readable_id: string; pr_url: string }[]> {
+  return q<{ readable_id: string; pr_url: string }>(
+    `SELECT t.readable_id, tp.pr_url FROM tasks t JOIN task_prs tp ON tp.task_id=t.id
+       WHERE t.readable_id LIKE $1 ORDER BY t.readable_id`,
+    [projectKey + "-%"],
+  );
+}
 /** PR (список) задач в стадии 'dev' — для синка «все доехали до main клиента» → prod. */
 export async function listDevStageTasksMulti(): Promise<{ readable_id: string; prs: string[] }[]> {
   return q<{ readable_id: string; prs: string[] }>(

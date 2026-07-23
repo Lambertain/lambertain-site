@@ -268,8 +268,21 @@ async function runDeploySync() {
   } catch (e) { console.error("deploy-sync", e.message); }
 }
 
+/** Авто-обновление Google-таблицы учёта задач проектов (эндпоинт сам троттлит ~15 мин). */
+async function runSheetSync() {
+  if (!ADMIN_TOKEN || DRY) return;
+  try {
+    const r = await fetch(`${PORTAL_BASE}/api/admin/sheet-sync`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${ADMIN_TOKEN}`, "Content-Type": "application/json" },
+    });
+    if (!r.ok) console.error("sheet-sync", r.status, (await r.text()).slice(0, 120));
+  } catch (e) { console.error("sheet-sync", e.message); }
+}
+
 async function cycle() {
   if (flag("DEPLOY_SYNC")) await runDeploySync().catch((e) => console.error("deploy-sync:", e.message));
+  if (flag("SHEET_SYNC")) await runSheetSync().catch((e) => console.error("sheet-sync:", e.message));
   if (flag("NOTIFY_TOKENS")) await checkTokenDigest().catch((e) => console.error("tokens:", e.message));
   if (flag("REMIND_APPROVALS")) await remindSuperAdmin().catch((e) => console.error("remind:", e.message));
   if (flag("REMIND_ASSIGNEES")) await remindAssignees().catch((e) => console.error("remind-assignees:", e.message));
