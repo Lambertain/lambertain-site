@@ -64,7 +64,8 @@ function statusText(state: string | undefined, back?: PrState, app?: PrState): s
 
 async function syncProject(key: string, meta: import("@/lib/tasks/types").ProjectMeta, sheetId: string): Promise<{ key: string; rows: number; trelloFilled: number }> {
   const be = getBackend();
-  const tasks = await be.listTasks({ projectKey: key });
+  // Тільки клієнт-видимі задачі — внутрішні (розробник↔адмін) у клієнтський облік не потрапляють.
+  const tasks = (await be.listTasks({ projectKey: key })).filter((t) => !t.internal);
 
   // PR-и по задачах
   const prRows = await listTaskPrs(key);
