@@ -37,7 +37,13 @@
 - Menu button → `https://lambertain-site-production.up.railway.app/tma`.
 
 ## Доступы
-Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL` (локальная дев-БD `localhost:5434`), `DATABASE_PUBLIC_URL` (прод-БД портала через TCP-proxy), `GITHUB_TOKEN`, `ADMIN_API_TOKEN`. Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
+Все секреты — в `.env.local` (в git не попадает): `RAILWAY_TOKEN`, `ANTHROPIC_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ADMIN_PASSWORD`, `SESSION_SECRET`, `DATABASE_URL` (локальная дев-БD `localhost:5434`), `DATABASE_PUBLIC_URL` (прод-БД портала через TCP-proxy), `GITHUB_TOKEN`, `ADMIN_API_TOKEN`, `GOOGLE_SA_JSON` (сервис-акаунт для sheet-sync, только на Railway web-сервисе). Прод-значения — в env Railway. Полный список — в PM_PORTAL.md.
+
+## Авто-учёт задач в Google-таблице (sheet-sync)
+Портал сам держит клиентскую Google-таблицу учёта задач актуальной. Config-driven, переиспользуемо для любого проекта:
+- Включить: `POST /api/admin/project/config { projectKey, sheetId }` → пишет `meta.customFields.sheet.id`. SA-акаунт (`GOOGLE_SA_JSON`) должен быть Редактором таблицы.
+- Логика: `POST /api/admin/sheet-sync` (`ADMIN_API_TOKEN`) — для всех проектов с `sheet.id` собирает строки (задача/назва/Trello №/PR бек+фронт/дата на тест/статус) из БД+GitHub+Trello и пишет ТОЛЬКО значения (формат таблицы правится вручную и сохраняется). Только не-internal задачи. Self-throttle ~15 мин, `?force=1` — сразу.
+- Триггер: воркер `poller` (флаг `SHEET_SYNC`, дефолт вкл.) — как `deploy-sync`. Клиент `node:crypto` (JWT RS256) в `src/lib/sheet.ts`, без npm-зависимостей.
 
 ## Создание задач по API (для Claude/скриптов — без доступа к БД)
 `POST /api/admin/create-task`, заголовок `Authorization: Bearer $ADMIN_API_TOKEN` (значение — в `.env.local`).
